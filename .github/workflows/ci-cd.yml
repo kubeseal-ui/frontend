@@ -1,4 +1,14 @@
-name: Frontend CI/CD Pipeline
+name: CI/CD Pipeline
+
+# Verbatim copy of pamawas-correlator ci-cd.yml with kubeseal-ui adaptations:
+#  - Go replaced by Node 26 (the kubeseal-ui frontend toolchain)
+#  - Image name uses the pamawas expression
+#    ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+#    which resolves to ghcr.io/kubeseal-ui/frontend for this repo
+#  - Test job runs npm test + npm run lint (no codecov yet — add when a
+#    coverage reporter is wired into vitest)
+# Everything else (branch gates, action versions, security scan, release job)
+# is identical to pamawas-correlator.
 
 on:
   push:
@@ -53,10 +63,10 @@ jobs:
       run: ls -la dist
 
   docker:
-    name: Build & Push Docker Image (Frontend)
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push'
     permissions:
       contents: read
       packages: write
