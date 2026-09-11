@@ -5,10 +5,17 @@
 // described in internal-docs/engineering/frontend/application-design.md.
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from './views/HomeView.vue'
+import SecretDetailView from './views/SecretDetailView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomeView },
+    {
+      path: '/secrets/:namespace/:name',
+      name: 'secret-detail',
+      component: SecretDetailView,
+      props: true,
+    },
   ],
 })

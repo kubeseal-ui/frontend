@@ -1,7 +1,6 @@
 // Smoke test for the kubeseal-ui frontend router.
 //
-// MVP only exposes a single "/" route mapping to HomeView. This test pins
-// that contract so a future refactor cannot silently drop it.
+// MVP only exposes a single "home" route. Phase 3 adds the secret detail route.
 import { describe, it, expect } from 'vitest'
 import { router } from '../router'
 
@@ -10,6 +9,12 @@ describe('router', () => {
     const home = router.getRoutes().find((r) => r.name === 'home')
     expect(home).toBeDefined()
     expect(home?.path).toBe('/')
+  })
+
+  it('exposes the secret detail route at /secrets/:namespace/:name', () => {
+    const secretDetail = router.getRoutes().find((r) => r.name === 'secret-detail')
+    expect(secretDetail).toBeDefined()
+    expect(secretDetail?.path).toBe('/secrets/:namespace/:name')
   })
 
   it('resolves "/" to the home route', async () => {
