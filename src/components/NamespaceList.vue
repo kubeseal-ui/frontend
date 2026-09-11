@@ -6,7 +6,7 @@ interface Props {
   namespaces: Namespace[]
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 </script>
 
 <template>
