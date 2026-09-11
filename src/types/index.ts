@@ -43,4 +43,5 @@ export interface SealedSecretSummary {
 
 export interface SealedSecretDetail extends SealedSecretSummary {
   yaml?: string
+  sealed_secret_yaml?: string
 }
