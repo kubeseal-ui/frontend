@@ -1,88 +1,16 @@
-<script lang="ts" setup>
-import { ref, onMounted, watch } from 'vue'
+<script setup lang="ts">
+import { onMounted, ref, watch } from 'vue'
+import { NAlert, NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NSpin, NTag } from 'naive-ui'
 import { useRoute, useRouter } from 'vue-router'
 import { useSecretsStore } from '@/stores/secrets'
-import { useAuthStore } from '@/stores/auth'
-import type { SealedSecretDetail } from '@/stores/secrets'
 
-const route = useRoute()
-const router = useRouter()
-const secretsStore = useSecretsStore()
-const authStore = useAuthStore()
-
-const loading = ref(true)
-
-onMounted(async () => {
-  const namespace = route.params.namespace as string
-  const name = route.params.name as string
-
-  if (!namespace || !name) return
-
-  try {
-    await secretsStore.fetchDetail(namespace, name)
-  } catch (e) {
-    console.error('Failed to load secret:', e)
-  } finally {
-    loading.value = false
-  }
-})
-
-watch(
-  () => route.params,
-  async () => {
-    loading.value = true
-    const namespace = route.params.namespace as string
-    const name = route.params.name as string
-    if (namespace && name) {
-      await secretsStore.fetchDetail(namespace, name)
-    }
-    loading.value = false
-  }
-)
-
-function goBack() {
-  router.push('/')
-}
-
-function getDriftClass(drift: string): string {
-  if (drift === 'diverged') return 'text-red-600'
-  if (drift === 'in-sync') return 'text-green-600'
-  return 'text-gray-600'
-}
+const route = useRoute(); const router = useRouter(); const store = useSecretsStore(); const loading = ref(true); const error = ref('')
+function namespace() { return String(route.params.namespace) } function name() { return String(route.params.name) }
+async function load() { loading.value = true; error.value = ''; try { await store.fetchDetail(namespace(), name()) } catch (e) { error.value = e instanceof Error ? e.message : 'Unable to load secret metadata' } finally { loading.value = false } }
+function driftStatus() { const git = store.currentDetail?.git; return git?.drift || (git?.in_sync_with_live ? 'in-sync' : 'unknown') }
+onMounted(load); watch(() => [route.params.namespace, route.params.name], load)
 </script>
 
 <template>
-  <div class="p-4 max-w-2xl mx-auto">
-    <button @click="goBack" class="mb-4 text-blue-600 hover:underline">
-      &larr; Back to namespaces
-    </button>
-
-    <div v-if="loading" class="text-center">Loading...</div>
-
-    <div v-else-if="secretsStore.currentDetail" class="space-y-4">
-      <div class="bg-white p-4 rounded shadow">
-        <h1 class="text-xl font-bold">{{ secretsStore.currentDetail.name }}</h1>
-        <p class="text-sm text-gray-600">Namespace: {{ secretsStore.currentDetail.namespace }}</p>
-      </div>
-
-      <div v-if="secretsStore.currentDetail.git.in_sync_with_live === false" class="bg-yellow-50 p-4 rounded border border-yellow-200">
-        <p class="text-yellow-800">
-          Git-managed file is out of sync with live cluster state.
-        </p>
-        <p class="text-xs text-yellow-700 mt-1">
-          Path: {{ secretsStore.currentDetail.git.file_path }}<br />
-          Base commit: {{ secretsStore.currentDetail.git.base_commit || 'none' }}
-        </p>
-      </div>
-
-      <SecretKeyEditor
-        :detail="secretsStore.currentDetail"
-        @patch="() => { /* handled in parent */ }"
-      />
-    </div>
-
-    <div v-else class="text-center text-gray-500">
-      Secret not found
-    </div>
-  </div>
+  <main id="main-content" class="page-content detail-page"><NButton text @click="router.push({ name: 'namespace', params: { namespace: namespace() } })">← Back to namespace</NButton><NSpin :show="loading"><NAlert v-if="error" type="error" title="Could not load SealedSecret"><p>{{ error }}</p><NButton secondary @click="load">Retry</NButton></NAlert><NEmpty v-else-if="!store.currentDetail" description="SealedSecret not found"/><template v-else><div class="hero compact"><div><NTag size="small">{{ store.currentDetail.scope || 'strict' }}</NTag><h1>{{ store.currentDetail.name }}</h1><p>{{ store.currentDetail.namespace }} · {{ store.currentDetail.key_count }} encrypted keys</p></div></div><NAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync">Status: {{ driftStatus() }}. Editing remains unavailable until a later phase verifies the source.</NAlert><NCard title="Metadata" segmented><NDescriptions label-placement="left" :column="1"><NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem><NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem><NDescriptionsItem label="Keys"><span v-for="key in store.currentDetail.keys" :key="key" class="metadata-key">{{ key }}</span></NDescriptionsItem><NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem><NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem><NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem></NDescriptions><NAlert type="info" title="Encrypted metadata only">Phase 1 and 2 do not reveal or modify existing secret values.</NAlert></NCard></template></NSpin></main>
 </template>

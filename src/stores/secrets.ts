@@ -1,90 +1,61 @@
-// Secrets store: metadata, encrypted diffs, and delivery results only.
 import { defineStore } from 'pinia'
 import { api } from '@/api'
-import type { Capability } from '@/stores/auth'
-
-export interface GitState {
-  managed: boolean
-  in_sync_with_live: boolean
-  drift: string // "in-sync", "diverged", or "unknown"
-  base_commit: string
-  file_path: string
-  delivery_mode: 'direct' | 'proposal'
-}
-
-// SealedSecretDetail matches the backend API response for a single secret detail.
-// The backend returns: name, namespace, scope, keys, key_count, created_at, git, sealed_secret_yaml.
-export interface SealedSecretDetail {
-  name: string
-  namespace: string
-  keys: string[]
-  key_count: number
-  created_at: string
-  scope?: string
-  yaml?: string
-  git: GitState
-  capabilities?: Capability[]
-}
-
-// Backend API response for secret list items (metadata-only, no yaml).
-export interface SealedSecretSummary {
-  name: string
-  namespace: string
-  scope?: string
-  key_count: number
-  created_at: string
-  git: GitState
-}
+import type { SealedSecretDetail, SealedSecretSummary, Namespace } from '@/types'
+export type { SealedSecretDetail, SealedSecretSummary } from '@/types'
 
 export const useSecretsStore = defineStore('secrets', {
   state: () => ({
+    namespaces: [] as Namespace[],
+    secrets: [] as SealedSecretSummary[],
     currentDetail: null as SealedSecretDetail | null,
-    currentDiff: null as { before: string; after: string; checksum: string } | null,
+    loading: false,
+    error: null as Error | null,
   }),
   actions: {
+    async fetchNamespaces() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get<Namespace[]>('/api/v1/namespaces')
+        this.namespaces = response.data
+        return response.data
+      } catch (error) {
+        this.error = error instanceof Error ? error : new Error('Failed to load namespaces')
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+    async fetchSecrets(namespace: string) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get<SealedSecretSummary[]>(`/api/v1/secrets?namespace=${encodeURIComponent(namespace)}`)
+        this.secrets = response.data
+        return response.data
+      } catch (error) {
+        this.error = error instanceof Error ? error : new Error('Failed to load secrets')
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
     async fetchDetail(namespace: string, name: string) {
-      const response = await api.get<SealedSecretDetail>(`/api/v1/secrets/${namespace}/${name}`)
-      this.currentDetail = response.data
-      return response.data
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get<SealedSecretDetail>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`)
+        this.currentDetail = response.data
+        return response.data
+      } catch (error) {
+        this.error = error instanceof Error ? error : new Error('Failed to load secret')
+        throw error
+      } finally {
+        this.loading = false
+      }
     },
-
-    async reveal(namespace: string, name: string, key: string, baseCommit: string) {
-      const response = await api.post<{ key: string; value: string }>(
-        `/api/v1/secrets/${namespace}/${name}/reveal`,
-        { key, base_commit: baseCommit }
-      )
-      return response.data
-    },
-
-    async computeDiff(
-      namespace: string,
-      name: string,
-      key: string,
-      operation: 'replace' | 'add' | 'delete',
-      value: string,
-      baseCommit: string
-    ) {
-      const response = await api.post<{ before: string; after: string; key: string; base_commit: string; checksum: string }>(
-        `/api/v1/secrets/${namespace}/${name}/diff`,
-        { key, operation, value, base_commit: baseCommit }
-      )
-      this.currentDiff = { before: response.data.before, after: response.data.after, checksum: response.data.checksum }
-      return response.data
-    },
-
-    async reseal(
-      namespace: string,
-      name: string,
-      key: string,
-      value: string,
-      baseCommit: string,
-      operation: 'replace' | 'add' | 'delete'
-    ) {
-      const response = await api.patch<{ yaml: string; checksum: string }>(
-        `/api/v1/secrets/${namespace}/${name}/values/${encodeURIComponent(key)}`,
-        { value, base_commit: baseCommit, operation }
-      )
-      return response.data
+    clearSensitiveState() {
+      this.currentDetail = null
     },
   },
 })
