@@ -31,4 +31,13 @@ describe('phase 3 secret workflow', () => {
     expect(result.proposal_url).toContain('/pr/1')
     expect(request).toHaveBeenCalledWith('/api/v1/gitops/deliver', { namespace: 'payments', name: 'api', yaml: 'encrypted-yaml', base_commit: 'base' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
   })
+
+  it('runs a server-side Git dry run before delivery', async () => {
+    const dryRun = vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'git-before', after: 'git-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc', mode: 'proposal' } } as never)
+    const store = useSecretsStore()
+    store.currentDiff = { before: 'encrypted-before', after: 'encrypted-after', key: 'password', base_commit: 'abc', checksum: 'sum' }
+    await store.dryRun('payments', 'api', 'encrypted-after', 'abc')
+    expect(dryRun).toHaveBeenCalledWith('/api/v1/gitops/dry-run', { namespace: 'payments', name: 'api', yaml: 'encrypted-after', base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
+    expect(JSON.stringify(store.dryRunResult)).toContain('git-after')
+  })
 })

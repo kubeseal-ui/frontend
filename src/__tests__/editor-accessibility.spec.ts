@@ -1,6 +1,6 @@
 // Browser-level component checks for the Phase 3 secret editor.
 // Covers keyboard reachability, accessible names, masked-by-default values,
-// capability-gated controls, and the shared review/delivery state.
+// capability-gated controls, the dry-run gate, and the shared review/delivery state.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
@@ -36,6 +36,10 @@ function grant(pinia: Pinia, namespace: string, capabilities: Capability[]) {
   useAuthStore(pinia).setSession({ email: 'u@example.com', name: 'User', username: 'u', namespaces: { [namespace]: capabilities } })
 }
 
+function reviewedDiff() {
+  return { before: 'encrypted-before', after: 'encrypted-after', key: 'password', base_commit: 'abc123', checksum: 'sum' }
+}
+
 let pinia: Pinia
 beforeEach(() => {
   pinia = createPinia()
@@ -48,8 +52,12 @@ function mountEditor(detail: SealedSecretDetail) {
   return mount(SecretKeyEditor, { props: { detail }, attachTo: document.body, global: { plugins: [pinia] } })
 }
 
-function revealButtons(wrapper: ReturnType<typeof mountEditor>) {
-  return wrapper.findAll('button').filter((button) => button.text() === 'Reveal one key')
+function mountPanel(detail: SealedSecretDetail) {
+  return mount(DeliveryPanel, { props: { detail }, global: { plugins: [pinia] } })
+}
+
+function findButton(wrapper: ReturnType<typeof mountEditor> | ReturnType<typeof mountPanel>, label: string) {
+  return wrapper.findAll('button').find((button) => button.text() === label)
 }
 
 describe('secret key editor accessibility', () => {
@@ -61,7 +69,7 @@ describe('secret key editor accessibility', () => {
     expect(wrapper.findAll('input[type="password"]')).toHaveLength(0)
     expect(wrapper.text()).toContain('concealed')
 
-    await revealButtons(wrapper)[0].trigger('click')
+    await findButton(wrapper, 'Reveal one key')!.trigger('click')
     await flushPromises()
 
     expect(reveal).toHaveBeenCalledWith('payments', 'api', 'password', 'abc123')
@@ -76,21 +84,21 @@ describe('secret key editor accessibility', () => {
     grant(pinia, 'payments', ['metadata:read'])
     const wrapper = mountEditor(makeDetail())
 
-    expect(revealButtons(wrapper)).toHaveLength(0)
+    expect(findButton(wrapper, 'Reveal one key')).toBeFalsy()
     expect(wrapper.findAll('input')).toHaveLength(0)
     expect(wrapper.text()).toContain('Values concealed')
   })
 
-  it('explains drift and keeps the patch control disabled', async () => {
+  it('explains drift and keeps the review control disabled', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const wrapper = mountEditor(makeDetail({ git: { ...makeDetail().git, in_sync_with_live: false, drift: 'diverged' } }))
 
     expect(wrapper.text()).toContain('Editing disabled')
-    await revealButtons(wrapper)[0].trigger('click')
+    await findButton(wrapper, 'Reveal one key')!.trigger('click')
     await flushPromises()
 
-    const review = wrapper.findAll('button').find((button) => button.text() === 'Review encrypted diff')
+    const review = wrapper.findAll('button').find((button) => button.text().includes('Review encrypted diff'))
     expect(review?.attributes('disabled')).toBeDefined()
   })
 
@@ -98,16 +106,16 @@ describe('secret key editor accessibility', () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     const store = useSecretsStore(pinia)
     vi.spyOn(store, 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
-    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue({ before: 'b', after: 'a', key: 'password', base_commit: 'abc123', checksum: 'sum' })
+    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
     const wrapper = mountEditor(makeDetail())
-    await revealButtons(wrapper)[0].trigger('click')
+    await findButton(wrapper, 'Reveal one key')!.trigger('click')
     await flushPromises()
 
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
     const remove = wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'delete')
     expect(remove).toBeDefined()
     await remove!.setValue()
-    await wrapper.findAll('button').find((button) => button.text() === 'Review encrypted diff')!.trigger('click')
+    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
     await flushPromises()
 
     expect(computeDiff).toHaveBeenCalledWith('payments', 'api', 'password', 'delete', 'rotated', 'abc123')
@@ -118,7 +126,7 @@ describe('secret key editor accessibility', () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const wrapper = mountEditor(makeDetail())
-    await revealButtons(wrapper)[0].trigger('click')
+    await findButton(wrapper, 'Reveal one key')!.trigger('click')
     await flushPromises()
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
 
@@ -142,52 +150,101 @@ describe('secret key editor accessibility', () => {
 })
 
 describe('delivery panel policy controls', () => {
-  function reviewedProposal() {
+  it('gates delivery on a server-side dry run', async () => {
     grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
-    useSecretsStore(pinia).currentDiff = { before: 'encrypted-before', after: 'encrypted-after', key: 'password', base_commit: 'abc123', checksum: 'sum' }
-    return mount(DeliveryPanel, { props: { detail: makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }) }, global: { plugins: [pinia] } })
-  }
+    const store = useSecretsStore(pinia)
+    store.currentDiff = reviewedDiff()
+    store.pendingMutation = { namespace: 'payments', name: 'api', value: 'rotated', operation: 'replace' }
+    vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
+      // The real action advances the workflow: the pending mutation is cleared
+      // and the reviewed ciphertext stays in currentDiff for the dry run.
+      store.currentDetail = null
+      store.pendingMutation = null
+      return { yaml: 'encrypted-after', checksum: 'sum', diff_before: 'encrypted-before', diff_after: 'encrypted-after' }
+    })
+    vi.spyOn(store, 'dryRun').mockImplementation(async () => {
+      store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
+      return store.dryRunResult
+    })
+    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: 'deadbeef', proposal_url: 'https://git.example/pr/7', argocd_sync_verified: false })
+    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
 
-  it('offers only the server-selected proposal action', () => {
-    const wrapper = reviewedProposal()
-    const labels = wrapper.findAll('button').map((button) => button.text())
+    // Stage 'apply': the dry-run gate warns and the apply control is the only primary action.
+    expect(wrapper.text()).toContain('Run dry run before delivery')
+    expect(findButton(wrapper, 'Apply reviewed patch')).toBeTruthy()
+    expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
+    expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
 
-    expect(labels).toContain('Create proposal')
-    expect(labels).not.toContain('Deliver directly')
-    expect(wrapper.html()).toContain('encrypted-after')
+    await findButton(wrapper, 'Apply reviewed patch')!.trigger('click')
+    await flushPromises()
+
+    // Stage 'dry-run': the patch is applied, the dry-run control replaces the apply control.
+    expect(wrapper.text()).toContain('Encrypted patch applied and ready for dry run.')
+    expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
+    expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
+    expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
+
+    await findButton(wrapper, 'Run dry run')!.trigger('click')
+    await flushPromises()
+
+    // Stage 'deliver': the dry-run result is shown, the deliver control is gated on it.
+    expect(wrapper.text()).toContain('Dry run complete.')
+    expect(wrapper.text()).toContain('Path: clusters/prod/payments/api.yaml')
+    expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
+    expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
+
+    await findButton(wrapper, 'Create proposal')!.trigger('click')
+    await flushPromises()
+
+    expect(deliver).toHaveBeenCalledTimes(1)
+    expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123')
+    expect(wrapper.text()).toContain('https://git.example/pr/7')
+    expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
+  })
+
+  it('runs the dry run straight off the reviewed diff when nothing is pending', async () => {
+    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
+    const store = useSecretsStore(pinia)
+    store.currentDiff = reviewedDiff()
+    const dryRun = vi.spyOn(store, 'dryRun').mockImplementation(async () => {
+      store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
+      return store.dryRunResult
+    })
+    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
+
+    // No pending mutation: the apply step is skipped, the dry-run control leads.
+    expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
+    expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
+
+    await findButton(wrapper, 'Run dry run')!.trigger('click')
+    await flushPromises()
+
+    expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123')
+    expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
   })
 
   it('withholds delivery when the namespace capability is missing', () => {
     grant(pinia, 'payments', ['secret:seal', 'secret:decrypt'])
-    useSecretsStore(pinia).currentDiff = { before: 'encrypted-before', after: 'encrypted-after', key: 'password', base_commit: 'abc123', checksum: 'sum' }
-    const wrapper = mount(DeliveryPanel, { props: { detail: makeDetail() }, global: { plugins: [pinia] } })
+    useSecretsStore(pinia).currentDiff = reviewedDiff()
+    const wrapper = mountPanel(makeDetail())
 
     expect(wrapper.text()).toContain('Delivery unavailable')
     expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Deliver directly')
   })
 
   it('exposes no control for repository, branch, path, or mode', () => {
-    const wrapper = reviewedProposal()
+    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
+    useSecretsStore(pinia).currentDiff = reviewedDiff()
+    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
 
     expect(wrapper.findAll('input, select, textarea')).toHaveLength(0)
     const labelled = wrapper.findAll('[aria-label]').map((node) => node.attributes('aria-label'))
     expect(labelled.filter((label) => /repository|branch|path|delivery mode/i.test(label ?? ''))).toHaveLength(0)
   })
-
-  it('reports the delivered result without claiming ArgoCD synchronization', async () => {
-    const wrapper = reviewedProposal()
-    vi.spyOn(useSecretsStore(pinia), 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: 'deadbeef', proposal_url: 'https://git.example/pr/7', argocd_sync_verified: false })
-
-    await wrapper.findAll('button').find((button) => button.text() === 'Create proposal')!.trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('https://git.example/pr/7')
-    expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
-  })
 })
 
 describe('new secret draft review', () => {
-  it('hands the ciphertext to the shared review state and drops the plaintext', async () => {
+  it('hands the ciphertext to the shared review state, runs a dry run, and delivers', async () => {
     grant(pinia, 'payments', ['secret:seal', 'gitops:propose'])
     const store = useSecretsStore(pinia)
     vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
@@ -203,11 +260,25 @@ describe('new secret draft review', () => {
     expect(form.html()).not.toContain('plaintext-marker')
     expect(JSON.stringify(store.$state)).not.toContain('plaintext-marker')
 
+    vi.spyOn(store, 'dryRun').mockImplementation(async () => {
+      store.dryRunResult = { before: 'git-before', after: 'encrypted-new-secret', path: 'clusters/prod/payments/new-cred.yaml', base_commit: 'abc123', mode: 'proposal' }
+      return store.dryRunResult
+    })
     const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: 'cafe', proposal_url: 'https://git.example/pr/9', argocd_sync_verified: false })
-    const panel = mount(DeliveryPanel, { props: { detail: makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }) }, global: { plugins: [pinia] } })
+    const panel = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
     expect(panel.html()).toContain('encrypted-new-secret')
 
-    await panel.findAll('button').find((button) => button.text() === 'Create proposal')!.trigger('click')
+    // New-secret drafts skip the apply step: there is no keyed patch, so the
+    // dry-run runs straight off the encrypted draft ciphertext.
+    expect(findButton(panel, 'Apply reviewed patch')).toBeFalsy()
+    expect(findButton(panel, 'Run dry run')).toBeTruthy()
+
+    await findButton(panel, 'Run dry run')!.trigger('click')
+    await flushPromises()
+
+    expect(findButton(panel, 'Create proposal')).toBeTruthy()
+
+    await findButton(panel, 'Create proposal')!.trigger('click')
     await flushPromises()
 
     expect(deliver).toHaveBeenCalledWith('payments', 'new-cred', 'encrypted-new-secret', 'abc123')

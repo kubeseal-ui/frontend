@@ -1,3 +1,6 @@
+// Type barrel — no component re-exports. Components are imported from their
+// own files to keep each route's import graph small and avoid pulling the
+// editor tree into unrelated modules.
 export type Capability =
   | 'metadata:read'
   | 'secret:seal'
@@ -45,3 +48,40 @@ export interface SealedSecretDetail extends SealedSecretSummary {
   yaml?: string
   sealed_secret_yaml?: string
 }
+
+/** Ciphertext-only draft for a brand new SealedSecret. The plaintext Secret never enters the store. */
+export interface NewSecretDraft {
+  namespace: string
+  name: string
+  scope: string
+  yaml: string
+  base_commit: string
+}
+
+/** Encrypted dry-run result returned by `POST /gitops/dry-run`. */
+export interface DryRunResult {
+  before: string
+  after: string
+  path: string
+  base_commit: string
+  mode: 'direct' | 'proposal'
+}
+
+export interface EncryptedDiff {
+  before: string
+  after: string
+  key: string
+  base_commit: string
+  checksum: string
+}
+
+export interface DeliveryResult {
+  mode: 'direct' | 'proposal'
+  commit_sha: string
+  branch?: string
+  file_path?: string
+  proposal_url?: string
+  argocd_sync_verified: false
+}
+
+export interface ListResponse<T> { namespaces?: T[]; secrets?: T[] }
