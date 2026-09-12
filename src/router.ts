@@ -1,26 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { pinia } from './pinia'
-import HomeView from './views/HomeView.vue'
-import NamespaceView from './views/NamespaceView.vue'
-import SecretDetailView from './views/SecretDetailView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
-    { path: '/namespaces', name: 'namespaces', component: HomeView, meta: { requiresAuth: true } },
+    { path: '/', name: 'home', component: () => import('./views/HomeView.vue'), meta: { requiresAuth: true } },
+    { path: '/namespaces', name: 'namespaces', component: () => import('./views/HomeView.vue'), meta: { requiresAuth: true } },
     {
       path: '/namespaces/:namespace',
       name: 'namespace',
-      component: NamespaceView,
+      component: () => import('./views/NamespaceView.vue'),
       props: true,
       meta: { requiresAuth: true },
     },
     {
       path: '/secrets/:namespace/:name',
       name: 'secret-detail',
-      component: SecretDetailView,
+      component: () => import('./views/SecretDetailView.vue'),
       props: true,
       meta: { requiresAuth: true },
     },

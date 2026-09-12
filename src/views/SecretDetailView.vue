@@ -12,6 +12,8 @@ const route = useRoute(); const router = useRouter(); const auth = useAuthStore(
 const loading = ref(true); const error = ref('')
 const namespace = () => String(route.params.namespace); const name = () => String(route.params.name)
 const canPatch = computed(() => auth.hasCapability(namespace(), 'secret:seal') && auth.hasCapability(namespace(), 'secret:decrypt'))
+const canCreate = computed(() => auth.hasCapability(namespace(), 'secret:seal'))
+const showReview = computed(() => canPatch.value || canCreate.value)
 async function load() { loading.value = true; error.value = ''; store.clearSensitiveState(); try { await store.fetchDetail(namespace(), name()) } catch (e) { error.value = e instanceof Error ? e.message : 'Unable to load secret' } finally { loading.value = false } }
 function driftStatus() { const git = store.currentDetail?.git; return git?.drift || (git?.in_sync_with_live ? 'in-sync' : 'unknown') }
 onMounted(load); watch(() => [route.params.namespace, route.params.name], load)
@@ -28,8 +30,8 @@ onMounted(load); watch(() => [route.params.namespace, route.params.name], load)
         <NAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync">Status: {{ driftStatus() }}. Reveal, editing, and delivery are disabled.</NAlert>
         <NCard title="Metadata" segmented><NDescriptions label-placement="left" :column="1"><NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem><NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem><NDescriptionsItem label="Keys"><span v-for="key in store.currentDetail.keys" :key="key" class="metadata-key">{{ key }}</span></NDescriptionsItem><NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem><NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem><NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem></NDescriptions></NCard>
         <SecretKeyEditor :detail="store.currentDetail" />
-        <SecretNameEditor :namespace="namespace()" />
-        <DeliveryPanel v-if="canPatch" :detail="store.currentDetail" />
+        <SecretNameEditor :namespace="namespace()" :base-commit="store.currentDetail.git.base_commit" />
+        <DeliveryPanel v-if="showReview" :detail="store.currentDetail" />
       </template>
     </NSpin>
   </main>
