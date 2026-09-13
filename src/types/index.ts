@@ -13,7 +13,10 @@ export interface User {
   email: string
   name: string
   username: string
+  // Per-namespace grants (doc contract). Empty until the backend scopes
+  // capabilities per namespace; the flat list applies to every namespace.
   namespaces: Record<string, Capability[]>
+  capabilities?: Capability[]
 }
 
 export interface Namespace {
@@ -29,9 +32,12 @@ export interface GitState {
   managed: boolean
   in_sync_with_live: boolean
   drift: 'in-sync' | 'diverged' | 'unknown'
-  base_commit: string
-  file_path: string
-  delivery_mode: 'direct' | 'proposal'
+  // Present only when the Git source was read successfully.
+  base_commit?: string
+  file_path?: string
+  repository?: string
+  branch?: string
+  delivery_mode?: 'direct' | 'proposal'
 }
 
 export interface SealedSecretSummary {

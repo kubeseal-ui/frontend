@@ -16,7 +16,7 @@ const hasReview = computed(() => Boolean(store.currentDiff || store.newSecretDra
 // The repository, branch, path, and mode always come from the server-side namespace policy.
 const target = computed(() => store.newSecretDraft
   ? { namespace: store.newSecretDraft.namespace, name: store.newSecretDraft.name, base_commit: store.newSecretDraft.base_commit }
-  : { namespace: props.detail.namespace, name: props.detail.name, base_commit: store.currentDiff?.base_commit || props.detail.git.base_commit })
+  : { namespace: props.detail.namespace, name: props.detail.name, base_commit: store.currentDiff?.base_commit || props.detail.git.base_commit || '' })
 const reviewedYaml = computed(() => store.dryRunResult?.after || store.currentDiff?.after || store.newSecretDraft?.yaml || '')
 // Workflow stages are mutually exclusive: apply the reviewed patch, run the
 // server-side dry run, then deliver. One stage renders exactly one primary

@@ -18,7 +18,7 @@ const canReveal = computed(() => auth.hasCapability(props.detail.namespace, 'sec
 const canPatch = computed(() => auth.hasCapability(props.detail.namespace, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
 
 async function reveal(key: string) {
-  if (!canReveal.value) return
+  if (!canReveal.value || !props.detail.git.base_commit) return
   error.value = ''; activeKey.value = key
   try { revealed[key] = (await store.reveal(props.detail.namespace, props.detail.name, key, props.detail.git.base_commit)).value; operation[key] = operation[key] || 'replace' }
   catch (e) { error.value = e instanceof Error ? e.message : 'Reveal failed' }
@@ -27,7 +27,7 @@ async function reveal(key: string) {
 
 async function review(key: string) {
   const selectedOperation = operation[key] || 'replace'
-  if (!canPatch.value || (selectedOperation !== 'delete' && !replacements[key])) return
+  if (!canPatch.value || !props.detail.git.base_commit || (selectedOperation !== 'delete' && !replacements[key])) return
   error.value = ''; activeKey.value = key
   try { await store.computeDiff(props.detail.namespace, props.detail.name, key, selectedOperation, replacements[key] || '', props.detail.git.base_commit); message.value = 'Encrypted diff is ready for review.' }
   catch (e) { error.value = e instanceof Error ? e.message : 'Diff failed' }
