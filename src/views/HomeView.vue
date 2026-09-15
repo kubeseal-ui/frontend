@@ -47,8 +47,9 @@ async function logout() {
           <NCard v-for="namespace in secrets.namespaces" :key="namespace.name" hoverable>
             <RouterLink :to="`/namespaces/${encodeURIComponent(namespace.name)}`" class="card-link">
               <h2>{{ namespace.name }}</h2>
-              <p>{{ namespace.capabilities.length }} effective capabilities</p>
-              <span v-if="namespace.delivery">Delivery: {{ namespace.delivery.mode }}</span>
+              <span v-if="namespace.git_managed">Git managed</span>
+              <span v-else>unmanaged</span>
+              <span v-if="namespace.delivery_mode"> • {{ namespace.delivery_mode }}</span>
             </RouterLink>
           </NCard>
         </div>

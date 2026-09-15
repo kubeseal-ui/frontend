@@ -1,1 +1,0 @@
-// Barrel file for async components (import directly in components)
