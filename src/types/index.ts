@@ -95,6 +95,7 @@ export interface EncryptedDiff {
   key: string
   base_commit: string
   checksum: string
+  target_path?: string
 }
 
 export interface DeliveryResult {
