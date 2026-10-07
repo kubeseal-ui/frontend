@@ -28,6 +28,7 @@ jobs:
       with:
         node-version: '26'
         cache: 'npm'
+        cache-dependency-path: package-lock.json
 
     - name: Download dependencies
       run: npm ci
@@ -59,6 +60,7 @@ jobs:
       with:
         node-version: '26'
         cache: 'npm'
+        cache-dependency-path: package-lock.json
 
     - name: Download dependencies
       run: npm ci
