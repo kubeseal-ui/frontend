@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { NAlert, NButton, NCard, NInput, NRadio, NRadioGroup, NSpace, NSelect, NSelectOption } from 'naive-ui'
+import { NAlert, NButton, NCard, NInput, NRadio, NRadioGroup, NSpace, NSelect } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { NamespaceGitPaths } from '@/types'
