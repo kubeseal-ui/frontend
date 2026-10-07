@@ -197,7 +197,7 @@ describe('delivery panel policy controls', () => {
     await flushPromises()
 
     expect(deliver).toHaveBeenCalledTimes(1)
-    expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123')
+    expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', undefined)
     expect(wrapper.text()).toContain('https://git.example/pr/7')
     expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
   })
@@ -219,7 +219,7 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Run dry run')!.trigger('click')
     await flushPromises()
 
-    expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123')
+    expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', undefined)
     expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
   })
 
@@ -281,7 +281,7 @@ describe('new secret draft review', () => {
     await findButton(panel, 'Create proposal')!.trigger('click')
     await flushPromises()
 
-    expect(deliver).toHaveBeenCalledWith('payments', 'new-cred', 'encrypted-new-secret', 'abc123')
+    expect(deliver).toHaveBeenCalledWith('payments', 'new-cred', 'encrypted-new-secret', 'abc123', undefined)
     expect(store.newSecretDraft).toBeNull()
   })
 
