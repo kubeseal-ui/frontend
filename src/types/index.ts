@@ -62,6 +62,7 @@ export interface NewSecretDraft {
   scope: string
   yaml: string
   base_commit: string
+  target_path?: string
 }
 
 /** Encrypted dry-run result returned by `POST /gitops/dry-run`. */
@@ -70,6 +71,21 @@ export interface DryRunResult {
   after: string
   path: string
   base_commit: string
+  mode: 'direct' | 'proposal'
+  target_path?: string
+}
+
+/** Git paths configuration returned by `GET /gitops/paths`. */
+export interface GitPathsConfig {
+  namespaces: NamespaceGitPaths[]
+}
+
+export interface NamespaceGitPaths {
+  namespace: string
+  default_path: string
+  allowed_paths: string[]
+  repository: string
+  branch: string
   mode: 'direct' | 'proposal'
 }
 

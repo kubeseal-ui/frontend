@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/auth'
+import type { GitPathsConfig } from '@/types'
 
 export interface ApiErrorShape {
   error?: { code?: string; message?: string; request_id?: string }
@@ -53,6 +54,12 @@ class ApiClient {
   }
   async patch<T>(path: string, body: unknown, headers?: HeadersInit) {
     return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', ...headers } })
+  }
+
+  // Git paths
+  async getGitPaths(): Promise<GitPathsConfig> {
+    const response = await this.get<GitPathsConfig>('/api/v1/gitops/paths')
+    return response.data
   }
 
   setCsrfToken(token: string) { this.csrfToken = token }

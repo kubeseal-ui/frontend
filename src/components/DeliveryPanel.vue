@@ -15,8 +15,9 @@ const actionLabel = computed(() => mode.value === 'direct' ? 'Deliver directly' 
 const hasReview = computed(() => Boolean(store.currentDiff || store.newSecretDraft || store.dryRunResult))
 // The repository, branch, path, and mode always come from the server-side namespace policy.
 const target = computed(() => store.newSecretDraft
-  ? { namespace: store.newSecretDraft.namespace, name: store.newSecretDraft.name, base_commit: store.newSecretDraft.base_commit }
-  : { namespace: props.detail.namespace, name: props.detail.name, base_commit: store.currentDiff?.base_commit || props.detail.git.base_commit || '' })
+  ? { namespace: store.newSecretDraft.namespace, name: store.newSecretDraft.name, base_commit: store.newSecretDraft.base_commit, target_path: store.newSecretDraft.target_path }
+  : { namespace: props.detail.namespace, name: props.detail.name, base_commit: store.currentDiff?.base_commit || props.detail.git.base_commit || '', target_path: store.currentDiff?.target_path })
+
 const reviewedYaml = computed(() => store.dryRunResult?.after || store.currentDiff?.after || store.newSecretDraft?.yaml || '')
 // Workflow stages are mutually exclusive: apply the reviewed patch, run the
 // server-side dry run, then deliver. One stage renders exactly one primary
@@ -47,7 +48,7 @@ async function runDryRun() {
   if (!yaml || !canDeliver.value) return
   loading.value = true; error.value = ''; result.value = ''
   try {
-    await store.dryRun(target.value.namespace, target.value.name, yaml, target.value.base_commit)
+    await store.dryRun(target.value.namespace, target.value.name, yaml, target.value.base_commit, target.value.target_path)
     result.value = 'Dry run complete.'
   }
   catch (e) { error.value = e instanceof Error ? e.message : 'Dry run failed' }
@@ -59,7 +60,7 @@ async function deliver() {
   if (!yaml || !canDeliver.value) return
   loading.value = true; error.value = ''; result.value = ''
   try {
-    const response = await store.deliver(target.value.namespace, target.value.name, yaml, target.value.base_commit)
+    const response = await store.deliver(target.value.namespace, target.value.name, yaml, target.value.base_commit, target.value.target_path)
     result.value = response.proposal_url || response.commit_sha
     // The delivered ciphertext is no longer pending; the dry-run result stays
     // so the confirmation above remains visible until the user navigates away.

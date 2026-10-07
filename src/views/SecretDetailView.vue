@@ -14,9 +14,27 @@ const namespace = () => String(route.params.namespace); const name = () => Strin
 const canPatch = computed(() => auth.hasCapability(namespace(), 'secret:seal') && auth.hasCapability(namespace(), 'secret:decrypt'))
 const canCreate = computed(() => auth.hasCapability(namespace(), 'secret:seal'))
 const showReview = computed(() => canPatch.value || canCreate.value)
-async function load() { loading.value = true; error.value = ''; store.clearSensitiveState(); try { await store.fetchDetail(namespace(), name()) } catch (e) { error.value = e instanceof Error ? e.message : 'Unable to load secret' } finally { loading.value = false } }
+
+async function load() { 
+  loading.value = true; 
+  error.value = ''; 
+  store.clearSensitiveState(); 
+  try { 
+    await Promise.all([
+      store.fetchDetail(namespace(), name()),
+      store.fetchGitPaths(namespace())
+    ])
+  } catch (e) { 
+    error.value = e instanceof Error ? e.message : 'Unable to load secret' 
+  } finally { 
+    loading.value = false 
+  }
+}
+
 function driftStatus() { const git = store.currentDetail?.git; return git?.drift || (git?.in_sync_with_live ? 'in-sync' : 'unknown') }
-onMounted(load); watch(() => [route.params.namespace, route.params.name], load)
+
+onMounted(load); 
+watch(() => [route.params.namespace, route.params.name], load)
 </script>
 
 <template>
