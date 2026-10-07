@@ -22,7 +22,7 @@ async function load() {
   try { 
     await Promise.all([
       store.fetchDetail(namespace(), name()),
-      store.fetchGitPaths(namespace())
+      store.fetchGitPaths()
     ])
   } catch (e) { 
     error.value = e instanceof Error ? e.message : 'Unable to load secret' 
