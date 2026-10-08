@@ -44,13 +44,23 @@ onBeforeUnmount(() => clear())
 </script>
 
 <template>
-  <NCard title="Secret keys" segmented class="glass-blur">
-    <NAlert v-if="!detail.git.in_sync_with_live" type="warning" title="Editing disabled">Git and live state differ. Resolve drift before revealing or editing values.</NAlert>
-    <NAlert v-if="!canReveal" type="info" title="Values concealed">You can inspect encrypted key names, but this namespace does not grant reveal access.</NAlert>
-    <NAlert v-if="error" type="error" title="Operation failed" closable @close="error = ''">{{ error }}</NAlert>
-    <NAlert v-if="message" type="success" closable @close="message = ''">{{ message }}</NAlert>
-    <div v-for="key in detail.keys || []" :key="key" class="key-row">
-      <div class="key-name"><code>{{ key }}</code><NTag size="small">concealed</NTag></div>
+  <NCard title="Secret keys" segmented class="glass">
+    <NAlert v-if="!detail.git.in_sync_with_live" type="warning" title="Editing disabled" class="mb-3">Git and live state differ. Resolve drift before revealing or editing values.</NAlert>
+    <NAlert v-if="!canReveal" type="info" title="Values concealed" class="mb-3">You can inspect encrypted key names, but this namespace does not grant reveal access.</NAlert>
+    <NAlert v-if="error" type="error" title="Operation failed" closable class="mb-3" @close="error = ''">{{ error }}</NAlert>
+    <NAlert v-if="message" type="success" closable class="mb-3" @close="message = ''">{{ message }}</NAlert>
+    <!-- border-t rather than a divider element: the first row is the one that
+         must not draw one, which reads as a rule between rows and no rule
+         above the list. -->
+    <div
+      v-for="key in detail.keys || []"
+      :key="key"
+      class="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
+    >
+      <div class="flex items-center gap-2">
+        <code class="font-mono text-sm">{{ key }}</code>
+        <NTag size="small">concealed</NTag>
+      </div>
       <NSpace align="center" wrap>
         <NButton v-if="canReveal && !revealed[key]" :disabled="!!activeKey" @click="reveal(key)">Reveal one key</NButton>
         <template v-else-if="revealed[key]">
@@ -68,6 +78,6 @@ onBeforeUnmount(() => clear())
         </template>
       </NSpace>
     </div>
-    <NAlert v-if="store.currentDiff" type="info" title="Encrypted diff ready">The server returned encrypted before/after content. Review and delivery controls are in the panel below.</NAlert>
+    <NAlert v-if="store.currentDiff" type="info" title="Encrypted diff ready" class="mt-3">The server returned encrypted before/after content. Review and delivery controls are in the panel below.</NAlert>
   </NCard>
 </template>

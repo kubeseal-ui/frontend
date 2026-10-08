@@ -35,8 +35,11 @@ describe('app shell', () => {
   it('renders the brand, the signed-in user, and sign out', () => {
     const wrapper = mountShell()
 
-    expect(wrapper.find('.brand').text()).toBe('kubeseal-ui')
-    expect(wrapper.find('.user-label').text()).toBe('Ada')
+    // Located by content and role rather than by a styling class: the shell is
+    // utility-first now, so the classes that used to double as test hooks are
+    // gone and the text is the stable part.
+    expect(wrapper.findAll('a').map((link) => link.text())).toContain('kubeseal-ui')
+    expect(wrapper.text()).toContain('Ada')
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('Sign out')
   })
 
@@ -47,7 +50,7 @@ describe('app shell', () => {
     expect(group.exists()).toBe(true)
     expect(group.attributes('aria-label')).toBe('Colour theme')
 
-    const options = wrapper.findAll('.theme-option')
+    const options = wrapper.findAll('[aria-pressed]')
     expect(options.map((option) => option.text())).toEqual(['Light', 'Dark', 'System'])
     for (const option of options) expect(option.attributes('aria-pressed')).toBeDefined()
   })
@@ -57,10 +60,10 @@ describe('app shell', () => {
     ui.setThemePreference('dark')
     const wrapper = mountShell()
 
-    const pressed = () => wrapper.findAll('.theme-option').filter((option) => option.attributes('aria-pressed') === 'true')
+    const pressed = () => wrapper.findAll('[aria-pressed]').filter((option) => option.attributes('aria-pressed') === 'true')
     expect(pressed().map((option) => option.text())).toEqual(['Dark'])
 
-    await wrapper.findAll('.theme-option').find((option) => option.text() === 'Light')!.trigger('click')
+    await wrapper.findAll('[aria-pressed]').find((option) => option.text() === 'Light')!.trigger('click')
 
     expect(ui.themePreference).toBe('light')
     expect(pressed().map((option) => option.text())).toEqual(['Light'])

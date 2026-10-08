@@ -98,7 +98,11 @@ export function buildThemeOverrides(mode: ThemeMode): GlobalThemeOverrides {
     Card: {
       color: `${p.surface}b8`,
       borderColor: `${p.borderStrong}73`,
-      borderRadius: '20px',
+      // Mirrors --radius-card in style.css. The `.n-card.glass` rule there
+      // states the same radius for the same reason the colours are stated in
+      // both places: Naive owns the card's own paint, so what it draws and what
+      // the material draws have to agree rather than one silently winning.
+      borderRadius: '24px',
       titleTextColor: p.ink,
       textColor: p.muted,
     },

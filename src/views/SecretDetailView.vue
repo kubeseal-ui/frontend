@@ -16,19 +16,19 @@ const canPatch = computed(() => auth.hasCapability(namespace(), 'secret:seal') &
 // Secret, and lives at /namespaces/:namespace/new.
 const showReview = computed(() => canPatch.value)
 
-async function load() { 
-  loading.value = true; 
-  error.value = ''; 
-  store.clearSensitiveState(); 
-  try { 
+async function load() {
+  loading.value = true;
+  error.value = '';
+  store.clearSensitiveState();
+  try {
     await Promise.all([
       store.fetchDetail(namespace(), name()),
       store.fetchGitPaths()
     ])
-  } catch (e) { 
-    error.value = e instanceof Error ? e.message : 'Unable to load secret' 
-  } finally { 
-    loading.value = false 
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Unable to load secret'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -61,33 +61,60 @@ async function onSync() {
   }
 }
 
-onMounted(load); 
+onMounted(load);
 watch(() => [route.params.namespace, route.params.name], load)
 </script>
 
 <template>
-  <div class="detail-page">
-    <NButton text @click="router.push({ name: 'namespace', params: { namespace: namespace() } })">← Back to namespace</NButton>
+  <div>
+    <NButton text class="mb-6" @click="router.push({ name: 'namespace', params: { namespace: namespace() } })">← Back to namespace</NButton>
     <NSpin :show="loading">
-      <NAlert v-if="error" type="error" title="Could not load SealedSecret"><p>{{ error }}</p><NButton secondary @click="load">Retry</NButton></NAlert>
+      <NAlert v-if="error" type="error" title="Could not load SealedSecret">
+        <p>{{ error }}</p>
+        <NButton secondary @click="load">Retry</NButton>
+      </NAlert>
       <NEmpty v-else-if="!store.currentDetail" description="SealedSecret not found" />
       <template v-else>
-        <div class="page-heading"><div><NTag size="small">{{ store.currentDetail.scope || 'strict' }}</NTag><h1>{{ store.currentDetail.name }}</h1><p>{{ store.currentDetail.namespace }} · {{ store.currentDetail.key_count }} encrypted keys</p></div></div>
-        <NAlert v-if="syncSuccess" type="success" closable style="margin-bottom: 1rem;" @close="syncSuccess = ''">{{ syncSuccess }}</NAlert>
-        <NAlert v-if="syncError" type="error" closable style="margin-bottom: 1rem;" @close="syncError = ''">{{ syncError }}</NAlert>
-        <NAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync" style="margin-bottom: 1rem;">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <NTag size="small">{{ store.currentDetail.scope || 'strict' }}</NTag>
+            <h1 class="mt-1 mb-0 text-[clamp(1.8rem,4vw,2.5rem)] tracking-tight">{{ store.currentDetail.name }}</h1>
+            <p class="mb-0 text-muted">{{ store.currentDetail.namespace }} · {{ store.currentDetail.key_count }} encrypted keys</p>
+          </div>
+        </div>
+
+        <NAlert v-if="syncSuccess" type="success" closable class="mb-4" @close="syncSuccess = ''">{{ syncSuccess }}</NAlert>
+        <NAlert v-if="syncError" type="error" closable class="mb-4" @close="syncError = ''">{{ syncError }}</NAlert>
+        <NAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync" class="mb-4">
           <p>Status: {{ driftStatus() }}. Reveal, editing, and delivery are disabled.</p>
-          <div v-if="driftStatus() === 'git_only'" style="margin-top: 8px;">
+          <div v-if="driftStatus() === 'git_only'" class="mt-2">
             <p>Manifest exists in Git but not in cluster. Pending ArgoCD reconciliation.</p>
           </div>
-          <div v-else-if="canSync" style="margin-top: 8px;">
+          <div v-else-if="canSync" class="mt-2">
             <NButton type="primary" size="small" :loading="syncing" @click="onSync">
               Sync Live Secret to Git
             </NButton>
           </div>
         </NAlert>
-        <NCard title="Metadata" segmented class="glass-blur"><NDescriptions label-placement="left" :column="1"><NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem><NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem><NDescriptionsItem label="Keys"><span v-for="key in store.currentDetail.keys" :key="key" class="metadata-key">{{ key }}</span></NDescriptionsItem><NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem><NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem><NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem></NDescriptions></NCard>
-        <SecretKeyEditor :detail="store.currentDetail" />
+
+        <NCard title="Metadata" segmented class="glass mb-4">
+          <NDescriptions label-placement="left" :column="1">
+            <NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem>
+            <NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem>
+            <NDescriptionsItem label="Keys">
+              <span
+                v-for="key in store.currentDetail.keys"
+                :key="key"
+                class="mr-1 mb-1 inline-block rounded-chip border border-border bg-surface-raised px-2 py-0.5 font-mono text-xs"
+              >{{ key }}</span>
+            </NDescriptionsItem>
+            <NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem>
+            <NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem>
+            <NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem>
+          </NDescriptions>
+        </NCard>
+
+        <SecretKeyEditor :detail="store.currentDetail" class="mb-4" />
         <DeliveryPanel v-if="showReview" :detail="store.currentDetail" />
       </template>
     </NSpin>

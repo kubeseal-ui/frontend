@@ -55,7 +55,7 @@ function discard() {
 </script>
 
 <template>
-  <NCard v-if="canCreate" title="Create new SealedSecret" segmented class="glass-blur">
+  <NCard v-if="canCreate" title="Create new SealedSecret" segmented class="glass">
     <NSpace vertical>
       <NInput v-model:value="name" placeholder="Secret name" :input-props="{ 'aria-label': 'New secret name' }" />
       <NRadioGroup v-model:value="scope" name="secret-scope">
@@ -63,12 +63,23 @@ function discard() {
           <NRadio v-for="option in scopes" :key="option.value" :value="option.value">{{ option.label }}</NRadio>
         </NSpace>
       </NRadioGroup>
-      <div v-if="currentNsPaths && allowedPaths.length > 0" class="target-path-selector">
-        <label class="select-label">Target directory</label>
-        <NSelect v-model:value="targetPath" :options="[{ label: defaultPath, value: '' }, ...allowedPaths.map(p => ({ label: p, value: p }))]" placeholder="Use default path" style="width: 100%" />
-        <p class="select-hint">Default: {{ defaultPath }}</p>
+      <div v-if="currentNsPaths && allowedPaths.length > 0" class="flex flex-col gap-1">
+        <label class="text-sm font-medium">Target directory</label>
+        <NSelect
+          v-model:value="targetPath"
+          :options="[{ label: defaultPath, value: '' }, ...allowedPaths.map(p => ({ label: p, value: p }))]"
+          placeholder="Use default path"
+          class="w-full"
+        />
+        <p class="m-0 text-xs text-muted">Default: {{ defaultPath }}</p>
       </div>
-      <NInput v-model:value="yaml" type="textarea" placeholder="Complete Kubernetes Secret YAML" :autosize="{ minRows: 5, maxRows: 12 }" :input-props="{ 'aria-label': 'New secret YAML' }" />
+      <NInput
+        v-model:value="yaml"
+        type="textarea"
+        placeholder="Complete Kubernetes Secret YAML"
+        :autosize="{ minRows: 5, maxRows: 12 }"
+        :input-props="{ 'aria-label': 'New secret YAML' }"
+      />
       <NButton type="primary" :loading="loading" :disabled="!name || !yaml" @click="createDraft">Encrypt for review</NButton>
       <NAlert v-if="error" type="error" title="Unable to encrypt">{{ error }}</NAlert>
       <NAlert v-if="store.newSecretDraft" type="success" title="Encrypted draft ready">
@@ -78,9 +89,3 @@ function discard() {
     </NSpace>
   </NCard>
 </template>
-
-<style scoped>
-.target-path-selector { display: flex; flex-direction: column; gap: 4px; }
-.select-label { font-weight: 500; font-size: 0.875rem; }
-.select-hint { margin: 0; font-size: 0.75rem; color: var(--text-color-2); }
-</style>

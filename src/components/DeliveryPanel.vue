@@ -90,12 +90,21 @@ async function deliver() {
 </script>
 
 <template>
-  <NCard v-if="hasReview" title="Encrypted review and delivery" segmented class="glass-blur">
+  <NCard v-if="hasReview" title="Encrypted review and delivery" segmented class="glass">
     <NSpace vertical>
       <NAlert type="info" title="Encrypted review">Only encrypted manifests are shown. The server resolved the repository, branch, path, and delivery mode.</NAlert>
-      <div v-if="store.currentDiff" class="encrypted-diff" aria-label="Encrypted manifest diff"><strong>Encrypted before</strong><NCode :code="store.currentDiff.before" language="yaml" /><strong>Encrypted after</strong><NCode :code="store.currentDiff.after" language="yaml" /></div>
-      <div v-else-if="store.newSecretDraft" class="encrypted-diff" aria-label="Encrypted new secret draft"><strong>Encrypted new SealedSecret {{ store.newSecretDraft.name }}</strong><NCode :code="store.newSecretDraft.yaml" language="yaml" /></div>
-      <div v-if="store.dryRunResult" class="encrypted-diff" aria-label="Encrypted Git dry-run"><strong>Git before</strong><NCode :code="store.dryRunResult.before" language="yaml" /><strong>Git after</strong><NCode :code="store.dryRunResult.after" language="yaml" /><p>Path: {{ store.dryRunResult.path }} · base: {{ store.dryRunResult.base_commit }}</p></div>
+      <div v-if="store.currentDiff" class="flex flex-col gap-2 rounded-card-inner border border-border bg-surface-raised/70 p-3" aria-label="Encrypted manifest diff">
+        <strong>Encrypted before</strong><NCode :code="store.currentDiff.before" language="yaml" />
+        <strong>Encrypted after</strong><NCode :code="store.currentDiff.after" language="yaml" />
+      </div>
+      <div v-else-if="store.newSecretDraft" class="flex flex-col gap-2 rounded-card-inner border border-border bg-surface-raised/70 p-3" aria-label="Encrypted new secret draft">
+        <strong>Encrypted new SealedSecret {{ store.newSecretDraft.name }}</strong><NCode :code="store.newSecretDraft.yaml" language="yaml" />
+      </div>
+      <div v-if="store.dryRunResult" class="flex flex-col gap-2 rounded-card-inner border border-border bg-surface-raised/70 p-3" aria-label="Encrypted Git dry-run">
+        <strong>Git before</strong><NCode :code="store.dryRunResult.before" language="yaml" />
+        <strong>Git after</strong><NCode :code="store.dryRunResult.after" language="yaml" />
+        <p class="m-0 text-sm text-muted">Path: {{ store.dryRunResult.path }} · base: {{ store.dryRunResult.base_commit }}</p>
+      </div>
       <NAlert v-if="stage === 'apply'" type="warning" title="Run dry run before delivery">Confirm the encrypted patch, then run a server-side dry run before delivering through the {{ mode }} policy.</NAlert>
       <NButton v-if="stage === 'apply'" type="primary" :loading="applying" @click="applyPatch">Apply reviewed patch</NButton>
       <NButton v-else-if="stage === 'dry-run' && canDeliverNow" type="primary" :loading="loading" @click="runDryRun">Run dry run</NButton>
