@@ -50,8 +50,11 @@ describe('app shell', () => {
     expect(group.exists()).toBe(true)
     expect(group.attributes('aria-label')).toBe('Colour theme')
 
+    // Located by aria-label, not by text: the options are glyph-only, and the
+    // svg inside them is aria-hidden, so the label attribute is the only name
+    // these controls have. Asserting it here is what keeps that true.
     const options = wrapper.findAll('[aria-pressed]')
-    expect(options.map((option) => option.text())).toEqual(['Light', 'Dark', 'System'])
+    expect(options.map((option) => option.attributes('aria-label'))).toEqual(['Light', 'Dark', 'System'])
     for (const option of options) expect(option.attributes('aria-pressed')).toBeDefined()
   })
 
@@ -61,12 +64,12 @@ describe('app shell', () => {
     const wrapper = mountShell()
 
     const pressed = () => wrapper.findAll('[aria-pressed]').filter((option) => option.attributes('aria-pressed') === 'true')
-    expect(pressed().map((option) => option.text())).toEqual(['Dark'])
+    expect(pressed().map((option) => option.attributes('aria-label'))).toEqual(['Dark'])
 
-    await wrapper.findAll('[aria-pressed]').find((option) => option.text() === 'Light')!.trigger('click')
+    await wrapper.findAll('[aria-pressed]').find((option) => option.attributes('aria-label') === 'Light')!.trigger('click')
 
     expect(ui.themePreference).toBe('light')
-    expect(pressed().map((option) => option.text())).toEqual(['Light'])
+    expect(pressed().map((option) => option.attributes('aria-label'))).toEqual(['Light'])
   })
 
   it('offers a skip link to the main region it renders', () => {

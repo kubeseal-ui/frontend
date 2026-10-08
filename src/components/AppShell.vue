@@ -117,26 +117,39 @@ async function logout() {
              override: two utilities on the same property are resolved by
              stylesheet order, not by the order they appear in the attribute.
 
-             Each button keeps its word next to its glyph: the icon is a
-             mnemonic, not the label. That is also why the icons cost the test
-             suite nothing — AppIcon renders an svg with no text node, so
-             `button.text()` is still exactly "Light", "Dark", or "System". -->
+             Each button is its glyph alone, so the word has to live somewhere
+             else: `aria-label` names the control for a screen reader, and
+             `title` is what a pointer user gets on hover. AppIcon is
+             `aria-hidden` and renders no text node, so without the label
+             attribute these three buttons would have no accessible name at all.
+             That is also what app-shell.spec.ts now locates them by.
+
+             Glyph-only is only safe because the three are unambiguous: sun and
+             moon are read as light and dark without a legend, and the display
+             is the standing mnemonic for "whatever the system is doing" — the
+             one state that has no conventional glyph and so the one where the
+             hover label is doing real work rather than restating the obvious.
+
+             The font-weight classes went with the words — weight says nothing
+             about an icon. The state is still carried by fill and by the
+             selected chip's shadow, and still exposed with aria-pressed. -->
         <div class="flex items-center gap-[2px] rounded-chip bg-bg/70 p-[3px]" role="group" aria-label="Colour theme">
           <button
             v-for="theme in themes"
             :key="theme.value"
             type="button"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-chip border-0 px-2.5 py-1 text-xs"
+            :aria-label="theme.label"
+            :title="theme.label"
+            class="inline-flex cursor-pointer items-center justify-center rounded-chip border-0 p-1.5"
             :class="
               ui.themePreference === theme.value
-                ? 'bg-surface font-bold text-ink shadow-sm'
-                : 'bg-transparent font-semibold text-muted hover:text-ink'
+                ? 'bg-surface text-ink shadow-sm'
+                : 'bg-transparent text-muted hover:text-ink'
             "
             :aria-pressed="ui.themePreference === theme.value"
             @click="ui.setThemePreference(theme.value)"
           >
-            <AppIcon :name="theme.icon" :size="12" />
-            {{ theme.label }}
+            <AppIcon :name="theme.icon" :size="14" />
           </button>
         </div>
 
