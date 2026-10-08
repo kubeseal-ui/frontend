@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Troubleshooting guide
-    url: https://github.com/kubeseal-ui/api/blob/main/docs/troubleshooting.md
-    about: Login loops, missing namespaces, drift blocks, reveal and delivery errors.
-  - name: Private security disclosure
-    url: https://github.com/kubeseal-ui/api/security/advisories/new
-    about: Report a vulnerability privately instead of opening a public issue.
