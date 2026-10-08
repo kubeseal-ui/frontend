@@ -90,18 +90,18 @@ onBeforeUnmount(() => clear())
           <AppSecretInput
             v-model="revealed[key]"
             readonly
-            :aria-label="`Revealed value for ${key}`"
+            :ariaLabel="`Revealed value for ${key}`"
           />
           <AppSecretInput
             v-model="replacements[key]"
             placeholder="Replacement value"
-            :aria-label="`Replacement value for ${key}`"
+            :ariaLabel="`Replacement value for ${key}`"
           />
           <AppRadioGroup
             :model-value="operation[key] || 'replace'"
             :name="`operation-${key}`"
             :options="OPERATIONS"
-            :aria-label="`Operation for ${key}`"
+            :ariaLabel="`Operation for ${key}`"
             :disabled="!canPatch"
             @update:model-value="setOperation(key, $event)"
           />

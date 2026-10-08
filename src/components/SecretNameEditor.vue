@@ -64,13 +64,13 @@ function discard() {
 <template>
   <AppCard v-if="canCreate" title="Create new SealedSecret" icon="plus">
     <div class="flex flex-col gap-3">
-      <AppInput v-model="name" aria-label="New secret name" placeholder="Secret name" />
+      <AppInput v-model="name" ariaLabel="New secret name" placeholder="Secret name" />
 
       <AppRadioGroup
         v-model="scope"
         name="secret-scope"
         :options="scopes"
-        aria-label="Secret scope"
+        ariaLabel="Secret scope"
       />
 
       <AppSelect
@@ -81,7 +81,7 @@ function discard() {
         :options="pathOptions"
       />
 
-      <AppTextarea v-model="yaml" aria-label="New secret YAML" placeholder="Complete Kubernetes Secret YAML" :rows="6" />
+      <AppTextarea v-model="yaml" ariaLabel="New secret YAML" placeholder="Complete Kubernetes Secret YAML" :rows="6" />
 
       <div>
         <AppButton
