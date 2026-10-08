@@ -15,6 +15,13 @@ export const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/namespaces/:namespace/new',
+      name: 'new-secret',
+      component: () => import('./views/NewSecretView.vue'),
+      props: true,
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/secrets/:namespace/:name',
       name: 'secret-detail',
       component: () => import('./views/SecretDetailView.vue'),

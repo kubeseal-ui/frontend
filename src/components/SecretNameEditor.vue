@@ -3,9 +3,14 @@ import { computed, ref, onMounted } from 'vue'
 import { NAlert, NButton, NCard, NInput, NRadio, NRadioGroup, NSpace, NSelect } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
+import { ApiError } from '@/api'
 import type { NamespaceGitPaths } from '@/types'
 
-const props = defineProps<{ namespace: string; baseCommit: string }>()
+// baseCommit is the branch head to deliver against. It is optional: callers
+// that do not already hold one (the create page) omit it and take the head the
+// server reports back from the encrypt call, which is where the vacancy check
+// happens. Callers that hold one — the detail page — still win with it.
+const props = defineProps<{ namespace: string; baseCommit?: string }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
 const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetPath = ref(''); const error = ref(''); const loading = ref(false)
@@ -30,7 +35,16 @@ async function createDraft() {
   try {
     await store.createNewSecretDraft(props.namespace, name.value, yaml.value, scope.value, props.baseCommit, targetPath.value || undefined)
     yaml.value = ''
-  } catch (e) { error.value = e instanceof Error ? e.message : 'Encryption failed' }
+  } catch (e) {
+    // The server refuses to encrypt onto an occupied mapped path. Say so
+    // plainly and point at the flow that is allowed to change that manifest,
+    // rather than echoing the envelope message alone.
+    if (e instanceof ApiError && e.code === 'PATH_OCCUPIED') {
+      error.value = `${e.message} Use the existing Secret instead: open it from the namespace list and edit one value there.`
+    } else {
+      error.value = e instanceof Error ? e.message : 'Encryption failed'
+    }
+  }
   finally { loading.value = false }
 }
 

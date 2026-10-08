@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import { NButton, NCard, NEmpty, NSpin } from 'naive-ui'
+import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 
 const props = defineProps<{ namespace: string }>()
+const router = useRouter()
 const secrets = useSecretsStore()
+const auth = useAuthStore()
 const loaded = ref(false)
+
+// Hiding the control is a usability affordance; the server refuses an
+// unauthorized seal independently.
+const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
+
+function createSecret() {
+  router.push(`/namespaces/${encodeURIComponent(props.namespace)}/new`)
+}
 
 /**
  * Drift is conveyed by colour in the stylesheet, but never by colour alone:
@@ -47,7 +58,10 @@ onMounted(load)
         <p class="eyebrow">Namespace</p>
         <h1 id="namespace-title">{{ props.namespace }}</h1>
       </div>
-      <NButton secondary @click="load">Refresh</NButton>
+      <div class="heading-actions">
+        <NButton v-if="canSeal" type="primary" @click="createSecret">Create new Secret</NButton>
+        <NButton secondary @click="load">Refresh</NButton>
+      </div>
     </div>
 
     <NSpin :show="!loaded || secrets.loading">

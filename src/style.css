@@ -170,6 +170,7 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
 
 .content-shell { width: min(1100px, calc(100% - 2rem)); margin: 0 auto; padding: 2.5rem 0 4rem; }
 .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.heading-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
 .eyebrow { margin: 0 0 .35rem; color: var(--color-accent); font-size: .75rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 0; font-size: clamp(1.8rem, 4vw, 2.5rem); letter-spacing: -.03em; }

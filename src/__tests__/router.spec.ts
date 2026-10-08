@@ -24,6 +24,14 @@ describe('router', () => {
     expect(secretDetail?.path).toBe('/secrets/:namespace/:name')
   })
 
+  // Creating a Secret is an action on the namespace, not on an existing Secret,
+  // so it needs its own address rather than living under /secrets/.
+  it('exposes the new-secret route at /namespaces/:namespace/new', () => {
+    const newSecret = router.getRoutes().find((r) => r.name === 'new-secret')
+    expect(newSecret).toBeDefined()
+    expect(newSecret?.path).toBe('/namespaces/:namespace/new')
+  })
+
   it('resolves "/" to the home route', async () => {
     await router.push('/')
     await router.isReady()

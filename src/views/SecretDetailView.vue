@@ -5,15 +5,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import SecretKeyEditor from '@/components/SecretKeyEditor.vue'
-import SecretNameEditor from '@/components/SecretNameEditor.vue'
 import DeliveryPanel from '@/components/DeliveryPanel.vue'
 
 const route = useRoute(); const router = useRouter(); const auth = useAuthStore(); const store = useSecretsStore()
 const loading = ref(true); const error = ref('')
 const namespace = () => String(route.params.namespace); const name = () => String(route.params.name)
 const canPatch = computed(() => auth.hasCapability(namespace(), 'secret:seal') && auth.hasCapability(namespace(), 'secret:decrypt'))
-const canCreate = computed(() => auth.hasCapability(namespace(), 'secret:seal'))
-const showReview = computed(() => canPatch.value || canCreate.value)
+// Review and delivery on this page now only ever follow a one-key patch.
+// Creating a new Secret is an action on the namespace, not on someone else's
+// Secret, and lives at /namespaces/:namespace/new.
+const showReview = computed(() => canPatch.value)
 
 async function load() { 
   loading.value = true; 
@@ -87,7 +88,6 @@ watch(() => [route.params.namespace, route.params.name], load)
         </NAlert>
         <NCard title="Metadata" segmented class="glass-blur"><NDescriptions label-placement="left" :column="1"><NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem><NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem><NDescriptionsItem label="Keys"><span v-for="key in store.currentDetail.keys" :key="key" class="metadata-key">{{ key }}</span></NDescriptionsItem><NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem><NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem><NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem></NDescriptions></NCard>
         <SecretKeyEditor :detail="store.currentDetail" />
-        <SecretNameEditor :namespace="namespace()" :base-commit="store.currentDetail.git.base_commit || ''" />
         <DeliveryPanel v-if="showReview" :detail="store.currentDetail" />
       </template>
     </NSpin>
