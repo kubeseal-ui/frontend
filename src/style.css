@@ -228,17 +228,19 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
 }
 
 /*
- * Naive UI's NCard carries its own background, border, and shadow, and injects
- * that stylesheet at runtime — after this one. At equal specificity Naive wins
- * on source order, so the card's material is stated one level of specificity
- * higher. (The opaque fallbacks below use !important instead, for the different
- * reason that they must also overrule Naive's own colour variable.)
+ * Form controls. One utility rather than the same block of declarations in
+ * every input, select, and textarea; the field primitives apply it.
+ *
+ * Written longhand rather than with @apply so the placeholder and focus colours
+ * can name palette tokens directly. The contrast spec resolves every var() in
+ * this file, so these have to stay tokens rather than literals.
  */
-.n-card.glass {
-  background-color: var(--glass-fill);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--radius-card);
-  box-shadow: var(--glass-shadow);
+@utility field {
+  @apply w-full rounded-xl border border-border-strong bg-surface-raised px-3 py-2 text-sm text-ink;
+
+  &::placeholder { color: var(--app-muted); }
+  &:focus-visible { border-color: var(--app-accent); }
+  &:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 /* The specular highlight, moved to the pointer by useGlassSpecular. It is held
@@ -258,12 +260,22 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(28% 40% at var(--glass-x) var(--glass-y), var(--glass-specular), transparent 70%);
+  /* The highlight is capped in absolute terms as well as relative ones. A pure
+     percentage size scales with the surface, which is fine on a card and wrong
+     on anything long and thin: on the full-width header, 28% x 40% becomes a
+     500px-wide ellipse a few pixels tall, which smears across the chrome
+     instead of reading as a lit point. min() keeps it circular-ish everywhere. */
+  background: radial-gradient(min(28%, 150px) min(40%, 150px) at var(--glass-x) var(--glass-y), var(--glass-specular), transparent 70%);
   opacity: 0;
   transition: opacity 400ms cubic-bezier(.32, .72, 0, 1);
 }
 .glass:hover::before,
 .glass:focus-within::before { opacity: 1; }
+
+/* The header keeps the rim and the blur but never the pointer highlight: it is
+   chrome, not content, and it is the one surface whose proportions guarantee
+   the gradient above distorts. */
+header.glass::before { display: none; }
 
 /*
  * Tier 2: edge refraction. The filter bends the backdrop near the shape's
@@ -301,13 +313,13 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
  * engine can honour the preference while having full blur support. Both are
  * therefore handled, and both must produce the same opaque result.
  *
- * The card selector is restated in both blocks because `.n-card.glass` above
- * out-specifies a bare `.glass`, and would otherwise keep the rim and the lift
- * on a surface that is no longer glass.
+ * The material has a single selector now, so each block states `.glass` once.
+ * There is no second, more specific rule that would survive the fallback and
+ * keep the rim and the lift on a surface that is no longer glass.
  */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   body::before { display: none; }
-  .glass, .n-card.glass {
+  .glass {
     background: var(--app-surface);
     border: 1px solid var(--app-border);
     -webkit-backdrop-filter: none;
@@ -316,15 +328,11 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
   }
   .glass::before { display: none; }
   .header-cluster { background: var(--app-surface); }
-  /* Naive resolves the card's colour from its own variable, so this is the one
-     place !important is the right tool: it is not fighting specificity, it is
-     overruling a value Naive owns. */
-  .n-card { background-color: var(--app-surface) !important; }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   body::before { display: none; }
-  .glass, .n-card.glass {
+  .glass {
     background: var(--app-surface);
     border: 1px solid var(--app-border);
     -webkit-backdrop-filter: none;
@@ -333,7 +341,6 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
   }
   .glass::before { display: none; }
   .header-cluster { background: var(--app-surface); }
-  .n-card { background-color: var(--app-surface) !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

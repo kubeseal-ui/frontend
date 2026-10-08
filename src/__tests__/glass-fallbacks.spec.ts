@@ -50,9 +50,8 @@ describe('the material degrades in three tiers', () => {
     // vocabulary as the templates that use it.
     expect(block).toContain('backdrop-blur')
     // The fill, rim, and lift come from shared tokens rather than being spelled
-    // out here, because `.n-card.glass` below has to state the same material at
-    // a higher specificity than Naive UI's own card rules — one definition, two
-    // selectors, no chance of the two drifting apart.
+    // out here, so the derived material resolves against whatever palette is in
+    // force at use time: one definition, both themes, no second copy of a value.
     expect(block).toContain('var(--glass-fill)')
     expect(block).toContain('var(--glass-shadow)')
     // The rim is what separates glass from a flat translucent fill: without a

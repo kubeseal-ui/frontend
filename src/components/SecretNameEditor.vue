@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { NAlert, NButton, NCard, NInput, NRadio, NRadioGroup, NSpace, NSelect } from 'naive-ui'
+import AppAlert from '@/components/ui/AppAlert.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppInput from '@/components/ui/AppInput.vue'
+import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppTextarea from '@/components/ui/AppTextarea.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { ApiError } from '@/api'
@@ -24,6 +30,7 @@ const currentNsPaths = computed((): NamespaceGitPaths | undefined => {
 })
 const allowedPaths = computed(() => currentNsPaths.value?.allowed_paths || [])
 const defaultPath = computed(() => currentNsPaths.value?.default_path || '')
+const pathOptions = computed(() => [{ label: 'Use default path', value: '' }, ...allowedPaths.value.map(p => ({ label: p, value: p }))])
 
 onMounted(() => {
   store.fetchGitPaths()
@@ -55,37 +62,47 @@ function discard() {
 </script>
 
 <template>
-  <NCard v-if="canCreate" title="Create new SealedSecret" segmented class="glass">
-    <NSpace vertical>
-      <NInput v-model:value="name" placeholder="Secret name" :input-props="{ 'aria-label': 'New secret name' }" />
-      <NRadioGroup v-model:value="scope" name="secret-scope">
-        <NSpace>
-          <NRadio v-for="option in scopes" :key="option.value" :value="option.value">{{ option.label }}</NRadio>
-        </NSpace>
-      </NRadioGroup>
-      <div v-if="currentNsPaths && allowedPaths.length > 0" class="flex flex-col gap-1">
-        <label class="text-sm font-medium">Target directory</label>
-        <NSelect
-          v-model:value="targetPath"
-          :options="[{ label: defaultPath, value: '' }, ...allowedPaths.map(p => ({ label: p, value: p }))]"
-          placeholder="Use default path"
-          class="w-full"
-        />
-        <p class="m-0 text-xs text-muted">Default: {{ defaultPath }}</p>
-      </div>
-      <NInput
-        v-model:value="yaml"
-        type="textarea"
-        placeholder="Complete Kubernetes Secret YAML"
-        :autosize="{ minRows: 5, maxRows: 12 }"
-        :input-props="{ 'aria-label': 'New secret YAML' }"
+  <AppCard v-if="canCreate" title="Create new SealedSecret" icon="plus">
+    <div class="flex flex-col gap-3">
+      <AppInput v-model="name" aria-label="New secret name" placeholder="Secret name" />
+
+      <AppRadioGroup
+        v-model="scope"
+        name="secret-scope"
+        :options="scopes"
+        aria-label="Secret scope"
       />
-      <NButton type="primary" :loading="loading" :disabled="!name || !yaml" @click="createDraft">Encrypt for review</NButton>
-      <NAlert v-if="error" type="error" title="Unable to encrypt">{{ error }}</NAlert>
-      <NAlert v-if="store.newSecretDraft" type="success" title="Encrypted draft ready">
+
+      <AppSelect
+        v-if="currentNsPaths && allowedPaths.length > 0"
+        v-model="targetPath"
+        label="Target directory"
+        :hint="`Default: ${defaultPath}`"
+        :options="pathOptions"
+      />
+
+      <AppTextarea v-model="yaml" aria-label="New secret YAML" placeholder="Complete Kubernetes Secret YAML" :rows="6" />
+
+      <div>
+        <AppButton
+          variant="primary"
+          icon="lock"
+          :loading="loading"
+          :disabled="!name || !yaml"
+          @click="createDraft"
+        >
+          Encrypt for review
+        </AppButton>
+      </div>
+
+      <AppAlert v-if="error" type="error" title="Unable to encrypt">{{ error }}</AppAlert>
+      <AppAlert v-if="store.newSecretDraft" type="success" title="Encrypted draft ready">
         Ciphertext for {{ store.newSecretDraft.name }} is queued in the shared review and delivery panel below. The plaintext Secret is no longer held on this page.
-      </NAlert>
-      <NButton v-if="store.newSecretDraft" secondary @click="discard">Discard encrypted draft</NButton>
-    </NSpace>
-  </NCard>
+      </AppAlert>
+
+      <div v-if="store.newSecretDraft">
+        <AppButton @click="discard">Discard encrypted draft</AppButton>
+      </div>
+    </div>
+  </AppCard>
 </template>

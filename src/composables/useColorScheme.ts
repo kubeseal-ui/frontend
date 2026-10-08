@@ -1,6 +1,12 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from 'vue'
 import { useUiStore } from '@/stores/ui'
-import { buildThemeOverrides, type ThemeMode } from '@/theme/naive'
+
+/**
+ * The theme actually in force — the two states the stylesheet can express.
+ * The three-state *preference* (`light | dark | system`) belongs to the UI
+ * store, which owns it; this is only what it resolves to.
+ */
+type ThemeMode = 'light' | 'dark'
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 
@@ -54,6 +60,5 @@ export function useColorScheme() {
   return {
     resolvedTheme,
     isDark: computed(() => resolvedTheme.value === 'dark'),
-    themeOverrides: computed(() => buildThemeOverrides(resolvedTheme.value)),
   }
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { NButton } from 'naive-ui'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore, type ThemePreference } from '@/stores/ui'
 import { LENS_MAP } from '@/theme/lens-map'
@@ -86,11 +87,19 @@ async function logout() {
       class="glass sticky top-0 z-10 flex items-center justify-between gap-4 rounded-none px-[clamp(1rem,4vw,4rem)] py-[0.7rem] data-[contracted=true]:py-[0.45rem]"
       :data-contracted="String(contracted)"
     >
-      <RouterLink to="/" class="text-[1.1rem] font-bold tracking-tight text-ink no-underline">kubeseal-ui</RouterLink>
+      <RouterLink to="/" class="flex items-center gap-2 text-[1.1rem] font-bold tracking-tight text-ink no-underline">
+        <span class="flex size-7 items-center justify-center rounded-lg border border-border-strong/60 bg-surface/60 text-accent">
+          <AppIcon name="lock" :size="16" />
+        </span>
+        kubeseal-ui
+      </RouterLink>
 
       <!-- One grouped pill rather than three separate translucent controls. -->
       <div class="header-cluster flex items-center gap-2 rounded-chip border border-border-strong/50 bg-surface/70 py-1 pl-3 pr-1.5">
-        <span v-if="displayName" class="text-sm text-muted">{{ displayName }}</span>
+        <span v-if="displayName" class="flex items-center gap-1.5 text-sm text-muted">
+          <AppIcon name="shield" :size="14" />
+          {{ displayName }}
+        </span>
 
         <!-- A segmented control of pressed buttons rather than a radio group:
              the state is exposed per control with aria-pressed and the group
@@ -110,7 +119,7 @@ async function logout() {
           </button>
         </div>
 
-        <NButton v-if="auth.isAuthenticated" secondary @click="logout">Sign out</NButton>
+        <AppButton v-if="auth.isAuthenticated" variant="secondary" icon="sign-out" @click="logout">Sign out</AppButton>
       </div>
     </header>
 
