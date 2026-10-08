@@ -35,6 +35,14 @@ const GIT_PATHS: GitPathsConfig = {
 beforeEach(() => {
   setActivePinia(pinia)
   vi.restoreAllMocks()
+  // Every mount of the create page resolves the namespace's Git paths. Left
+  // unmocked that is a real request to the happy-dom document origin
+  // (http://localhost:3000), and because the store is a singleton shared across
+  // these tests, its connection failure lands *after* the test that started it
+  // — running fetchGitPaths's catch and clearing gitPaths out from under a
+  // later test, which surfaces as a missing delivery control rather than as a
+  // failed fetch. Mocking it here means no test can leak a real request.
+  vi.spyOn(api, 'getGitPaths').mockResolvedValue(GIT_PATHS)
   useSecretsStore(pinia).$reset()
   document.body.innerHTML = ''
 })
