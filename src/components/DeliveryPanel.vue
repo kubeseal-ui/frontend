@@ -73,7 +73,7 @@ async function deliver() {
 </script>
 
 <template>
-  <NCard v-if="hasReview" title="Encrypted review and delivery" segmented>
+  <NCard v-if="hasReview" title="Encrypted review and delivery" segmented class="glass-blur">
     <NSpace vertical>
       <NAlert type="info" title="Encrypted review">Only encrypted manifests are shown. The server resolved the repository, branch, path, and delivery mode.</NAlert>
       <div v-if="store.currentDiff" class="encrypted-diff" aria-label="Encrypted manifest diff"><strong>Encrypted before</strong><NCode :code="store.currentDiff.before" language="yaml" /><strong>Encrypted after</strong><NCode :code="store.currentDiff.after" language="yaml" /></div>

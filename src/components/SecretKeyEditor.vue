@@ -44,7 +44,7 @@ onBeforeUnmount(() => clear())
 </script>
 
 <template>
-  <NCard title="Secret keys" segmented>
+  <NCard title="Secret keys" segmented class="glass-blur">
     <NAlert v-if="!detail.git.in_sync_with_live" type="warning" title="Editing disabled">Git and live state differ. Resolve drift before revealing or editing values.</NAlert>
     <NAlert v-if="!canReveal" type="info" title="Values concealed">You can inspect encrypted key names, but this namespace does not grant reveal access.</NAlert>
     <NAlert v-if="error" type="error" title="Operation failed" closable @close="error = ''">{{ error }}</NAlert>

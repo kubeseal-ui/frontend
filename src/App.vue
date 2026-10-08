@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { NConfigProvider, NMessageProvider } from 'naive-ui'
+import { NConfigProvider, NMessageProvider, darkTheme, lightTheme } from 'naive-ui'
+import AppShell from '@/components/AppShell.vue'
+import { useColorScheme } from '@/composables/useColorScheme'
+
+// Resolving the scheme here, in the app root's setup, publishes data-theme
+// before the first paint. Until the bundle runs, the stylesheet's
+// prefers-color-scheme block governs, so there is no unstyled flash.
+const { isDark, themeOverrides } = useColorScheme()
 </script>
 
 <template>
-  <NConfigProvider>
+  <NConfigProvider :theme="isDark ? darkTheme : lightTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
-      <RouterView />
+      <AppShell>
+        <RouterView />
+      </AppShell>
     </NMessageProvider>
   </NConfigProvider>
 </template>

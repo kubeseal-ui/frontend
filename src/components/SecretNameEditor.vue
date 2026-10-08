@@ -41,7 +41,7 @@ function discard() {
 </script>
 
 <template>
-  <NCard v-if="canCreate" title="Create new SealedSecret" segmented>
+  <NCard v-if="canCreate" title="Create new SealedSecret" segmented class="glass-blur">
     <NSpace vertical>
       <NInput v-model:value="name" placeholder="Secret name" :input-props="{ 'aria-label': 'New secret name' }" />
       <NRadioGroup v-model:value="scope" name="secret-scope">

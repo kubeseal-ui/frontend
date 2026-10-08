@@ -65,7 +65,7 @@ watch(() => [route.params.namespace, route.params.name], load)
 </script>
 
 <template>
-  <main id="main-content" class="content-shell detail-page">
+  <div class="detail-page">
     <NButton text @click="router.push({ name: 'namespace', params: { namespace: namespace() } })">← Back to namespace</NButton>
     <NSpin :show="loading">
       <NAlert v-if="error" type="error" title="Could not load SealedSecret"><p>{{ error }}</p><NButton secondary @click="load">Retry</NButton></NAlert>
@@ -85,11 +85,11 @@ watch(() => [route.params.namespace, route.params.name], load)
             </NButton>
           </div>
         </NAlert>
-        <NCard title="Metadata" segmented><NDescriptions label-placement="left" :column="1"><NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem><NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem><NDescriptionsItem label="Keys"><span v-for="key in store.currentDetail.keys" :key="key" class="metadata-key">{{ key }}</span></NDescriptionsItem><NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem><NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem><NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem></NDescriptions></NCard>
+        <NCard title="Metadata" segmented class="glass-blur"><NDescriptions label-placement="left" :column="1"><NDescriptionsItem label="Namespace">{{ store.currentDetail.namespace }}</NDescriptionsItem><NDescriptionsItem label="Scope">{{ store.currentDetail.scope || 'strict' }}</NDescriptionsItem><NDescriptionsItem label="Keys"><span v-for="key in store.currentDetail.keys" :key="key" class="metadata-key">{{ key }}</span></NDescriptionsItem><NDescriptionsItem label="Git status">{{ driftStatus() }}</NDescriptionsItem><NDescriptionsItem label="Mapped path">{{ store.currentDetail.git.file_path || 'Unavailable' }}</NDescriptionsItem><NDescriptionsItem label="Base commit">{{ store.currentDetail.git.base_commit || 'Unavailable' }}</NDescriptionsItem></NDescriptions></NCard>
         <SecretKeyEditor :detail="store.currentDetail" />
         <SecretNameEditor :namespace="namespace()" :base-commit="store.currentDetail.git.base_commit || ''" />
         <DeliveryPanel v-if="showReview" :detail="store.currentDetail" />
       </template>
     </NSpin>
-  </main>
+  </div>
 </template>
