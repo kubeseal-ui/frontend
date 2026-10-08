@@ -112,7 +112,6 @@ describe('the create page', () => {
   it('runs form to encryption to dry run to delivery with no Secret detail anywhere', async () => {
     grant(['secret:seal', 'gitops:propose'])
     const store = useSecretsStore(pinia)
-    vi.spyOn(api, 'getGitPaths').mockResolvedValue(GIT_PATHS)
     // The server reports the branch head it verified the vacant path against.
     vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret', base_commit: 'head-1' } } as never)
 
@@ -149,7 +148,6 @@ describe('the create page', () => {
   it('withholds delivery when the server reported no base commit', async () => {
     grant(['secret:seal', 'gitops:propose'])
     const store = useSecretsStore(pinia)
-    vi.spyOn(api, 'getGitPaths').mockResolvedValue(GIT_PATHS)
     // The namespace is mapped, but the response carries no head for it.
     vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
 
@@ -159,14 +157,16 @@ describe('the create page', () => {
 
     expect(store.newSecretDraft?.base_commit).toBe('')
     // Both GitOps endpoints reject an empty base commit, so neither control is
-    // offered rather than being offered and then refused with a 400.
+    // offered rather than being offered and then refused with a 400. The
+    // namespace is mapped, so the alert must be the missing-head one, not the
+    // no-delivery-policy one — both carry the same "Delivery unavailable" title.
     expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
     expect(wrapper.text()).toContain('Delivery unavailable')
+    expect(wrapper.text()).toContain('did not report a base commit')
   })
 
   it('explains an occupied mapped path instead of overwriting the manifest', async () => {
     grant(['secret:seal'])
-    vi.spyOn(api, 'getGitPaths').mockResolvedValue(GIT_PATHS)
     vi.spyOn(api, 'post').mockRejectedValue(new ApiError(409, { error: { code: 'PATH_OCCUPIED', message: 'A manifest for this Secret already exists at the mapped path' } }))
 
     const wrapper = mountNewSecretView()
@@ -182,7 +182,6 @@ describe('the create page', () => {
     grant(['secret:seal'])
     const store = useSecretsStore(pinia)
     store.newSecretDraft = { namespace: 'payments', name: 'brand-new', scope: 'strict', yaml: 'encrypted-new-secret', base_commit: 'head-1' }
-    vi.spyOn(api, 'getGitPaths').mockResolvedValue(GIT_PATHS)
 
     const wrapper = mountNewSecretView()
     await flushPromises()
