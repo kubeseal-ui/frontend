@@ -179,14 +179,24 @@ body {
    fallbacks below remove it entirely. It stays because it is what the glass
    has to refract: remove it and the blur has nothing to show.
 
-   A radial gradient reads as a blob whenever its centre is on screen, and three
-   of them read as a mess: each draws a closed oval the eye can trace against a
-   near-black page. So no centre is on screen. Both are placed above the top
-   edge and sized larger than the viewport, which leaves only their lower tails
-   falling across the page — one soft falloff with no edge anywhere, strongest
-   behind the header and spent by mid-page. The third gradient is gone rather
-   than moved: its centre sat at 55% 82%, which put a green oval inside the
+   Two rules, and the second one is the bug this rule used to have.
+
+   1. No gradient centre is on screen. A radial gradient reads as a blob
+   whenever its centre is visible, and three of them read as a mess: each draws
+   a closed oval the eye can trace. Both centres sit above the top edge, so only
+   their lower tails fall across the page. The third gradient is gone rather
+   than moved: its centre was at 55% 82%, which put a green oval inside the
    first card on every page.
+
+   2. The box overscans the viewport. A cut is visible only when this layer's
+   own edge lands inside the viewport, and the layer used to end at `height:
+   80vh` from a -25% top — an edge at 55% of the viewport, mid-display, with the
+   third gradient still at about 5% alpha and cut off mid-fade. Hence -4% and
+   not 0: the drift below translates the layer by up to 2% of its own size, so
+   at inset 0 the animation would slide the right edge to 98% of the width and
+   cut the wash there instead. The gradients now expire around 61-67% of the
+   viewport height, and anything they still have left at a box edge does so
+   outside the screen.
 
    Chroma is held well below the accent token's own saturation so surfaces read
    neutral the way a system material does; colour belongs on controls. The
@@ -196,7 +206,7 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -4%;
   z-index: -1;
   pointer-events: none;
   background:
