@@ -221,7 +221,7 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
  * the material speaks the same vocabulary as the templates that use it.
  */
 @utility glass {
-  @apply relative overflow-hidden backdrop-blur-2xl backdrop-saturate-150;
+  @apply relative overflow-hidden backdrop-blur-lg backdrop-saturate-150;
   background-color: var(--glass-fill);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--glass-shadow);
@@ -244,12 +244,19 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
 /* The specular highlight, moved to the pointer by useGlassSpecular. It is held
    at zero opacity until the surface is hovered, so a page of cards is not a
    field of competing highlights; reduced motion neutralises the transition
-   through the global rule at the end of this file. */
+   through the global rule at the end of this file.
+
+   It sits at a negative z-index so it paints over the surface's own fill but
+   under its content — a highlight drawn on top of the text would wash out
+   exactly the thing the material exists to keep legible. That is safe here
+   because backdrop-filter gives the element a stacking context, so the
+   highlight cannot escape behind an ancestor's background; where the material
+   is not drawn the rule below removes it outright. */
 .glass::before {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   background: radial-gradient(28% 40% at var(--glass-x) var(--glass-y), var(--glass-specular), transparent 70%);
   opacity: 0;
@@ -272,8 +279,11 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
  */
 @supports (backdrop-filter: url(#liquid-lens)) {
   .glass {
-    -webkit-backdrop-filter: blur(6px) saturate(160%) url(#liquid-lens);
-    backdrop-filter: blur(6px) saturate(160%) url(#liquid-lens);
+    /* The same blur and saturation as the tier this replaces: the lens adds
+       edge refraction, it does not change the diffusion. An engine that takes
+       this branch must not see the material get sharper or flatter. */
+    -webkit-backdrop-filter: blur(16px) saturate(150%) url(#liquid-lens);
+    backdrop-filter: blur(16px) saturate(150%) url(#liquid-lens);
   }
 }
 
@@ -290,10 +300,20 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
  * backdrop-filter while the user has no transparency preference, and a modern
  * engine can honour the preference while having full blur support. Both are
  * therefore handled, and both must produce the same opaque result.
+ *
+ * The card selector is restated in both blocks because `.n-card.glass` above
+ * out-specifies a bare `.glass`, and would otherwise keep the rim and the lift
+ * on a surface that is no longer glass.
  */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   body::before { display: none; }
-  .glass { background: var(--app-surface); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .glass, .n-card.glass {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
   .glass::before { display: none; }
   .header-cluster { background: var(--app-surface); }
   /* Naive resolves the card's colour from its own variable, so this is the one
@@ -304,7 +324,13 @@ button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 
 
 @media (prefers-reduced-transparency: reduce) {
   body::before { display: none; }
-  .glass { background: var(--app-surface); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .glass, .n-card.glass {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
   .glass::before { display: none; }
   .header-cluster { background: var(--app-surface); }
   .n-card { background-color: var(--app-surface) !important; }
