@@ -179,6 +179,15 @@ body {
    fallbacks below remove it entirely. It stays because it is what the glass
    has to refract: remove it and the blur has nothing to show.
 
+   A radial gradient reads as a blob whenever its centre is on screen, and three
+   of them read as a mess: each draws a closed oval the eye can trace against a
+   near-black page. So no centre is on screen. Both are placed above the top
+   edge and sized larger than the viewport, which leaves only their lower tails
+   falling across the page — one soft falloff with no edge anywhere, strongest
+   behind the header and spent by mid-page. The third gradient is gone rather
+   than moved: its centre sat at 55% 82%, which put a green oval inside the
+   first card on every page.
+
    Chroma is held well below the accent token's own saturation so surfaces read
    neutral the way a system material does; colour belongs on controls. The
    drift is deliberately slow — a moving backdrop behind several
@@ -187,15 +196,13 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: -25% -10% auto -10%;
-  height: 80vh;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(45% 55% at 16% 28%, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 72%),
-    radial-gradient(42% 52% at 84% 18%, color-mix(in srgb, var(--app-info) 14%, transparent), transparent 74%),
-    radial-gradient(50% 45% at 55% 82%, color-mix(in srgb, var(--app-success) 10%, transparent), transparent 76%);
-  animation: ambient-drift 60s ease-in-out infinite alternate;
+    radial-gradient(120% 130% at 22% -40%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 78%),
+    radial-gradient(110% 120% at 86% -30%, color-mix(in srgb, var(--app-info) 11%, transparent), transparent 80%);
+  animation: ambient-drift 90s ease-in-out infinite alternate;
 }
 
 @keyframes ambient-drift {

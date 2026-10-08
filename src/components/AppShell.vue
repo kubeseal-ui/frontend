@@ -12,10 +12,10 @@ const ui = useUiStore()
 
 const displayName = computed(() => auth.user?.name || auth.user?.username || '')
 
-const themes: { value: ThemePreference; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+const themes: { value: ThemePreference; label: string; icon: string }[] = [
+  { value: 'light', label: 'Light', icon: 'sun' },
+  { value: 'dark', label: 'Dark', icon: 'moon' },
+  { value: 'system', label: 'System', icon: 'monitor' },
 ]
 
 // The header contracts once the page has scrolled past the sentinel above it.
@@ -104,17 +104,38 @@ async function logout() {
         <!-- A segmented control of pressed buttons rather than a radio group:
              the state is exposed per control with aria-pressed and the group
              carries the accessible name, which survives being embedded in a
-             header without relying on attribute pass-through. -->
-        <div class="flex items-center gap-[2px] rounded-chip p-[3px]" role="group" aria-label="Colour theme">
+             header without relying on attribute pass-through.
+
+             The track is filled and the button carries no background of its own
+             until it is selected, and both halves are load-bearing. The cluster
+             is bg-surface/70 and the selected chip is bg-surface — the same
+             colour one alpha step apart, about 1/255 against each other. With
+             no track the chip has nothing to contrast against and the control
+             reads as three loose words.
+
+             Each state is one class list rather than a static list plus an
+             override: two utilities on the same property are resolved by
+             stylesheet order, not by the order they appear in the attribute.
+
+             Each button keeps its word next to its glyph: the icon is a
+             mnemonic, not the label. That is also why the icons cost the test
+             suite nothing — AppIcon renders an svg with no text node, so
+             `button.text()` is still exactly "Light", "Dark", or "System". -->
+        <div class="flex items-center gap-[2px] rounded-chip bg-bg/70 p-[3px]" role="group" aria-label="Colour theme">
           <button
             v-for="theme in themes"
             :key="theme.value"
             type="button"
-            class="cursor-pointer rounded-chip border-0 bg-transparent px-2.5 py-1 text-xs font-semibold text-muted hover:text-ink"
-            :class="{ 'bg-surface font-bold text-ink shadow-sm': ui.themePreference === theme.value }"
+            class="inline-flex cursor-pointer items-center gap-1 rounded-chip border-0 px-2.5 py-1 text-xs"
+            :class="
+              ui.themePreference === theme.value
+                ? 'bg-surface font-bold text-ink shadow-sm'
+                : 'bg-transparent font-semibold text-muted hover:text-ink'
+            "
             :aria-pressed="ui.themePreference === theme.value"
             @click="ui.setThemePreference(theme.value)"
           >
+            <AppIcon :name="theme.icon" :size="12" />
             {{ theme.label }}
           </button>
         </div>

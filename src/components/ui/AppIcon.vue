@@ -51,6 +51,27 @@ const icons: Record<string, string[]> = {
     'M21.5 12S18 18.5 12 18.5a10 10 0 0 1-4.3-1',
     'm4 4 16 16',
   ],
+  // The three theme states. Sun and moon are read as light and dark without a
+  // legend; the display says "whatever the system is doing", which is the one
+  // state with no conventional glyph and therefore the one that most needs its
+  // word kept beside it.
+  sun: [
+    'M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z',
+    'M12 2.5v2',
+    'M12 19.5v2',
+    'M2.5 12h2',
+    'M19.5 12h2',
+    'm5.3 5.3 1.4 1.4',
+    'm17.3 17.3 1.4 1.4',
+    'm17.3 5.3 1.4-1.4',
+    'm5.3 18.7 1.4-1.4',
+  ],
+  moon: ['M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'],
+  monitor: [
+    'M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z',
+    'M12 18v3',
+    'M8 21h8',
+  ],
 }
 
 withDefaults(defineProps<{ name: string; size?: number }>(), { size: 18 })
