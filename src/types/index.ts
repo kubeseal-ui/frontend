@@ -31,7 +31,7 @@ export interface Namespace {
 export interface GitState {
   managed: boolean
   in_sync_with_live: boolean
-  drift: 'in-sync' | 'diverged' | 'unknown'
+  drift: 'in-sync' | 'diverged' | 'live_only' | 'git_only' | 'unknown'
   // Present only when the Git source was read successfully.
   base_commit?: string
   file_path?: string

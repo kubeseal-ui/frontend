@@ -36,6 +36,8 @@ h2 { margin-bottom: .35rem; font-size: 1.05rem; }
 .status-badge { display: inline-flex; border: 1px solid var(--color-border); border-radius: 999px; padding: .2rem .55rem; font-size: .75rem !important; font-weight: 650; }
 .status-badge[data-status="in-sync"] { color: var(--color-success); }
 .status-badge[data-status="diverged"] { color: var(--color-danger); }
+.status-badge[data-status="live_only"], .status-badge[data-status="live-only"] { color: var(--color-warning, #f59e0b); }
+.status-badge[data-status="git_only"], .status-badge[data-status="git-only"] { color: var(--color-info, #3b82f6); }
 .state-panel { display: grid; gap: .5rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: .75rem; background: var(--color-surface); }
 .error-panel { border-color: #f0b4ae; }
 .error-panel p { margin-bottom: .25rem; color: var(--color-muted); }

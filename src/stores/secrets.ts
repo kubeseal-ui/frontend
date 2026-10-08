@@ -31,6 +31,7 @@ export const useSecretsStore = defineStore('secrets', {
     /** Server-side Git dry-run for the reviewed ciphertext. The server resolves repository, branch, and path. */
     async dryRun(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.dryRunResult = response.data; return response.data },
     async deliver(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DeliveryResult>('/api/v1/gitops/deliver', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.deliveryResult = response.data; return response.data },
+    async syncToGit(namespace: string, name: string, baseCommit: string) { const response = await api.post<DeliveryResult>('/api/v1/gitops/sync', { namespace, name, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() }); await this.fetchDetail(namespace, name); return response.data },
     async fetchGitPaths() { try { this.gitPaths = await api.getGitPaths(); return this.gitPaths } catch { this.gitPaths = null; return null } },
     clearSensitiveState() { this.currentDetail = null; this.currentDiff = null; this.pendingMutation = null; this.newSecretDraft = null; this.dryRunResult = null; this.deliveryResult = null },
   },

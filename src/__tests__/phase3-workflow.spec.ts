@@ -40,4 +40,13 @@ describe('phase 3 secret workflow', () => {
     expect(dryRun).toHaveBeenCalledWith('/api/v1/gitops/dry-run', { namespace: 'payments', name: 'api', yaml: 'encrypted-after', base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
     expect(JSON.stringify(store.dryRunResult)).toContain('git-after')
   })
+
+  it('syncs a drifted live secret to Git with an idempotency key', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { mode: 'direct', commit_sha: 'sha-sync', branch: 'main', file_path: 'clusters/payments/api.yaml', argocd_sync_verified: false } } as never)
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { name: 'api', namespace: 'payments', git: { in_sync_with_live: true, drift: 'in-sync' } } } as never)
+    const store = useSecretsStore()
+    const result = await store.syncToGit('payments', 'api', 'base-123')
+    expect(result.commit_sha).toBe('sha-sync')
+    expect(post).toHaveBeenCalledWith('/api/v1/gitops/sync', { namespace: 'payments', name: 'api', base_commit: 'base-123' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
+  })
 })
