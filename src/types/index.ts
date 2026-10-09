@@ -89,10 +89,34 @@ export interface NamespaceGitPaths {
   mode: 'direct' | 'proposal'
 }
 
+/** The operations one entry of a reviewed batch can carry. */
+export type MutationOperation = 'replace' | 'add' | 'delete'
+
+/**
+ * One entry change in a reviewed batch. A batch is one reviewed diff and one
+ * commit, so several of these travel together rather than one per round trip.
+ * `value` is empty for a delete.
+ */
+export interface Mutation {
+  key: string
+  operation: MutationOperation
+  value: string
+}
+
+/**
+ * The keys and operations the API echoes back for a reviewed batch — never
+ * their values. The caller already holds the values it submitted, and
+ * plaintext has no place in a response body.
+ */
+export interface MutationSummary {
+  key: string
+  operation: MutationOperation
+}
+
 export interface EncryptedDiff {
   before: string
   after: string
-  key: string
+  mutations: MutationSummary[]
   base_commit: string
   checksum: string
   target_path?: string

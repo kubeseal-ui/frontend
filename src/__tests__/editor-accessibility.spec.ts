@@ -36,8 +36,8 @@ function grant(pinia: Pinia, namespace: string, capabilities: Capability[]) {
   useAuthStore(pinia).setSession({ email: 'u@example.com', name: 'User', username: 'u', namespaces: { [namespace]: capabilities } })
 }
 
-function reviewedDiff() {
-  return { before: 'encrypted-before', after: 'encrypted-after', key: 'password', base_commit: 'abc123', checksum: 'sum' }
+function reviewedDiff(mutations = [{ key: 'password', operation: 'replace' as const }]) {
+  return { before: 'encrypted-before', after: 'encrypted-after', mutations, base_commit: 'abc123', checksum: 'sum' }
 }
 
 let pinia: Pinia
@@ -118,8 +118,73 @@ describe('secret key editor accessibility', () => {
     await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
     await flushPromises()
 
-    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', 'password', 'delete', 'rotated', 'abc123')
+    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [{ key: 'password', operation: 'delete', value: '' }], 'abc123')
     expect(wrapper.text()).toContain('Encrypted diff is ready for review.')
+  })
+
+  it('submits every staged change as one batch', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const store = useSecretsStore(pinia)
+    vi.spyOn(store, 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
+    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
+    const wrapper = mountEditor(makeDetail())
+
+    // A replacement, staged without ever revealing the key it replaces.
+    await findButton(wrapper, 'Change')!.trigger('click')
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+
+    // A deletion of the other key, also without a reveal. The radios are found
+    // by the group name, which is unique per row — so this addresses the
+    // username row rather than whichever delete radio happens to come first.
+    await findButton(wrapper, 'Change')!.trigger('click')
+    await wrapper.find('input[name="operation-username"][value="delete"]').setValue()
+
+    // A brand new key: the capability the editor did not have at all before,
+    // because the add controls only ever rendered inside a revealed row.
+    await findButton(wrapper, 'Add key')!.trigger('click')
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('api_key')
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('brand-new')
+
+    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
+    await flushPromises()
+
+    // One batch, one round trip: three keys changed, one diff computed.
+    expect(computeDiff).toHaveBeenCalledTimes(1)
+    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [
+      { key: 'password', operation: 'replace', value: 'rotated' },
+      { key: 'username', operation: 'delete', value: '' },
+      { key: 'api_key', operation: 'add', value: 'brand-new' },
+    ], 'abc123')
+  })
+
+  it('withholds review until every staged change is complete', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const store = useSecretsStore(pinia)
+    vi.spyOn(store, 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
+    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
+    const wrapper = mountEditor(makeDetail())
+
+    // Staged but valueless: the server would refuse it, so the review control
+    // is closed and the reason is stated rather than left to a 400.
+    await findButton(wrapper, 'Change')!.trigger('click')
+    await flushPromises()
+    expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Every key being changed needs a value.')
+
+    // A new key that collides with one already in the Secret is refused in the
+    // same place, because the API refuses an add over an existing key.
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await findButton(wrapper, 'Add key')!.trigger('click')
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('username')
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('clash')
+    expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Every new key needs a name the Secret does not already use: username.')
+
+    // Renamed to something free, the batch submits.
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('api_key')
+    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
+    await flushPromises()
+    expect(computeDiff).toHaveBeenCalledTimes(1)
   })
 
   it('names every control, keeps disabled actions out of the tab order, and focuses what is enabled', async () => {
@@ -154,7 +219,7 @@ describe('delivery panel policy controls', () => {
     grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
     const store = useSecretsStore(pinia)
     store.currentDiff = reviewedDiff()
-    store.pendingMutation = { namespace: 'payments', name: 'api', value: 'rotated', operation: 'replace' }
+    store.pendingMutation = { namespace: 'payments', name: 'api', mutations: [{ key: 'password', operation: 'replace', value: 'rotated' }] }
     vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
       // The real action advances the workflow: the pending mutation is cleared
       // and the reviewed ciphertext stays in currentDiff for the dry run.
@@ -256,7 +321,14 @@ describe('new secret draft review', () => {
     await flushPromises()
 
     expect(store.newSecretDraft).toMatchObject({ namespace: 'payments', name: 'new-cred', yaml: 'encrypted-new-secret', base_commit: 'abc123' })
-    expect((form.find('textarea').element as HTMLTextAreaElement).value).toBe('')
+    // Reset to the template, not to nothing: the template holds no values, so
+    // no part of the submitted manifest survives, and the next Secret starts
+    // from the document's shape rather than from a blank page. The name is kept
+    // because the field is, and the template's name line follows it.
+    const reset = (form.find('textarea').element as HTMLTextAreaElement).value
+    expect(reset).toContain('kind: Secret')
+    expect(reset).toContain('name: new-cred')
+    expect(reset).not.toContain('plaintext-marker')
     expect(form.html()).not.toContain('plaintext-marker')
     expect(JSON.stringify(store.$state)).not.toContain('plaintext-marker')
 

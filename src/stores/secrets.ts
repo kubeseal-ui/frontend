@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { api } from '@/api'
-import type { SealedSecretDetail, SealedSecretSummary, Namespace, DryRunResult, EncryptedDiff, DeliveryResult, NewSecretDraft, ListResponse, GitPathsConfig, NamespaceGitPaths } from '@/types'
+import type { SealedSecretDetail, SealedSecretSummary, Namespace, DryRunResult, EncryptedDiff, DeliveryResult, NewSecretDraft, ListResponse, GitPathsConfig, NamespaceGitPaths, Mutation } from '@/types'
 export type { SealedSecretDetail, SealedSecretSummary } from '@/types'
 
 /** Ciphertext-only draft for a brand new SealedSecret. The plaintext Secret never enters the store. */
-export type { NewSecretDraft, DryRunResult, EncryptedDiff, DeliveryResult, GitPathsConfig }
+export type { NewSecretDraft, DryRunResult, EncryptedDiff, DeliveryResult, GitPathsConfig, Mutation }
 
 function idempotencyKey() { return crypto.randomUUID() }
 
@@ -34,7 +34,14 @@ function resolveGitPaths(config: GitPathsConfig | null, namespace: string): Name
 export const useSecretsStore = defineStore('secrets', {
   state: () => ({
     namespaces: [] as Namespace[], secrets: [] as SealedSecretSummary[], currentDetail: null as SealedSecretDetail | null,
-    currentDiff: null as EncryptedDiff | null, pendingMutation: null as { namespace: string; name: string; value: string; operation: 'replace' | 'add' | 'delete' } | null,
+    currentDiff: null as EncryptedDiff | null,
+    /**
+     * The batch the reviewed diff was computed for, with the Secret it belongs
+     * to. It is kept so the apply step sends exactly what was reviewed rather
+     * than whatever the editor happens to hold by the time the operator
+     * confirms — the review would be meaningless otherwise.
+     */
+    pendingMutation: null as { namespace: string; name: string; mutations: Mutation[] } | null,
     newSecretDraft: null as NewSecretDraft | null,
     dryRunResult: null as DryRunResult | null,
     deliveryResult: null as DeliveryResult | null, loading: false, error: null as Error | null,
@@ -75,9 +82,22 @@ export const useSecretsStore = defineStore('secrets', {
     async fetchSecrets(namespace: string) { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<SealedSecretSummary>>(`/api/v1/secrets?namespace=${encodeURIComponent(namespace)}`); this.secrets = response.data.secrets || []; return this.secrets } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secrets'); throw error } finally { this.loading = false } },
     async fetchDetail(namespace: string, name: string) { this.loading = true; this.error = null; try { const response = await api.get<SealedSecretDetail>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`); this.currentDetail = response.data; return response.data } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secret'); throw error } finally { this.loading = false } },
     async reveal(namespace: string, name: string, key: string, baseCommit: string) { const response = await api.post<{ key: string; value: string }>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/reveal`, { key, base_commit: baseCommit }); return response.data },
-    async computeDiff(namespace: string, name: string, key: string, operation: 'replace' | 'add' | 'delete', value: string, baseCommit: string) { const response = await api.post<EncryptedDiff>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/diff`, { key, operation, value, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() }); this.currentDiff = response.data; this.pendingMutation = { namespace, name, value, operation }; return response.data },
-    async applyReviewedMutation() { if (!this.currentDiff || !this.pendingMutation) throw new Error('No reviewed mutation'); const { namespace, name, value, operation } = this.pendingMutation; const response = await api.patch<{ yaml: string; checksum: string; diff_before: string; diff_after: string }>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/values/${encodeURIComponent(this.currentDiff.key)}`, { value, base_commit: this.currentDiff.base_commit, operation }, { 'Idempotency-Key': idempotencyKey() }); this.currentDetail = null; this.pendingMutation = null; return response.data },
-    async reseal(namespace: string, name: string, key: string, value: string, baseCommit: string, operation: 'replace' | 'add' | 'delete') { const response = await api.patch<{ yaml: string; checksum: string; diff_before: string; diff_after: string }>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/values/${encodeURIComponent(key)}`, { value, base_commit: baseCommit, operation }, { 'Idempotency-Key': idempotencyKey() }); return response.data },
+    /**
+     * Asks the server for the encrypted before/after of a whole batch of entry
+     * changes. Nothing is persisted: the operator reviews the ciphertext diff
+     * and only then calls applyReviewedMutation.
+     *
+     * One batch is one reviewed change, so the editor submits everything it has
+     * staged at once rather than a key per round trip.
+     */
+    async computeDiff(namespace: string, name: string, mutations: Mutation[], baseCommit: string) { const response = await api.post<EncryptedDiff>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/diff`, { mutations, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() }); this.currentDiff = response.data; this.pendingMutation = { namespace, name, mutations: mutations.map((mutation) => ({ ...mutation })) }; return response.data },
+    /**
+     * Persists the batch that was just reviewed.
+     *
+     * The keys travel in the body rather than a path segment, because a batch
+     * has no single key to name in a URL.
+     */
+    async applyReviewedMutation() { if (!this.currentDiff || !this.pendingMutation) throw new Error('No reviewed mutation'); const { namespace, name, mutations } = this.pendingMutation; const response = await api.patch<{ yaml: string; checksum: string; diff_before: string; diff_after: string }>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/values`, { mutations, base_commit: this.currentDiff.base_commit }, { 'Idempotency-Key': idempotencyKey() }); this.currentDetail = null; this.pendingMutation = null; return response.data },
     /**
      * Encrypts a complete new Secret and hands the ciphertext to the shared
      * review/delivery state.

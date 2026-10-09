@@ -53,6 +53,61 @@ function drift(status: string) {
   return driftStates[status] ?? { ...UNKNOWN_DRIFT, label: status }
 }
 
+/**
+ * The drift rollup, and the filter built from it.
+ *
+ * Drift is legible one card at a time today, which means a namespace of forty
+ * Secrets tells you nothing about itself: you cannot see that six are out of
+ * sync without reading forty cards. The counts are derived from the listing the
+ * grid already renders, so the summary costs no extra request.
+ *
+ * "Out of sync" is deliberately everything that is not in-sync rather than one
+ * chip per state. Diverged, live-only and git-only all want the same thing from
+ * the person reading this page — a look — and a chip per state would put a
+ * filter row the width of the page in front of a grid that is mostly cards.
+ */
+type DriftFilter = 'all' | 'in-sync' | 'out-of-sync'
+
+interface DriftFilterChip {
+  value: DriftFilter
+  label: string
+  icon: IconName
+  classes: string
+  count: number
+}
+
+const filter = ref<DriftFilter>('all')
+
+const driftCounts = computed(() => {
+  const total = secrets.secrets.length
+  const inSync = secrets.secrets.filter((secret) => secret.git.drift === 'in-sync').length
+  return { total, inSync, outOfSync: total - inSync }
+})
+
+/**
+ * The chips take their labels, glyphs and colours from `driftStates`, so the
+ * vocabulary stays in one place and a chip cannot drift away from the card it
+ * filters. The out-of-sync chip borrows the diverged treatment even though its
+ * label is broader: it is the chip that shows what needs attention, and inventing
+ * a second colour for "something is wrong" would say less, not more.
+ */
+const filters = computed<DriftFilterChip[]>(() => [
+  { value: 'all', label: 'All', icon: 'database', classes: UNKNOWN_DRIFT.classes, count: driftCounts.value.total },
+  { value: 'in-sync', label: drift('in-sync').label, icon: drift('in-sync').icon, classes: drift('in-sync').classes, count: driftCounts.value.inSync },
+  { value: 'out-of-sync', label: 'Out of sync', icon: drift('diverged').icon, classes: drift('diverged').classes, count: driftCounts.value.outOfSync },
+])
+
+// One predicate for both sides of the filter, so a Secret cannot appear under
+// neither chip or under both.
+const visibleSecrets = computed(() => {
+  if (filter.value === 'all') return secrets.secrets
+  const wantSync = filter.value === 'in-sync'
+  return secrets.secrets.filter((secret) => (secret.git.drift === 'in-sync') === wantSync)
+})
+
+const emptyFilterDescription = computed(() =>
+  filter.value === 'in-sync' ? 'No SealedSecrets are in sync' : 'No SealedSecrets are out of sync')
+
 async function load() {
   loaded.value = false
   try {
@@ -99,38 +154,67 @@ onMounted(load)
       description="No SealedSecrets in this namespace"
     />
 
-    <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4" aria-label="SealedSecrets">
-      <li v-for="secret in secrets.secrets" :key="secret.name">
-        <!-- The link covers the card, not just its text: the card's hover
-             affordance applies to the whole surface. -->
-        <AppCard class="group">
-          <RouterLink
-            :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
-            class="absolute inset-0 z-10 rounded-card-inner"
-          >
-            <span class="sr-only">{{ secret.name }}</span>
-          </RouterLink>
+    <template v-else>
+      <!-- The summary doubles as the filter. They are real buttons carrying
+           aria-pressed, so the pressed state is announced and the summary is
+           reachable by keyboard rather than being a read-only decoration that
+           looks interactive. Selection is not colour alone either: the chosen
+           chip is fully opaque and ringed, the others are dimmed. -->
+      <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by drift">
+        <button
+          v-for="chip in filters"
+          :key="chip.value"
+          type="button"
+          class="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-chip border px-2.5 py-1 text-xs font-semibold transition"
+          :class="[chip.classes, filter === chip.value ? 'ring-2 ring-current' : 'opacity-60 hover:opacity-100']"
+          :aria-pressed="filter === chip.value"
+          @click="filter = chip.value"
+        >
+          <AppIcon :name="chip.icon" :size="12" />
+          {{ chip.label }}
+          <span class="font-normal opacity-80">{{ chip.count }}</span>
+        </button>
+      </div>
 
-          <div class="flex h-full flex-col gap-1">
-            <h2 class="mb-0 flex min-h-[2.5em] items-start gap-2 text-[1.05rem] leading-tight">
-              <AppIcon name="key" :size="16" class="mt-1 text-accent" />
-              <span class="min-w-0 break-words">{{ secret.name }}</span>
-            </h2>
-            <!-- mt-auto keeps the status row on one baseline across the row
-                 even when a neighbouring name wraps to two lines. -->
-            <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm text-muted">{{ secret.key_count }} keys · {{ secret.scope || 'strict' }}</span>
-              <span
-                class="inline-flex items-center gap-1 whitespace-nowrap rounded-chip border px-2 py-0.5 text-xs font-semibold"
-                :class="drift(secret.git.drift).classes"
-              >
-                <AppIcon :name="drift(secret.git.drift).icon" :size="12" />
-                {{ drift(secret.git.drift).label }}
-              </span>
+      <AppEmpty
+        v-if="visibleSecrets.length === 0"
+        icon="database"
+        :description="emptyFilterDescription"
+      />
+
+      <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4" aria-label="SealedSecrets">
+        <li v-for="secret in visibleSecrets" :key="secret.name">
+          <!-- The link covers the card, not just its text: the card's hover
+               affordance applies to the whole surface. -->
+          <AppCard class="group">
+            <RouterLink
+              :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
+              class="absolute inset-0 z-10 rounded-card-inner"
+            >
+              <span class="sr-only">{{ secret.name }}</span>
+            </RouterLink>
+
+            <div class="flex h-full flex-col gap-1">
+              <h2 class="mb-0 flex min-h-[2.5em] items-start gap-2 text-[1.05rem] leading-tight">
+                <AppIcon name="key" :size="16" class="mt-1 text-accent" />
+                <span class="min-w-0 break-words">{{ secret.name }}</span>
+              </h2>
+              <!-- mt-auto keeps the status row on one baseline across the row
+                   even when a neighbouring name wraps to two lines. -->
+              <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm text-muted">{{ secret.key_count }} keys · {{ secret.scope || 'strict' }}</span>
+                <span
+                  class="inline-flex items-center gap-1 whitespace-nowrap rounded-chip border px-2 py-0.5 text-xs font-semibold"
+                  :class="drift(secret.git.drift).classes"
+                >
+                  <AppIcon :name="drift(secret.git.drift).icon" :size="12" />
+                  {{ drift(secret.git.drift).label }}
+                </span>
+              </div>
             </div>
-          </div>
-        </AppCard>
-      </li>
-    </ul>
+          </AppCard>
+        </li>
+      </ul>
+    </template>
   </section>
 </template>

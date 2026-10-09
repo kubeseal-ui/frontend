@@ -9,20 +9,45 @@ beforeEach(() => {
 })
 
 describe('phase 3 secret workflow', () => {
-  it('sends a one-key diff request with an idempotency key', async () => {
+  it('sends a batch diff request with an idempotency key', async () => {
     const request = vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'encrypted-before', after: 'encrypted-after', checksum: 'sum' } } as never)
-    await useSecretsStore().computeDiff('payments', 'api', 'password', 'replace', 'new', 'abc')
-    expect(request).toHaveBeenCalledWith('/api/v1/secrets/payments/api/diff', { key: 'password', operation: 'replace', value: 'new', base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
+    const mutations = [
+      { key: 'password', operation: 'replace' as const, value: 'new' },
+      { key: 'api_key', operation: 'add' as const, value: 'key' },
+    ]
+    await useSecretsStore().computeDiff('payments', 'api', mutations, 'abc')
+    expect(request).toHaveBeenCalledWith('/api/v1/secrets/payments/api/diff', { mutations, base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
   })
 
-  it('applies the reviewed one-key mutation and stores encrypted output only', async () => {
-    vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'before', after: 'after', key: 'password', base_commit: 'abc', checksum: 'sum' } } as never)
+  it('applies the reviewed batch and stores encrypted output only', async () => {
+    const mutations = [
+      { key: 'password', operation: 'replace' as const, value: 'new' },
+      { key: 'api_key', operation: 'add' as const, value: 'key' },
+    ]
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'before', after: 'after', mutations: [{ key: 'password', operation: 'replace' }, { key: 'api_key', operation: 'add' }], base_commit: 'abc', checksum: 'sum' } } as never)
     const patch = vi.spyOn(api, 'patch').mockResolvedValue({ data: { yaml: 'encrypted-updated', checksum: 'sum', diff_before: 'before', diff_after: 'after' } } as never)
     const store = useSecretsStore()
-    await store.computeDiff('payments', 'api', 'password', 'replace', 'new', 'abc')
+    await store.computeDiff('payments', 'api', mutations, 'abc')
     await store.applyReviewedMutation()
-    expect(patch).toHaveBeenCalledWith('/api/v1/secrets/payments/api/values/password', { value: 'new', base_commit: 'abc', operation: 'replace' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
+    // The keys travel in the body: a batch has no single key to name in a path.
+    expect(patch).toHaveBeenCalledWith('/api/v1/secrets/payments/api/values', { mutations, base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
     expect(store.currentDetail).toBeNull()
+    expect(store.pendingMutation).toBeNull()
+  })
+
+  it('applies exactly the batch that was reviewed, not the editor state at apply time', async () => {
+    const reviewed = [{ key: 'password', operation: 'replace' as const, value: 'reviewed-value' }]
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'before', after: 'after', mutations: [{ key: 'password', operation: 'replace' }], base_commit: 'abc', checksum: 'sum' } } as never)
+    const patch = vi.spyOn(api, 'patch').mockResolvedValue({ data: { yaml: 'encrypted-updated', checksum: 'sum', diff_before: 'before', diff_after: 'after' } } as never)
+    const store = useSecretsStore()
+    await store.computeDiff('payments', 'api', reviewed, 'abc')
+
+    // The caller keeps its own reference and mutates it afterwards. What was
+    // reviewed is what must be applied: a diff the operator approved for one
+    // value cannot be silently spent on another.
+    reviewed[0].value = 'something-else'
+    await store.applyReviewedMutation()
+    expect(patch).toHaveBeenCalledWith('/api/v1/secrets/payments/api/values', { mutations: [{ key: 'password', operation: 'replace', value: 'reviewed-value' }], base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
   })
 
   it('delivers using the server-selected mode and returns the result', async () => {
@@ -35,7 +60,7 @@ describe('phase 3 secret workflow', () => {
   it('runs a server-side Git dry run before delivery', async () => {
     const dryRun = vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'git-before', after: 'git-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc', mode: 'proposal' } } as never)
     const store = useSecretsStore()
-    store.currentDiff = { before: 'encrypted-before', after: 'encrypted-after', key: 'password', base_commit: 'abc', checksum: 'sum' }
+    store.currentDiff = { before: 'encrypted-before', after: 'encrypted-after', mutations: [{ key: 'password', operation: 'replace' }], base_commit: 'abc', checksum: 'sum' }
     await store.dryRun('payments', 'api', 'encrypted-after', 'abc')
     expect(dryRun).toHaveBeenCalledWith('/api/v1/gitops/dry-run', { namespace: 'payments', name: 'api', yaml: 'encrypted-after', base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
     expect(JSON.stringify(store.dryRunResult)).toContain('git-after')

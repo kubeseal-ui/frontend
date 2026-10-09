@@ -30,6 +30,12 @@ const target = computed(() => store.newSecretDraft
 
 const reviewedYaml = computed(() => store.dryRunResult?.after || store.currentDiff?.after || store.newSecretDraft?.yaml || '')
 /**
+ * What the reviewed patch covers, named the way the server echoed it back:
+ * keys and operations, never values. A batch can carry several changes, so the
+ * operator needs to see which ones they are confirming before applying them.
+ */
+const reviewedKeys = computed(() => store.currentDiff?.mutations?.map((mutation) => `${mutation.operation} ${mutation.key}`).join(', ') || '')
+/**
  * Both GitOps endpoints reject an empty base commit, and the server compares it
  * against the branch head. It arrives from the encrypt response for a new
  * Secret and from the detail for an existing one. When neither produced one —
@@ -100,6 +106,7 @@ async function deliver() {
       <div v-if="store.currentDiff" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
         <AppCode label="Encrypted before" :code="store.currentDiff.before" />
         <AppCode label="Encrypted after" :code="store.currentDiff.after" />
+        <p v-if="reviewedKeys" class="m-0 text-sm text-muted">Includes: {{ reviewedKeys }}</p>
       </div>
 
       <div v-else-if="store.newSecretDraft" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">

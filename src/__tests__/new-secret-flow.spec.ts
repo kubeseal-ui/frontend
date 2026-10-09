@@ -191,3 +191,78 @@ describe('the create page', () => {
     expect(store.newSecretDraft).toBeNull()
   })
 })
+
+// The box starts from a Secret manifest with the frame already written, so the
+// operator supplies values rather than the document. These checks pin the three
+// things that makes possible to get wrong: a name written in two places, a
+// template that submits itself, and a template that eats a pasted manifest.
+describe('the manifest template', () => {
+  function textarea(wrapper: VueWrapper) {
+    return wrapper.find('textarea').element as HTMLTextAreaElement
+  }
+
+  it('starts the box from a Secret and keeps its name line on the name field', async () => {
+    grant(['secret:seal'])
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+
+    // Seeded before any name is typed, with the namespace the route owns.
+    expect(textarea(wrapper).value).toContain('kind: Secret')
+    expect(textarea(wrapper).value).toContain('namespace: payments')
+    expect(textarea(wrapper).value).toContain('stringData:')
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('api-credentials')
+
+    // One authority for the name: the server refuses a manifest whose
+    // metadata.name disagrees with the request, so this line follows the field
+    // rather than being a second place to write it.
+    expect(textarea(wrapper).value).toContain('name: api-credentials')
+    expect(textarea(wrapper).value.match(/name:/g)).toHaveLength(1)
+  })
+
+  it('withholds encryption until the template has been filled in', async () => {
+    grant(['secret:seal'])
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('brand-new')
+    const encrypt = findButton(wrapper, 'Encrypt for review')!
+
+    // A template that seals one empty value is one keystroke from being
+    // delivered, so the control stays withheld and the page says why.
+    expect(encrypt.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Fill in the template')
+
+    await wrapper.find('textarea').setValue('kind: Secret\nstringData:\n  token: value')
+    expect(findButton(wrapper, 'Encrypt for review')!.attributes('disabled')).toBeUndefined()
+
+    await findButton(wrapper, 'Encrypt for review')!.trigger('click')
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ name: 'brand-new', yaml: 'kind: Secret\nstringData:\n  token: value' }))
+  })
+
+  it('gives the adopt source an empty box and leaves a pasted manifest alone', async () => {
+    grant(['secret:seal'])
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+
+    const adopt = wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'adopt')
+    expect(adopt).toBeDefined()
+    await adopt!.setValue()
+
+    // Nothing to paste over: adopting starts from kubectl output, not a frame.
+    expect(textarea(wrapper).value).toBe('')
+
+    const pasted = 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: live\nstringData:\n  password: pasted-marker'
+    await wrapper.find('textarea').setValue(pasted)
+
+    // Back to writing a new one: a manifest already in the box is not the
+    // component's to overwrite, even though the source changed underneath it.
+    const create = wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'create')
+    await create!.setValue()
+
+    expect(textarea(wrapper).value).toBe(pasted)
+  })
+})
