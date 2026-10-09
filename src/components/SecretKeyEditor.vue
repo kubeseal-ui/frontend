@@ -102,6 +102,16 @@ async function startEdit(key: string) {
   keyRows.value[key]?.querySelector<HTMLInputElement>('input[type="password"]')?.focus()
 }
 
+// A removal is a delete of a key that is here, and the row that names the key states it outright
+// rather than as a mode of Change: a delete opens no value field, so nothing sits between choosing
+// it and reviewing it. Focus follows the option it staged.
+async function removeKey(key: string) {
+  editing[key] = true
+  operation[key] = 'delete'
+  await nextTick()
+  keyRows.value[key]?.querySelector<HTMLInputElement>(`input[name="operation-${key}"][value="delete"]`)?.focus()
+}
+
 // Focus follows the new row, for the same reason: the tray is where the typing happens.
 async function addRow() {
   const id = nextRowId++
@@ -284,14 +294,17 @@ onBeforeUnmount(() => clear())
           readonly
           :ariaLabel="`Revealed value for ${key}`"
         />
-        <AppButton v-if="canReveal && !hasRevealed(key)" :disabled="!!activeKey" @click="reveal(key)">
+        <AppButton v-if="canReveal && !hasRevealed(key)" icon="eye" :disabled="!!activeKey" @click="reveal(key)">
           Reveal one key
         </AppButton>
-        <AppButton v-if="hasRevealed(key)" :aria-label="`Conceal ${key}`" @click="conceal(key)">
+        <AppButton v-if="hasRevealed(key)" icon="eye-off" :aria-label="`Conceal ${key}`" @click="conceal(key)">
           Conceal
         </AppButton>
-        <AppButton v-if="canReveal && !editing[key]" :aria-label="`Change ${key}`" @click="startEdit(key)">
+        <AppButton v-if="canReveal && !editing[key]" icon="pencil" :aria-label="`Change ${key}`" @click="startEdit(key)">
           Change
+        </AppButton>
+        <AppButton v-if="canReveal && !editing[key]" variant="ghost" icon="trash" :aria-label="`Remove ${key}`" @click="removeKey(key)">
+          Remove
         </AppButton>
       </div>
     </div>
@@ -413,11 +426,12 @@ onBeforeUnmount(() => clear())
       </ul>
 
       <div class="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-        <AppButton v-if="canPatch" @click="addRow">Add key</AppButton>
+        <AppButton v-if="canPatch" icon="plus" @click="addRow">Add key</AppButton>
         <AppButton
           v-if="batch.length > 0"
           class="ml-auto"
           variant="primary"
+          icon="lock"
           :loading="reviewing"
           :disabled="!canReview"
           @click="reviewBatch"

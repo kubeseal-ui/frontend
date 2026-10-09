@@ -9,7 +9,7 @@ import { useSecretsStore } from '@/stores/secrets'
 import SecretKeyEditor from '@/components/SecretKeyEditor.vue'
 import SecretNameEditor from '@/components/SecretNameEditor.vue'
 import DeliveryPanel from '@/components/DeliveryPanel.vue'
-import type { Capability, SealedSecretDetail } from '@/types'
+import type { Capability, MutationOperation, SealedSecretDetail } from '@/types'
 
 function makeDetail(overrides: Partial<SealedSecretDetail> = {}): SealedSecretDetail {
   return {
@@ -35,7 +35,7 @@ function grant(pinia: Pinia, namespace: string, capabilities: Capability[]) {
   useAuthStore(pinia).setSession({ email: 'u@example.com', name: 'User', username: 'u', namespaces: { [namespace]: capabilities } })
 }
 
-function reviewedDiff(mutations = [{ key: 'password', operation: 'replace' as const }]) {
+function reviewedDiff(mutations: { key: string; operation: MutationOperation }[] = [{ key: 'password', operation: 'replace' }]) {
   return { before: 'encrypted-before', after: 'encrypted-after', mutations, base_commit: 'abc123', checksum: 'sum' }
 }
 
@@ -154,6 +154,26 @@ describe('secret key editor accessibility', () => {
 
     expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [{ key: 'password', operation: 'delete', value: '' }], 'abc123')
     expect(wrapper.text()).toContain('Encrypted diff is ready for review.')
+  })
+
+  it('stages a removal from the row that names the key', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const store = useSecretsStore(pinia)
+    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff([{ key: 'password', operation: 'delete' }]))
+    const wrapper = mountEditor(makeDetail())
+
+    // Removing a key is stated by the row that names it rather than hidden behind Change: a
+    // delete opens no value field, so one must not be what choosing a removal lands the cursor in.
+    await findButton(wrapper, 'Remove')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[aria-label="Replacement value for password"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Deletes the key; no value is needed.')
+    expect(document.activeElement).toBe(wrapper.find('input[name="operation-password"][value="delete"]').element)
+
+    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
+    await flushPromises()
+    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [{ key: 'password', operation: 'delete', value: '' }], 'abc123')
   })
 
   it('submits every staged change as one batch', async () => {

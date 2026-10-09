@@ -195,6 +195,7 @@ async function deliver() {
           <AppButton
             v-if="stage === 'apply'"
             variant="primary"
+            icon="check"
             :loading="applying"
             @click="applyPatch"
           >
@@ -213,6 +214,7 @@ async function deliver() {
           <AppButton
             v-if="stage === 'dry-run' && canDeliverNow"
             variant="primary"
+            icon="refresh"
             :loading="loading"
             @click="runDryRun"
           >
@@ -238,6 +240,7 @@ async function deliver() {
           <AppButton
             v-if="stage === 'deliver' && canDeliverNow"
             variant="primary"
+            icon="arrow-right"
             :loading="loading"
             @click="deliver"
           >
