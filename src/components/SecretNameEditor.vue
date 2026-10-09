@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -71,9 +71,33 @@ function rewriteTemplateName(doc: string, previous: string, next: string): strin
 const pristineTemplate = computed(() => templateFor(name.value, props.namespace))
 const renderedName = ref('')
 
-// A box holding only the template would seal one empty value, so the control is withheld
-// rather than merely unwise.
+// A box holding only the template would seal one empty value, so pressing encrypt has to
+// answer rather than send. What is missing is said by the field it belongs to, and only
+// once that field has been left or encrypt has been pressed — a message that arrives
+// before anything has been touched reads as a fault rather than a prompt.
 const holdsOnlyTemplate = computed(() => yaml.value === pristineTemplate.value)
+const shown = reactive({ name: false, yaml: false })
+
+function nameProblem() {
+  if (!shown.name) return ''
+  return name.value.trim() === '' ? 'This Secret needs a name.' : ''
+}
+
+// An empty box and an untouched template are the same answer: nothing to seal either way.
+function yamlProblem() {
+  if (!shown.yaml) return ''
+  if (yaml.value.trim() === '') return 'Paste the manifest, or write one in this box.'
+  if (holdsOnlyTemplate.value) return 'This still holds only the template. Replace the empty key with the entries this Secret needs.'
+  return ''
+}
+
+// Leaving a field is what turns its problem on. Each box is its own unit here, so moving
+// to the next one counts as leaving — only movement inside the box does not.
+function leave(field: 'name' | 'yaml', event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (next && (event.currentTarget as HTMLElement).contains(next)) return
+  shown[field] = true
+}
 
 // Encrypting is what moves the flow on, so that is what folds this stage: the form keeps its
 // contents behind the toggle and the review below becomes what the page is about.
@@ -81,6 +105,7 @@ const override = ref<boolean | null>(null)
 const open = computed(() => override.value ?? !store.newSecretDraft)
 const toggle = ref<{ $el?: HTMLElement } | null>(null)
 const nameInput = ref<{ $el?: HTMLElement } | null>(null)
+const yamlInput = ref<{ $el?: HTMLElement } | null>(null)
 const summary = computed(() => [
   store.newSecretDraft ? `Encrypted draft for ${store.newSecretDraft.name}` : name.value,
   scope.value,
@@ -123,12 +148,28 @@ onMounted(() => {
   if (!store.gitPaths) store.fetchGitPaths()
 })
 
+// Offering the control and answering the press is what makes the missing piece legible:
+// with a batch to encrypt the operator is asking what is short, and a control greyed out
+// with the reason in a sentence beside it answers nothing.
+async function encrypt() {
+  if (!canCreate.value) return
+  shown.name = true; shown.yaml = true
+  await nextTick()
+  if (nameProblem() || yamlProblem()) {
+    ;(nameProblem() ? nameInput.value?.$el : yamlInput.value?.$el)?.focus()
+    return
+  }
+  await createDraft()
+}
+
 async function createDraft() {
-  if (!canCreate.value || !name.value || !yaml.value || holdsOnlyTemplate.value) return
   error.value = ''; loading.value = true
   try {
     await store.createNewSecretDraft(props.namespace, name.value, yaml.value, scope.value, props.baseCommit, targetPath.value || undefined)
     seedTemplate()
+    // The form is back on the template, so it must not carry the answer to a press that
+    // has just been acted on.
+    shown.name = false; shown.yaml = false
   } catch (e) {
     // Both refusals are about which manifest this is, so they are restated in the
     // operator's terms; describeError carries the server's request id either way.
@@ -147,6 +188,7 @@ function discard() {
   store.discardNewSecretDraft()
   name.value = ''; targetPath.value = ''
   seedTemplate()
+  shown.name = false; shown.yaml = false
   // Discarding takes the button that was pressed with it, so focus is carried to the field
   // the emptied form starts at rather than dropped on `<body>`.
   return refocusAfterCollapse(() => nameInput.value?.$el)
@@ -180,7 +222,7 @@ onUnmounted(() => { yaml.value = '' })
         v-model="mode"
         name="secret-source"
         :options="sources"
-        ariaLabel="Secret source"
+        label="Secret source"
       />
 
       <AppAlert v-if="adopting" type="info" title="Adopt an existing Secret">
@@ -189,13 +231,24 @@ onUnmounted(() => { yaml.value = '' })
         the Secret's content is versioned. Nothing is read from the cluster by this application.
       </AppAlert>
 
-      <AppInput ref="nameInput" v-model="name" ariaLabel="New secret name" :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'" />
+      <label class="flex flex-col gap-1 text-sm font-medium text-ink" @focusout="leave('name', $event)">
+        <span>Secret name</span>
+        <AppInput
+          ref="nameInput"
+          v-model="name"
+          ariaLabel="New secret name"
+          :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'"
+          :invalid="!!nameProblem()"
+          :describedBy="nameProblem() ? 'name-problem' : ''"
+        />
+        <span v-if="nameProblem()" id="name-problem" class="text-xs font-normal text-danger">{{ nameProblem() }}</span>
+      </label>
 
       <AppRadioGroup
         v-model="scope"
         name="secret-scope"
         :options="scopes"
-        ariaLabel="Secret scope"
+        label="Secret scope"
       />
 
       <AppSelect
@@ -206,30 +259,30 @@ onUnmounted(() => { yaml.value = '' })
         :options="pathOptions"
       />
 
-      <AppTextarea
-        v-model="yaml"
-        ariaLabel="New secret YAML"
-        :placeholder="adopting ? 'Output of the kubectl command above' : 'Complete Kubernetes Secret YAML'"
-        :rows="6"
-      />
+      <label class="flex flex-col gap-1 text-sm font-medium text-ink" @focusout="leave('yaml', $event)">
+        <span>Secret manifest</span>
+        <AppTextarea
+          ref="yamlInput"
+          v-model="yaml"
+          ariaLabel="New secret YAML"
+          :placeholder="adopting ? 'Output of the kubectl command above' : 'Complete Kubernetes Secret YAML'"
+          :rows="6"
+          :invalid="!!yamlProblem()"
+          :describedBy="yamlProblem() ? 'yaml-problem' : ''"
+        />
+        <span v-if="yamlProblem()" id="yaml-problem" class="text-xs font-normal text-danger">{{ yamlProblem() }}</span>
+      </label>
 
       <div>
         <AppButton
           variant="primary"
           icon="lock"
           :loading="loading"
-          :disabled="!name || !yaml || holdsOnlyTemplate"
-          @click="createDraft"
+          @click="encrypt"
         >
           Encrypt for review
         </AppButton>
       </div>
-
-      <!-- Withheld while a draft is held: submitting reseeds the template, so without this the
-           card would ask for the entries it has just been given. -->
-      <AppAlert v-if="holdsOnlyTemplate && name && !store.newSecretDraft" type="info" title="Fill in the template">
-        Replace the empty <code class="font-mono">key</code> with the entries this Secret needs, then encrypt.
-      </AppAlert>
 
       <AppAlert v-if="error" type="error" title="Unable to encrypt">{{ error }}</AppAlert>
     </div>

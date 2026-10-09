@@ -51,8 +51,8 @@ function mountNamespaceView() {
   return mount(NamespaceView, { props: { namespace: 'payments' }, global: { plugins: [pinia, router] } })
 }
 
-function mountNewSecretView() {
-  return mount(NewSecretView, { props: { namespace: 'payments' }, global: { plugins: [pinia, router] } })
+function mountNewSecretView(attachTo?: HTMLElement) {
+  return mount(NewSecretView, { props: { namespace: 'payments' }, attachTo, global: { plugins: [pinia, router] } })
 }
 
 /** Drives the create form the way a user does, leaving the draft encrypted. */
@@ -233,26 +233,54 @@ describe('the manifest template', () => {
     expect(textarea(wrapper).value.match(/name:/g)).toHaveLength(1)
   })
 
-  it('withholds encryption until the template has been filled in', async () => {
+  it('answers an unfilled template when encryption is pressed', async () => {
     grant(['secret:seal'])
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
-    const wrapper = mountNewSecretView()
+    // Attached, so the move the press makes onto the short field is observable.
+    const wrapper = mountNewSecretView(document.body)
     await flushPromises()
 
     await wrapper.find('input[aria-label="New secret name"]').setValue('brand-new')
     const encrypt = findButton(wrapper, 'Encrypt for review')!
 
-    // A template that seals one empty value is one keystroke from being delivered.
-    expect(encrypt.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('Fill in the template')
+    // A template that would seal one empty value is not a reason to grey the control out.
+    // Pressing it is the operator asking what is missing, and nothing is asked or said
+    // before they do.
+    expect(encrypt.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('only the template')
 
+    await encrypt.trigger('click')
+    await flushPromises()
+
+    expect(post).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('only the template')
+    expect(textarea(wrapper).getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(textarea(wrapper))
+
+    // Filling the box answers it live, without a second press.
     await wrapper.find('textarea').setValue('kind: Secret\nstringData:\n  token: value')
-    expect(findButton(wrapper, 'Encrypt for review')!.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('only the template')
 
     await findButton(wrapper, 'Encrypt for review')!.trigger('click')
     await flushPromises()
 
     expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ name: 'brand-new', yaml: 'kind: Secret\nstringData:\n  token: value' }))
+    wrapper.unmount()
+  })
+
+  it('answers a missing name before the manifest, and points at it', async () => {
+    grant(['secret:seal'])
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
+    const wrapper = mountNewSecretView(document.body)
+    await flushPromises()
+
+    await findButton(wrapper, 'Encrypt for review')!.trigger('click')
+    await flushPromises()
+
+    expect(post).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('This Secret needs a name.')
+    expect(document.activeElement).toBe(wrapper.find('input[aria-label="New secret name"]').element)
+    wrapper.unmount()
   })
 
   it('gives the adopt source an empty box and leaves a pasted manifest alone', async () => {

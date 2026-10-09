@@ -7,16 +7,20 @@ withDefaults(
     name: string
     options: { label: string; value: string }[]
     ariaLabel?: string
+    label?: string
     disabled?: boolean
   }>(),
-  { ariaLabel: '', disabled: false },
+  { ariaLabel: '', label: '', disabled: false },
 )
 
 defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <template>
-  <div role="radiogroup" :aria-label="ariaLabel || undefined" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+  <div role="radiogroup" :aria-label="ariaLabel || label || undefined" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <!-- A group of options with no visible question is a set of answers to nothing; the
+         caption is also the group's accessible name, so the two cannot drift apart. -->
+    <span v-if="label" class="w-full text-sm font-medium text-ink">{{ label }}</span>
     <label
       v-for="option in options"
       :key="option.value"

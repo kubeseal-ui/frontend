@@ -7,8 +7,10 @@ withDefaults(
     placeholder?: string
     rows?: number
     disabled?: boolean
+    invalid?: boolean
+    describedBy?: string
   }>(),
-  { placeholder: '', rows: 8, disabled: false },
+  { placeholder: '', rows: 8, disabled: false, invalid: false, describedBy: '' },
 )
 
 defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -18,6 +20,8 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
   <textarea
     :value="modelValue"
     :aria-label="ariaLabel"
+    :aria-invalid="invalid || undefined"
+    :aria-describedby="describedBy || undefined"
     :placeholder="placeholder"
     :rows="rows"
     :disabled="disabled"
