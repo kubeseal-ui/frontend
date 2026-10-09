@@ -13,8 +13,9 @@ export interface User {
   email: string
   name: string
   username: string
-  // Per-namespace grants (doc contract). Empty until the backend scopes
-  // capabilities per namespace; the flat list applies to every namespace.
+  // Grants that apply in named namespaces only. The flat list below applies
+  // everywhere, and the two union: an effective grant in a namespace is
+  // capabilities ∪ namespaces[namespace]. The map is present but may be empty.
   namespaces: Record<string, Capability[]>
   capabilities?: Capability[]
 }
