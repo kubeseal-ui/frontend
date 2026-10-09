@@ -6,6 +6,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
 import AppSecretInput from '@/components/ui/AppSecretInput.vue'
 import AppTag from '@/components/ui/AppTag.vue'
+import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { Mutation, MutationOperation, SealedSecretDetail } from '@/types'
@@ -72,7 +73,7 @@ async function reveal(key: string) {
     editing[key] = true
     operation[key] = operation[key] || 'replace'
   }
-  catch (e) { error.value = e instanceof Error ? e.message : 'Reveal failed' }
+  catch (e) { error.value = describeError(e, 'The key could not be revealed') }
   finally { activeKey.value = '' }
 }
 
@@ -135,7 +136,7 @@ async function reviewBatch() {
     await store.computeDiff(props.detail.namespace, props.detail.name, batch.value, props.detail.git.base_commit)
     message.value = 'Encrypted diff is ready for review.'
   }
-  catch (e) { error.value = e instanceof Error ? e.message : 'Diff failed' }
+  catch (e) { error.value = describeError(e, 'The encrypted diff could not be computed') }
   finally { reviewing.value = false }
 }
 

@@ -7,6 +7,7 @@ import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
+import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { Capability, Namespace, NamespaceGitPaths } from '@/types'
@@ -112,7 +113,7 @@ onMounted(async () => {
 
     <div v-if="secrets.error" class="grid gap-2 rounded-card-inner border border-danger bg-surface/60 p-4" role="alert">
       <strong>Unable to load namespaces.</strong>
-      <p class="mb-1 text-muted">{{ secrets.error.message }}</p>
+      <p class="mb-1 text-muted">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
       <AppButton @click="secrets.fetchNamespaces">Try again</AppButton>
     </div>
 

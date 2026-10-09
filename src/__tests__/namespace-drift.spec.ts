@@ -93,6 +93,16 @@ describe('namespace drift rollup', () => {
     expect(wrapper.text()).toContain('Git only')
   })
 
+  it('counts keys correctly at one and names what the scope is', async () => {
+    const { wrapper } = await mountNamespaceView([{ ...summary('api', 'in-sync'), key_count: 1, scope: 'namespace-wide' }])
+
+    // A SealedSecret holding one value used to read as "1 keys", and the scope
+    // was printed as a bare word beside the count with nothing saying what it
+    // described.
+    expect(wrapper.text()).toContain('1 key · namespace-wide scope')
+    expect(wrapper.text()).not.toContain('1 keys')
+  })
+
   it('filters to the Secrets that are out of sync', async () => {
     const { wrapper } = await mountNamespaceView()
 

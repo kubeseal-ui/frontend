@@ -131,7 +131,21 @@ export const useSecretsStore = defineStore('secrets', {
     /** Server-side Git dry-run for the reviewed ciphertext. The server resolves repository, branch, and path. */
     async dryRun(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.dryRunResult = response.data; return response.data },
     async deliver(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DeliveryResult>('/api/v1/gitops/deliver', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.deliveryResult = response.data; return response.data },
-    async syncToGit(namespace: string, name: string, baseCommit: string) { const response = await api.post<DeliveryResult>('/api/v1/gitops/sync', { namespace, name, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() }); await this.fetchDetail(namespace, name); return response.data },
+    /**
+     * Copies the live Secret into Git, then re-reads the state the page is
+     * rendering from.
+     *
+     * The push is the operation, and it has already happened by the time the
+     * re-read runs: a refresh that fails afterwards must not be reported as a
+     * failed sync, because the operator's next move would be to press the
+     * control again and meet a base-commit conflict on a push that landed. The
+     * next load re-reads the state anyway.
+     */
+    async syncToGit(namespace: string, name: string, baseCommit: string) {
+      const response = await api.post<DeliveryResult>('/api/v1/gitops/sync', { namespace, name, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() })
+      try { await this.fetchDetail(namespace, name) } catch { /* reported on the next load */ }
+      return response.data
+    },
     async fetchGitPaths() { try { const paths = await api.getGitPaths(); this.gitPaths = paths; this.gitPathsLoaded = true; return paths } catch { this.gitPaths = null; this.gitPathsLoaded = false; return null } },
     clearSensitiveState() { this.currentDetail = null; this.currentDiff = null; this.pendingMutation = null; this.newSecretDraft = null; this.dryRunResult = null; this.deliveryResult = null },
   },

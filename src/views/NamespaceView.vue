@@ -8,8 +8,11 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import { type IconName } from '@/components/ui/icons'
+import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
+import { driftPresentation } from '@/utils/drift'
+import { countLabel } from '@/utils/format'
 
 const props = defineProps<{ namespace: string }>()
 const router = useRouter()
@@ -26,31 +29,17 @@ function createSecret() {
 }
 
 /**
- * Drift is conveyed by colour, but never by colour alone: each state also
- * carries a glyph and a word, so it survives a monochrome display, a
- * colour-blind reader, and a screen reader. The glyph is an icon rather than a
- * character because the icon set is drawn on the same optical weight as the
- * text it sits beside.
+ * The drift vocabulary — the glyphs, the words, and the colours — lives in
+ * utils/drift.ts, because the detail page names the same states in prose above
+ * the editor and two copies of the table would let one page call a Secret
+ * "Live only" while the next printed the raw enum the API sends.
  *
- * The colour lives here as a class rather than in the stylesheet so the
- * status vocabulary and its treatment sit next to each other. Tailwind reads
- * these literals straight out of this file, which is what keeps
- * border-success/40 a real utility rather than a generated-name lookalike.
+ * This page adds one thing to it: the colours are read from there as literals
+ * so Tailwind sees them where they are written, and the rollup below borrows
+ * the same treatment for its "Out of sync" chip.
  */
-const driftStates: Record<string, { icon: IconName; label: string; classes: string }> = {
-  'in-sync': { icon: 'check', label: 'In sync', classes: 'text-success border-success/40' },
-  diverged: { icon: 'alert', label: 'Diverged', classes: 'text-danger border-danger/40' },
-  live_only: { icon: 'info', label: 'Live only', classes: 'text-warning border-warning/40' },
-  'live-only': { icon: 'info', label: 'Live only', classes: 'text-warning border-warning/40' },
-  git_only: { icon: 'info', label: 'Git only', classes: 'text-info border-info/40' },
-  'git-only': { icon: 'info', label: 'Git only', classes: 'text-info border-info/40' },
-  unknown: { icon: 'info', label: 'Unknown', classes: 'text-muted border-border' },
-}
-
-const UNKNOWN_DRIFT = { icon: 'info', label: '', classes: 'text-muted border-border' }
-
 function drift(status: string) {
-  return driftStates[status] ?? { ...UNKNOWN_DRIFT, label: status }
+  return driftPresentation(status)
 }
 
 /**
@@ -85,14 +74,14 @@ const driftCounts = computed(() => {
 })
 
 /**
- * The chips take their labels, glyphs and colours from `driftStates`, so the
- * vocabulary stays in one place and a chip cannot drift away from the card it
- * filters. The out-of-sync chip borrows the diverged treatment even though its
- * label is broader: it is the chip that shows what needs attention, and inventing
- * a second colour for "something is wrong" would say less, not more.
+ * The chips take their labels, glyphs and colours from the shared drift
+ * vocabulary, so a chip cannot drift away from the card it filters. The
+ * out-of-sync chip borrows the diverged treatment even though its label is
+ * broader: it is the chip that shows what needs attention, and inventing a
+ * second colour for "something is wrong" would say less, not more.
  */
 const filters = computed<DriftFilterChip[]>(() => [
-  { value: 'all', label: 'All', icon: 'database', classes: UNKNOWN_DRIFT.classes, count: driftCounts.value.total },
+  { value: 'all', label: 'All', icon: 'database', classes: drift('unknown').classes, count: driftCounts.value.total },
   { value: 'in-sync', label: drift('in-sync').label, icon: drift('in-sync').icon, classes: drift('in-sync').classes, count: driftCounts.value.inSync },
   { value: 'out-of-sync', label: 'Out of sync', icon: drift('diverged').icon, classes: drift('diverged').classes, count: driftCounts.value.outOfSync },
 ])
@@ -144,7 +133,7 @@ onMounted(load)
 
     <div v-if="secrets.error" class="grid gap-2 rounded-card-inner border border-danger bg-surface/60 p-4" role="alert">
       <strong>Unable to load secrets.</strong>
-      <p class="mb-1 text-muted">{{ secrets.error.message }}</p>
+      <p class="mb-1 text-muted">{{ describeError(secrets.error, 'Unable to load secrets') }}</p>
       <AppButton @click="load">Try again</AppButton>
     </div>
 
@@ -202,7 +191,7 @@ onMounted(load)
               <!-- mt-auto keeps the status row on one baseline across the row
                    even when a neighbouring name wraps to two lines. -->
               <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
-                <span class="text-sm text-muted">{{ secret.key_count }} keys · {{ secret.scope || 'strict' }}</span>
+                <span class="text-sm text-muted">{{ countLabel(secret.key_count, 'key') }} · {{ secret.scope || 'strict' }} scope</span>
                 <span
                   class="inline-flex items-center gap-1 whitespace-nowrap rounded-chip border px-2 py-0.5 text-xs font-semibold"
                   :class="drift(secret.git.drift).classes"

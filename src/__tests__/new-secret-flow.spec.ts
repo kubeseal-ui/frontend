@@ -128,6 +128,12 @@ describe('the create page', () => {
     // The delivery panel has no detail to read a mode from; the mode comes from
     // the namespace's fixed Git policy.
     expect(wrapper.findComponent(DeliveryPanel).exists()).toBe(true)
+    // The review alert states the destination the server resolved, so the
+    // operator can see where this is going without any control offering to
+    // change it.
+    expect(wrapper.text()).toContain('repository org/repo')
+    expect(wrapper.text()).toContain('branch main')
+    expect(wrapper.text()).toContain('proposal delivery')
     expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
 
     const dryRun = vi.spyOn(store, 'dryRun').mockImplementation(async () => {
@@ -143,6 +149,15 @@ describe('the create page', () => {
     await flushPromises()
     expect(deliver).toHaveBeenCalledWith('payments', 'brand-new', 'encrypted-new-secret', 'head-1', undefined)
     expect(wrapper.text()).toContain('https://git.example/pr/11')
+    // The outcome names the commit, the branch it went to, and the file it
+    // wrote — the file being the dry run's resolved path, since a new Secret has
+    // no detail to read one from — and the proposal URL is a link to it.
+    expect(wrapper.text()).toContain('Proposal opened')
+    expect(wrapper.text()).toContain('Pushed cafe to main at clusters/payments/brand-new.yaml and opened a merge proposal.')
+    const opened = wrapper.find('a[href="https://git.example/pr/11"]')
+    expect(opened.exists()).toBe(true)
+    expect(opened.attributes('target')).toBe('_blank')
+    expect(opened.attributes('rel')).toBe('noopener noreferrer')
 
     // The delivery consumed the draft, and the base commit came from it. This
     // panel has no detail to fall back to, so what is left is the outcome — not

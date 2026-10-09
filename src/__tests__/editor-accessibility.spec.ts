@@ -244,8 +244,9 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Apply reviewed patch')!.trigger('click')
     await flushPromises()
 
-    // Stage 'dry-run': the patch is confirmed, and the dry-run control replaces the apply control.
-    expect(wrapper.text()).toContain('Encrypted patch confirmed and ready for dry run.')
+    // Stage 'dry-run': the patch is applied, and the dry-run control replaces the apply control.
+    expect(wrapper.text()).toContain('Reviewed patch applied.')
+    expect(wrapper.text()).toContain('Nothing is written to Git yet')
     expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
     expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
     expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
@@ -255,7 +256,11 @@ describe('delivery panel policy controls', () => {
 
     // Stage 'deliver': the dry-run result is shown, the deliver control is gated on it.
     expect(wrapper.text()).toContain('Dry run complete.')
+    expect(wrapper.text()).toContain('wrote nothing')
+    // The path line names the base commit the change was checked against in the
+    // form Git prints it, rather than the full hash the server sent.
     expect(wrapper.text()).toContain('Path: clusters/prod/payments/api.yaml')
+    expect(wrapper.text()).toContain('base commit abc123')
     expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
     expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
 
@@ -269,6 +274,14 @@ describe('delivery panel policy controls', () => {
     expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(wrapper.text()).toContain('https://git.example/pr/7')
     expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
+
+    // The outcome says what was written, and the proposal URL is the link to
+    // what was opened rather than inert text.
+    expect(wrapper.text()).toContain('Proposal opened')
+    expect(wrapper.text()).toContain('Pushed deadbeef at clusters/prod/payments/api.yaml and opened a merge proposal.')
+    const proposal = wrapper.find('a[href="https://git.example/pr/7"]')
+    expect(proposal.exists()).toBe(true)
+    expect(proposal.attributes('rel')).toBe('noopener noreferrer')
 
     // The delivery consumed the review it was made from. The detail keeps a base
     // commit, so without a delivered state the panel would offer the same
@@ -298,6 +311,35 @@ describe('delivery panel policy controls', () => {
 
     expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
+  })
+
+  it('names the commit, branch, and file for a direct push', async () => {
+    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:push'])
+    const store = useSecretsStore(pinia)
+    store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'kube/immich/tet-cred.yml', base_commit: 'abc1234def', mode: 'direct' }
+    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({
+      mode: 'direct',
+      commit_sha: '2a0a5dd0ac92dd290240811b4d3ef0ee8afa1be1',
+      branch: 'main',
+      file_path: 'kube/immich/tet-cred.yml',
+      argocd_sync_verified: false,
+    })
+    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'direct' } }))
+
+    await findButton(wrapper, 'Deliver directly')!.trigger('click')
+    await flushPromises()
+
+    expect(deliver).toHaveBeenCalledTimes(1)
+    // A direct push has no proposal URL, so this is the case that used to end at
+    // `proposal_url || commit_sha` — a bare forty-character hash with nothing
+    // saying what it was. Every field the server sent is now reported, and the
+    // commit is shortened to the seven characters Git prints.
+    expect(wrapper.text()).toContain('Delivered directly')
+    expect(wrapper.text()).toContain('Committed 2a0a5dd to main at kube/immich/tet-cred.yml.')
+    expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
+    // Nothing offers a second push of what has just landed.
+    expect(findButton(wrapper, 'Deliver directly')).toBeFalsy()
+    expect(wrapper.text()).not.toContain('Delivery unavailable')
   })
 
   it('withholds delivery when the namespace capability is missing', () => {

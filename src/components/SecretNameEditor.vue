@@ -9,7 +9,7 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
-import { ApiError } from '@/api'
+import { ApiError, describeError } from '@/api'
 import type { NamespaceGitPaths } from '@/types'
 
 /**
@@ -165,13 +165,14 @@ async function createDraft() {
   } catch (e) {
     // Both refusals are about which manifest this is, and both are worth
     // restating in the terms the operator is working in rather than echoing
-    // the envelope message alone.
+    // the envelope message alone. describeError carries the server's request id
+    // either way, which is what a report of the failure needs to be looked up.
     if (e instanceof ApiError && e.code === 'PATH_OCCUPIED') {
-      error.value = `${e.message} Use the existing Secret instead: open it from the namespace list and edit one value there.`
+      error.value = `${describeError(e, 'Encryption failed')} Use the existing Secret instead: open it from the namespace list and edit one value there.`
     } else if (e instanceof ApiError && e.code === 'INVALID_MANIFEST') {
-      error.value = `${e.message} Check that the name above matches metadata.name in the manifest, and that it is a Secret rather than a SealedSecret.`
+      error.value = `${describeError(e, 'Encryption failed')} Check that the name above matches metadata.name in the manifest, and that it is a Secret rather than a SealedSecret.`
     } else {
-      error.value = e instanceof Error ? e.message : 'Encryption failed'
+      error.value = describeError(e, 'Encryption failed')
     }
   }
   finally { loading.value = false }
