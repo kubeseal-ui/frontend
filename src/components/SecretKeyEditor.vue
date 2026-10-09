@@ -219,12 +219,20 @@ function clear(key?: string) {
     added.value = []
   }
   if (store.currentDiff) { store.currentDiff = null; store.pendingMutation = null }
+  // The sentence named the diff this has just dropped.
+  message.value = ''
 }
 
-// Submitting the review is what moves the page on to the panel below, so that is what folds
-// this stage. Folding discards nothing: the staged rows are still here behind the toggle, and
-// discarding them clears the diff, which brings the editor back rather than leaving it folded
-// over a review that no longer exists.
+// A delivery consumes the staged set: the ciphertext that reached Git was built from these
+// rows. Clearing the diff alone leaves them standing as a change that has already landed,
+// and the cleared diff is what unfolds the editor over them.
+watch(() => store.deliveryResult, (outcome) => {
+  if (outcome) clear()
+})
+
+// Submitting the review moves the page on to the panel below, so that is what folds this stage.
+// Folding discards nothing — the rows sit behind the toggle — but they are the plaintext the
+// delivered ciphertext was built from, so a delivery consumes them, as a discard does.
 const override = ref<boolean | null>(null)
 const open = computed(() => override.value ?? !store.currentDiff)
 const toggle = ref<{ $el?: HTMLElement } | null>(null)

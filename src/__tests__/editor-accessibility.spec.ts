@@ -337,6 +337,35 @@ describe('secret key editor accessibility', () => {
     expect(findButton(wrapper, 'Hide')).toBeTruthy()
     expect(findButton(wrapper, 'Edit')).toBeFalsy()
   })
+
+  it('drops the staged set once a delivery has consumed it', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const store = useSecretsStore(pinia)
+    vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
+    const wrapper = mountEditor(makeDetail())
+
+    await findButton(wrapper, 'Change')!.trigger('click')
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
+    await flushPromises()
+
+    // The reviewed state the panel delivers from, then the push it reports and the diff it
+    // consumed to make it.
+    store.currentDiff = reviewedDiff()
+    await flushPromises()
+    expect(wrapper.text()).toContain('1 change reviewed')
+
+    store.deliveryResult = { mode: 'direct', commit_sha: '2a0a5dd', argocd_sync_verified: false }
+    store.currentDiff = null
+    await flushPromises()
+
+    // Those rows were the plaintext the delivered ciphertext was built from, so they leave
+    // with it rather than standing as a change that has already landed.
+    expect(wrapper.text()).toContain('Nothing staged.')
+    expect(wrapper.text()).not.toContain('1 staged change')
+    expect(wrapper.text()).not.toContain('Encrypted diff is ready for review')
+    expect(findButton(wrapper, 'Review encrypted diff')).toBeFalsy()
+  })
 })
 
 describe('delivery panel policy controls', () => {
