@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -7,6 +7,7 @@ import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
 import AppSecretInput from '@/components/ui/AppSecretInput.vue'
 import AppTag from '@/components/ui/AppTag.vue'
 import { describeError } from '@/api'
+import { refocusAfterCollapse } from '@/utils/refocus'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { Mutation, MutationOperation, SealedSecretDetail } from '@/types'
@@ -163,6 +164,21 @@ function clear(key?: string) {
   if (store.currentDiff) { store.currentDiff = null; store.pendingMutation = null }
 }
 
+// Submitting the review is what moves the page on to the panel below, so that is what folds
+// this stage. Folding discards nothing: the staged rows are still here behind the toggle, and
+// discarding them clears the diff, which brings the editor back rather than leaving it folded
+// over a review that no longer exists.
+const override = ref<boolean | null>(null)
+const open = computed(() => override.value ?? !store.currentDiff)
+const toggle = ref<{ $el?: HTMLElement } | null>(null)
+const reviewedCount = computed(() => store.currentDiff?.mutations?.length || 0)
+const summary = computed(() => (reviewedCount.value === 1 ? '1 change reviewed' : `${reviewedCount.value} changes reviewed`))
+
+watch(() => Boolean(store.currentDiff), async (reviewed, was) => {
+  override.value = null
+  if (reviewed && !was) await refocusAfterCollapse(() => toggle.value?.$el)
+}, { flush: 'post' })
+
 onBeforeUnmount(() => clear())
 </script>
 
@@ -173,11 +189,20 @@ onBeforeUnmount(() => clear())
     <AppAlert v-if="error" type="error" title="Operation failed" closable class="mb-3" @close="error = ''">{{ error }}</AppAlert>
     <AppAlert v-if="message" type="success" closable class="mb-3" @close="message = ''">{{ message }}</AppAlert>
 
+    <!-- The review moves the page on to the panel below, so submitting one folds this stage.
+         It stays the way back into the keys, and folding discards nothing staged. -->
+    <div v-if="!open || store.currentDiff" class="mb-3 flex flex-wrap items-center gap-2">
+      <span v-if="!open" class="text-sm text-muted">{{ summary }}</span>
+      <AppButton v-if="!open" ref="toggle" size="small" variant="ghost" class="ml-auto" @click="override = true">Edit</AppButton>
+      <AppButton v-else size="small" variant="ghost" class="ml-auto" @click="override = false">Hide</AppButton>
+    </div>
+
     <!-- The inventory is read-only: a row says what the Secret has — and, while revealed, what
          one value is — never what is being changed, so staging an add cannot rearrange the keys
          already here. -->
     <div
       v-for="key in detail.keys || []"
+      v-show="open"
       :key="key"
       class="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
     >
@@ -210,6 +235,7 @@ onBeforeUnmount(() => clear())
          as "nothing staged" — the empty state says it instead. -->
     <div
       v-if="canReveal"
+      v-show="open"
       class="mt-4 rounded-card-inner border"
       :class="stagedCount > 0 ? 'border-accent/40 bg-accent/5' : 'border-border'"
     >
@@ -328,6 +354,6 @@ onBeforeUnmount(() => clear())
       </div>
     </div>
 
-    <AppAlert v-if="store.currentDiff" type="info" title="Encrypted diff ready" class="mt-3">The server returned encrypted before/after content. Review and delivery controls are in the panel below.</AppAlert>
+    <AppAlert v-if="store.currentDiff" v-show="open" type="info" title="Encrypted diff ready" class="mt-3">The server returned encrypted before/after content. Review and delivery controls are in the panel below.</AppAlert>
   </AppCard>
 </template>

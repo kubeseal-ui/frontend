@@ -275,6 +275,28 @@ describe('secret key editor accessibility', () => {
       expect(document.activeElement).toBe(element)
     }
   })
+
+  it('folds the editor once a review exists, and Edit brings it back', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const store = useSecretsStore(pinia)
+    const wrapper = mountEditor(makeDetail())
+
+    // Nothing reviewed yet: the form is the page, so there is no fold and no toggle.
+    expect(findButton(wrapper, 'Edit')).toBeFalsy()
+
+    store.currentDiff = reviewedDiff()
+    await flushPromises()
+
+    // Folded to a line saying what was reviewed, with the way back in. Folding discards
+    // nothing: the inventory and the tray are behind the toggle, not gone.
+    expect(wrapper.text()).toContain('1 change reviewed')
+    expect(wrapper.text()).toContain('Reveal one key')
+    expect(wrapper.text()).toContain('Staged changes')
+
+    await findButton(wrapper, 'Edit')!.trigger('click')
+    expect(findButton(wrapper, 'Hide')).toBeTruthy()
+    expect(findButton(wrapper, 'Edit')).toBeFalsy()
+  })
 })
 
 describe('delivery panel policy controls', () => {
@@ -367,6 +389,38 @@ describe('delivery panel policy controls', () => {
 
     expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
+  })
+
+  it('opens the row the flow stands on and folds the ones it has left', async () => {
+    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
+    const store = useSecretsStore(pinia)
+    store.currentDiff = reviewedDiff()
+    vi.spyOn(store, 'dryRun').mockImplementation(async () => {
+      store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
+      return store.dryRunResult
+    })
+    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
+
+    // The rows that can be toggled, in order. A row the flow has not reached carries no
+    // `aria-expanded` at all, because there is nothing for it to open.
+    const rows = () => wrapper.findAll('button').filter((button) => button.attributes('aria-expanded') !== undefined)
+
+    // Standing on Check: Review folded, Check open, Deliver not yet reachable.
+    expect(rows().map((row) => row.attributes('aria-expanded'))).toEqual(['false', 'true'])
+
+    await findButton(wrapper, 'Run dry run')!.trigger('click')
+    await flushPromises()
+
+    // Deliver open, and the folded Check row still names the path and base commit the
+    // delivery is made against.
+    expect(rows().map((row) => row.attributes('aria-expanded'))).toEqual(['false', 'false', 'true'])
+    expect(rows()[1].text()).toContain('clusters/prod/payments/api.yaml')
+    expect(rows()[1].text()).toContain('base commit abc123')
+
+    // A folded row is a toggle, not a dead end.
+    await rows()[0].trigger('click')
+    expect(rows()[0].attributes('aria-expanded')).toBe('true')
+    expect(rows()[0].text()).toContain('Includes: replace password')
   })
 
   it('names the commit, branch, and file for a direct push', async () => {

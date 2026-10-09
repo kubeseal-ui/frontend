@@ -10,6 +10,7 @@ import AppTextarea from '@/components/ui/AppTextarea.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { ApiError, describeError } from '@/api'
+import { refocusAfterCollapse } from '@/utils/refocus'
 import type { NamespaceGitPaths } from '@/types'
 
 // One form for both ways a Secret gets managed: writing it here, and adopting a live one
@@ -74,6 +75,25 @@ const renderedName = ref('')
 // rather than merely unwise.
 const holdsOnlyTemplate = computed(() => yaml.value === pristineTemplate.value)
 
+// Encrypting is what moves the flow on, so that is what folds this stage: the form keeps its
+// contents behind the toggle and the review below becomes what the page is about.
+const override = ref<boolean | null>(null)
+const open = computed(() => override.value ?? !store.newSecretDraft)
+const toggle = ref<{ $el?: HTMLElement } | null>(null)
+const nameInput = ref<{ $el?: HTMLElement } | null>(null)
+const summary = computed(() => [
+  store.newSecretDraft ? `Encrypted draft for ${store.newSecretDraft.name}` : name.value,
+  scope.value,
+  targetPath.value || defaultPath.value,
+].filter(Boolean).join(' · '))
+
+watch(() => store.newSecretDraft, async () => {
+  override.value = null
+  // The control that folded the stage goes with it, so focus has to be carried to the toggle
+  // rather than left on `<body>`.
+  await refocusAfterCollapse(() => toggle.value?.$el)
+}, { flush: 'post' })
+
 function seedTemplate() {
   renderedName.value = name.value
   yaml.value = pristineTemplate.value
@@ -127,6 +147,9 @@ function discard() {
   store.discardNewSecretDraft()
   name.value = ''; targetPath.value = ''
   seedTemplate()
+  // Discarding takes the button that was pressed with it, so focus is carried to the field
+  // the emptied form starts at rather than dropped on `<body>`.
+  return refocusAfterCollapse(() => nameInput.value?.$el)
 }
 
 // A plaintext manifest must not outlive the page it was pasted on.
@@ -135,7 +158,24 @@ onUnmounted(() => { yaml.value = '' })
 
 <template>
   <AppCard v-if="canCreate" title="Create new SealedSecret" icon="plus">
-    <div class="flex flex-col gap-3">
+    <!-- The folded stage keeps saying what it holds, and stays the way back into it: a draft
+         never sits in a state the page offers no way out of. -->
+    <div v-if="!open || store.newSecretDraft" class="mb-3 flex flex-col gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span v-if="!open" class="text-sm text-muted">{{ summary }}</span>
+        <span class="ml-auto flex flex-wrap items-center gap-2">
+          <AppButton v-if="store.newSecretDraft" size="small" @click="discard">Discard encrypted draft</AppButton>
+          <AppButton v-if="!open" ref="toggle" size="small" variant="ghost" @click="override = true">Edit</AppButton>
+          <AppButton v-else size="small" variant="ghost" @click="override = false">Hide</AppButton>
+        </span>
+      </div>
+
+      <AppAlert v-if="store.newSecretDraft" type="success" title="Encrypted draft ready">
+        Ciphertext for {{ store.newSecretDraft.name }} is queued in the shared review and delivery panel below. The plaintext Secret is no longer held on this page.
+      </AppAlert>
+    </div>
+
+    <div v-show="open" class="flex flex-col gap-3">
       <AppRadioGroup
         v-model="mode"
         name="secret-source"
@@ -149,7 +189,7 @@ onUnmounted(() => { yaml.value = '' })
         the Secret's content is versioned. Nothing is read from the cluster by this application.
       </AppAlert>
 
-      <AppInput v-model="name" ariaLabel="New secret name" :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'" />
+      <AppInput ref="nameInput" v-model="name" ariaLabel="New secret name" :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'" />
 
       <AppRadioGroup
         v-model="scope"
@@ -185,18 +225,13 @@ onUnmounted(() => { yaml.value = '' })
         </AppButton>
       </div>
 
-      <AppAlert v-if="holdsOnlyTemplate && name" type="info" title="Fill in the template">
+      <!-- Withheld while a draft is held: submitting reseeds the template, so without this the
+           card would ask for the entries it has just been given. -->
+      <AppAlert v-if="holdsOnlyTemplate && name && !store.newSecretDraft" type="info" title="Fill in the template">
         Replace the empty <code class="font-mono">key</code> with the entries this Secret needs, then encrypt.
       </AppAlert>
 
       <AppAlert v-if="error" type="error" title="Unable to encrypt">{{ error }}</AppAlert>
-      <AppAlert v-if="store.newSecretDraft" type="success" title="Encrypted draft ready">
-        Ciphertext for {{ store.newSecretDraft.name }} is queued in the shared review and delivery panel below. The plaintext Secret is no longer held on this page.
-      </AppAlert>
-
-      <div v-if="store.newSecretDraft">
-        <AppButton @click="discard">Discard encrypted draft</AppButton>
-      </div>
     </div>
   </AppCard>
 </template>

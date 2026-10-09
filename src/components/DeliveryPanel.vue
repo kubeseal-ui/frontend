@@ -4,6 +4,7 @@ import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppCode from '@/components/ui/AppCode.vue'
+import StageRow from '@/components/ui/StageRow.vue'
 import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
@@ -81,6 +82,38 @@ const stage = computed<'review' | 'apply' | 'dry-run' | 'deliver'>(() => {
   return 'review'
 })
 
+type RowId = 'review' | 'check' | 'deliver'
+
+// The rail opens the row the flow is standing on, and a stage arriving resets any row the
+// operator opened by hand, so the next one comes up on its own.
+const openRow = computed<RowId>(() => {
+  if (stage.value === 'deliver') return 'deliver'
+  if (stage.value === 'dry-run') return 'check'
+  return 'review'
+})
+const override = ref<Partial<Record<RowId, boolean>>>({})
+watch(openRow, () => { override.value = {} })
+const isOpen = (id: RowId) => override.value[id] ?? id === openRow.value
+function setOpen(id: RowId, open: boolean) { override.value = { ...override.value, [id]: open } }
+
+// A row is done the moment the flow has left it, and a row the flow has not reached is
+// closed with the reason rather than merely unavailable.
+const rowState = (id: RowId): 'done' | 'current' | 'pending' => {
+  if (id === 'deliver' && delivered.value) return 'done'
+  if (id === openRow.value) return 'current'
+  if (id === 'review') return 'done'
+  return store.dryRunResult ? 'done' : 'pending'
+}
+
+const reviewSummary = computed(() => store.newSecretDraft
+  ? `Encrypted draft for ${store.newSecretDraft.name}`
+  : reviewedKeys.value ? `Includes: ${reviewedKeys.value}` : '')
+// The base commit is what a delivery is made against, so the row that checked it keeps
+// naming it after it folds.
+const checkSummary = computed(() => store.dryRunResult
+  ? `Path: ${store.dryRunResult.path} · base commit ${shortBase.value}`
+  : '')
+
 async function applyPatch() {
   if (!store.currentDiff) return
   applying.value = true; error.value = ''; result.value = ''
@@ -133,51 +166,72 @@ async function deliver() {
         Only encrypted manifests are shown. The server resolved the destination{{ shownDestination ? `: ${shownDestination}` : '' }} — nothing on this page chooses it.
       </AppAlert>
 
-      <div v-if="store.currentDiff" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
-        <AppCode label="Encrypted before" :code="store.currentDiff.before" />
-        <AppCode label="Encrypted after" :code="store.currentDiff.after" />
-        <p v-if="reviewedKeys" class="m-0 text-sm text-muted">Includes: {{ reviewedKeys }}</p>
-      </div>
-
-      <div v-else-if="store.newSecretDraft" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
-        <AppCode :label="`Encrypted new SealedSecret ${store.newSecretDraft.name}`" :code="store.newSecretDraft.yaml" />
-      </div>
-
-      <div v-if="store.dryRunResult" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
-        <AppCode label="Git before" :code="store.dryRunResult.before" />
-        <AppCode label="Git after" :code="store.dryRunResult.after" />
-        <p class="m-0 text-sm text-muted">Path: {{ store.dryRunResult.path }} · base commit {{ shortBase }}</p>
-      </div>
-
-      <AppAlert v-if="stage === 'apply'" type="warning" title="Run dry run before delivery">
-        Apply the reviewed patch, then run a server-side dry run before delivering through the {{ mode }} policy.
-      </AppAlert>
-
-      <div>
-        <AppButton
-          v-if="stage === 'apply'"
-          variant="primary"
-          :loading="applying"
-          @click="applyPatch"
+      <div class="rounded-card-inner border border-border">
+        <StageRow
+          title="Review"
+          :state="rowState('review')"
+          :summary="reviewSummary"
+          :open="isOpen('review')"
+          @update:open="setOpen('review', $event)"
         >
-          Apply reviewed patch
-        </AppButton>
-        <AppButton
-          v-else-if="stage === 'dry-run' && canDeliverNow"
-          variant="primary"
-          :loading="loading"
-          @click="runDryRun"
+          <div v-if="store.currentDiff" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
+            <AppCode label="Encrypted before" :code="store.currentDiff.before" />
+            <AppCode label="Encrypted after" :code="store.currentDiff.after" />
+          </div>
+          <div v-else-if="store.newSecretDraft" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
+            <AppCode :label="`Encrypted new SealedSecret ${store.newSecretDraft.name}`" :code="store.newSecretDraft.yaml" />
+          </div>
+          <AppButton
+            v-if="stage === 'apply'"
+            variant="primary"
+            :loading="applying"
+            @click="applyPatch"
+          >
+            Apply reviewed patch
+          </AppButton>
+        </StageRow>
+
+        <StageRow
+          title="Check against the branch"
+          :state="rowState('check')"
+          :summary="checkSummary"
+          locked="Waiting on the review above."
+          :open="isOpen('check')"
+          @update:open="setOpen('check', $event)"
         >
-          Run dry run
-        </AppButton>
-        <AppButton
-          v-else-if="stage === 'deliver' && canDeliverNow"
-          variant="primary"
-          :loading="loading"
-          @click="deliver"
+          <AppButton
+            v-if="stage === 'dry-run' && canDeliverNow"
+            variant="primary"
+            :loading="loading"
+            @click="runDryRun"
+          >
+            Run dry run
+          </AppButton>
+          <div v-if="store.dryRunResult" class="flex flex-col gap-3 rounded-card-inner border border-border bg-surface-raised/70 p-3">
+            <AppCode v-if="store.dryRunResult.before" label="Git before" :code="store.dryRunResult.before" />
+            <!-- A new Secret has no before: one box holding an empty string says nothing, and
+                 the draft it would be compared against is the row above. -->
+            <AppCode v-if="store.dryRunResult.before" label="Git after" :code="store.dryRunResult.after" />
+            <AppCode v-else label="What will be written" :code="store.dryRunResult.after" />
+          </div>
+        </StageRow>
+
+        <StageRow
+          title="Deliver"
+          :state="rowState('deliver')"
+          locked="Run dry run before delivery."
+          :open="isOpen('deliver')"
+          @update:open="setOpen('deliver', $event)"
         >
-          {{ actionLabel }}
-        </AppButton>
+          <AppButton
+            v-if="stage === 'deliver' && canDeliverNow"
+            variant="primary"
+            :loading="loading"
+            @click="deliver"
+          >
+            {{ actionLabel }}
+          </AppButton>
+        </StageRow>
       </div>
 
       <AppAlert v-if="!delivered && !canDeliver" type="warning" title="Delivery unavailable">

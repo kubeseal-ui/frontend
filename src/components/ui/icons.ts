@@ -18,6 +18,7 @@ export const ICONS = {
   'sign-out': ['M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3', 'M10 17l5-5-5-5', 'M15 12H3'],
   'arrow-right': ['M4 12h15', 'm13 6 6 6-6 6'],
   'chevron-left': ['M14.5 5 7.5 12l7 7'],
+  'chevron-down': ['m5 9.5 7 7 7-7'],
   plus: ['M12 5v14', 'M5 12h14'],
   check: ['M5 12.5l4.5 4.5L19 7'],
   alert: ['M12 3.5 2.5 20h19L12 3.5Z', 'M12 10v4.5', 'M12 17v.5'],
