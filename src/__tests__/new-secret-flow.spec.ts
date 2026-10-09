@@ -143,6 +143,14 @@ describe('the create page', () => {
     await flushPromises()
     expect(deliver).toHaveBeenCalledWith('payments', 'brand-new', 'encrypted-new-secret', 'head-1', undefined)
     expect(wrapper.text()).toContain('https://git.example/pr/11')
+
+    // The delivery consumed the draft, and the base commit came from it. This
+    // panel has no detail to fall back to, so what is left is the outcome — not
+    // the availability warning, which would announce that there is nothing to
+    // deliver against immediately after a delivery that succeeded.
+    expect(store.newSecretDraft).toBeNull()
+    expect(wrapper.text()).not.toContain('Delivery unavailable')
+    expect(wrapper.text()).not.toContain('did not report a base commit')
   })
 
   it('withholds delivery when the server reported no base commit', async () => {

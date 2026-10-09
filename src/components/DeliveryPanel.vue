@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -53,7 +53,21 @@ const reviewedKeys = computed(() => store.currentDiff?.mutations?.map((mutation)
  * and then refused with a 400.
  */
 const hasBaseCommit = computed(() => Boolean(target.value.base_commit))
-const canDeliverNow = computed(() => canDeliver.value && hasBaseCommit.value)
+/**
+ * A delivery consumes the review it was made from: the diff or the draft is
+ * cleared, and the base commit this panel reads goes with it. What is left to
+ * report is what the delivery produced — not whether another one is available —
+ * so the controls and both availability warnings stand down until the next
+ * review, rather than announcing that there is nothing to deliver against
+ * immediately after a delivery that succeeded.
+ */
+const delivered = ref(false)
+const canDeliverNow = computed(() => canDeliver.value && hasBaseCommit.value && !delivered.value)
+// Only a transition *into* a review re-arms the panel. A delivery clears these
+// same fields, and that must not read as a new review.
+watch([() => store.currentDiff, () => store.newSecretDraft], ([diff, draft]) => {
+  if (diff || draft) delivered.value = false
+})
 // Workflow stages are mutually exclusive: apply the reviewed patch, run the
 // server-side dry run, then deliver. One stage renders exactly one primary
 // control, so parallel v-if chains can never ghost-duplicate a button.
@@ -100,6 +114,7 @@ async function deliver() {
     result.value = response.proposal_url || response.commit_sha
     // The delivered ciphertext is no longer pending; the dry-run result stays
     // so the confirmation above remains visible until the user navigates away.
+    delivered.value = true
     store.currentDiff = null
     store.pendingMutation = null
     store.newSecretDraft = null
@@ -160,10 +175,10 @@ async function deliver() {
         </AppButton>
       </div>
 
-      <AppAlert v-if="!canDeliver" type="warning" title="Delivery unavailable">
+      <AppAlert v-if="!delivered && !canDeliver" type="warning" title="Delivery unavailable">
         {{ mode ? `This namespace requires ${mode} delivery, but your effective capabilities do not include the required delivery capability.` : 'This namespace has no Git delivery policy, so the reviewed manifest cannot be delivered from here.' }}
       </AppAlert>
-      <AppAlert v-else-if="!hasBaseCommit" type="warning" title="Delivery unavailable">
+      <AppAlert v-else-if="!delivered && !hasBaseCommit" type="warning" title="Delivery unavailable">
         The server did not report a base commit for this change, so there is nothing to deliver against. Reload the page and try again.
       </AppAlert>
 

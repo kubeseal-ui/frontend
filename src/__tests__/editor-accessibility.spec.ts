@@ -269,6 +269,14 @@ describe('delivery panel policy controls', () => {
     expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(wrapper.text()).toContain('https://git.example/pr/7')
     expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
+
+    // The delivery consumed the review it was made from. The detail keeps a base
+    // commit, so without a delivered state the panel would offer the same
+    // controls again against the ciphertext it has just pushed — a second
+    // delivery the server would refuse as a base-commit conflict — and would
+    // report the change as still awaiting delivery.
+    expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
+    expect(wrapper.text()).not.toContain('Delivery unavailable')
   })
 
   it('runs the dry run straight off the reviewed diff when nothing is pending', async () => {
