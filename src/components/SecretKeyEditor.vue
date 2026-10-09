@@ -231,8 +231,7 @@ watch(() => store.deliveryResult, (outcome) => {
 })
 
 // Submitting the review moves the page on to the panel below, so that is what folds this stage.
-// Folding discards nothing — the rows sit behind the toggle — but they are the plaintext the
-// delivered ciphertext was built from, so a delivery consumes them, as a discard does.
+// Folding discards nothing — the rows sit behind the toggle.
 const override = ref<boolean | null>(null)
 const open = computed(() => override.value ?? !store.currentDiff)
 const toggle = ref<{ $el?: HTMLElement } | null>(null)
