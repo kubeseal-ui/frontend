@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -19,13 +19,14 @@ const store = useSecretsStore()
 const revealed = reactive<Record<string, string>>({})
 const replacements = reactive<Record<string, string>>({})
 const operation = reactive<Record<string, MutationOperation>>({})
-/** Open edit controls: revealed, or opened to change without revealing. */
+/** Keys opened for editing. The inventory row stays read-only; the change is staged below. */
 const editing = reactive<Record<string, boolean>>({})
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const reviewing = ref(false)
 const message = ref('')
 const error = ref('')
+const addInputs = ref<Record<number, HTMLInputElement | null>>({})
 const canReveal = computed(() => auth.hasCapability(props.detail.namespace, 'secret:decrypt'))
 const canPatch = computed(() => auth.hasCapability(props.detail.namespace, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
 
@@ -41,36 +42,58 @@ function setOperation(key: string, value: string) {
   operation[key] = value as MutationOperation
 }
 
+function operationOf(key: string) {
+  return operation[key] || 'replace'
+}
+
 function hasRevealed(key: string) {
   return revealed[key] !== undefined
 }
 
+const stagedKeys = computed(() => (props.detail.keys || []).filter((key) => editing[key]))
+const stagedCount = computed(() => stagedKeys.value.length + added.value.length)
+
+// Revealing is a look, not a change: it stages nothing, so a value read on the way past can
+// never block the review with a change nobody asked for. Only Change stages a key, and a
+// replacement or a delete still needs no reveal at all.
 async function reveal(key: string) {
   if (!canReveal.value || !props.detail.git.base_commit) return
   error.value = ''; activeKey.value = key
   try {
     revealed[key] = (await store.reveal(props.detail.namespace, props.detail.name, key, props.detail.git.base_commit)).value
-    editing[key] = true
-    operation[key] = operation[key] || 'replace'
   }
   catch (e) { error.value = describeError(e, 'The key could not be revealed') }
   finally { activeKey.value = '' }
 }
 
-function startEdit(key: string) {
-  editing[key] = true
-  operation[key] = operation[key] || 'replace'
+/** Drops the plaintext this page is holding; the Secret itself is untouched. */
+function conceal(key: string) {
+  delete revealed[key]
 }
 
-function addRow() {
-  added.value.push({ id: nextRowId++, key: '', value: '' })
+function startEdit(key: string) {
+  editing[key] = true
+  operation[key] = operationOf(key)
+}
+
+// Focus follows the new row: the tray is where the typing happens, and a click that leaves
+// focus on the button makes the keyboard user tab back through the inventory to reach it.
+async function addRow() {
+  const id = nextRowId++
+  added.value.push({ id, key: '', value: '' })
+  await nextTick()
+  addInputs.value[id]?.focus()
+}
+
+function setAddInput(id: number, element: unknown) {
+  addInputs.value[id] = element instanceof HTMLInputElement ? element : null
 }
 
 const batch = computed<Mutation[]>(() => {
   const out: Mutation[] = []
   for (const key of props.detail.keys || []) {
     if (!editing[key]) continue
-    const op = operation[key] || 'replace'
+    const op = operationOf(key)
     out.push({ key, operation: op, value: op === 'delete' ? '' : replacements[key] || '' })
   }
   for (const row of added.value) {
@@ -97,6 +120,24 @@ const batchProblem = computed(() => {
   return ''
 })
 const canReview = computed(() => canPatch.value && batchProblem.value === '')
+
+// A row states its own problem, under the field it belongs to: the sentence above names no
+// key, so with several rows staged it is a scan rather than an answer.
+function addNameProblem(row: { key: string }) {
+  const key = row.key.trim()
+  if (key === '') return 'This new key needs a name.'
+  if ((props.detail.keys || []).includes(key)) return `This Secret already has a key named ${key}.`
+  if (added.value.filter((other) => other.key.trim() === key).length > 1) return 'Two new keys share this name.'
+  return ''
+}
+
+function addValueProblem(row: { key: string; value: string }) {
+  return addNameProblem(row) === '' && row.value === '' ? 'This new key needs a value.' : ''
+}
+
+function existingProblem(key: string) {
+  return operationOf(key) !== 'delete' && !(replacements[key] || '') ? 'This change needs a value.' : ''
+}
 
 async function reviewBatch() {
   if (!canReview.value || !props.detail.git.base_commit) return
@@ -132,6 +173,9 @@ onBeforeUnmount(() => clear())
     <AppAlert v-if="error" type="error" title="Operation failed" closable class="mb-3" @close="error = ''">{{ error }}</AppAlert>
     <AppAlert v-if="message" type="success" closable class="mb-3" @close="message = ''">{{ message }}</AppAlert>
 
+    <!-- The inventory is read-only: a row says what the Secret has — and, while revealed, what
+         one value is — never what is being changed, so staging an add cannot rearrange the keys
+         already here. -->
     <div
       v-for="key in detail.keys || []"
       :key="key"
@@ -139,73 +183,150 @@ onBeforeUnmount(() => clear())
     >
       <div class="flex items-center gap-2">
         <code class="font-mono text-sm">{{ key }}</code>
-        <AppTag>concealed</AppTag>
+        <AppTag v-if="editing[key]" tone="accent">{{ operationOf(key) }}</AppTag>
+        <AppTag v-else>concealed</AppTag>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
+        <AppSecretInput
+          v-if="hasRevealed(key)"
+          v-model="revealed[key]"
+          readonly
+          :ariaLabel="`Revealed value for ${key}`"
+        />
         <AppButton v-if="canReveal && !hasRevealed(key)" :disabled="!!activeKey" @click="reveal(key)">
           Reveal one key
+        </AppButton>
+        <AppButton v-if="hasRevealed(key)" :aria-label="`Conceal ${key}`" @click="conceal(key)">
+          Conceal
         </AppButton>
         <AppButton v-if="canReveal && !editing[key]" :aria-label="`Change ${key}`" @click="startEdit(key)">
           Change
         </AppButton>
-
-        <template v-if="editing[key]">
-          <AppSecretInput
-            v-if="hasRevealed(key)"
-            v-model="revealed[key]"
-            readonly
-            :ariaLabel="`Revealed value for ${key}`"
-          />
-          <AppSecretInput
-            v-model="replacements[key]"
-            placeholder="Replacement value"
-            :ariaLabel="`Replacement value for ${key}`"
-          />
-          <AppRadioGroup
-            :model-value="operation[key] || 'replace'"
-            :name="`operation-${key}`"
-            :options="EXISTING_OPERATIONS"
-            :ariaLabel="`Operation for ${key}`"
-            :disabled="!canPatch"
-            @update:model-value="setOperation(key, $event)"
-          />
-          <AppButton @click="clear(key)">Clear</AppButton>
-        </template>
       </div>
     </div>
 
+    <!-- Always on screen while reveal is available, so an absent tray could never be read
+         as "nothing staged" — the empty state says it instead. -->
     <div
-      v-for="(row, index) in added"
-      :key="row.id"
-      class="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3"
+      v-if="canReveal"
+      class="mt-4 rounded-card-inner border"
+      :class="stagedCount > 0 ? 'border-accent/40 bg-accent/5' : 'border-border'"
     >
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- `field` is `w-full`, so it needs a sized flex parent, not the row itself. -->
-        <span class="flex min-w-[11rem] flex-1 items-center">
-          <input v-model="row.key" :aria-label="`New key name ${index + 1}`" placeholder="Key name" class="field font-mono" />
+      <div class="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+        <span class="text-sm font-medium" :class="stagedCount > 0 ? 'text-accent' : 'text-muted'">
+          {{ stagedCount === 0 ? 'Staged changes' : (stagedCount === 1 ? '1 staged change' : `${stagedCount} staged changes`) }}
         </span>
-        <AppTag>new</AppTag>
+        <AppButton v-if="stagedCount > 0" size="small" variant="ghost" class="ml-auto" @click="clear()">Discard all</AppButton>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <AppSecretInput v-model="row.value" placeholder="Value" :ariaLabel="`New key value ${index + 1}`" />
-        <AppButton :aria-label="`Remove new key ${index + 1}`" @click="added.splice(index, 1)">Remove</AppButton>
-      </div>
-    </div>
 
-    <div v-if="canReveal" class="mt-4 flex flex-wrap items-center gap-2">
-      <AppButton v-if="canPatch" @click="addRow">Add key</AppButton>
-      <AppButton
-        v-if="batch.length > 0"
-        variant="primary"
-        :loading="reviewing"
-        :disabled="!canReview"
-        @click="reviewBatch"
-      >
-        Review encrypted diff
-      </AppButton>
+      <p v-if="stagedCount === 0" class="px-4 py-3 text-sm text-muted">
+        Nothing staged. Reveal or change a key, or add one the Secret does not have.
+      </p>
+
+      <ul v-else class="flex flex-col">
+        <li
+          v-for="(key, index) in stagedKeys"
+          :key="key"
+          class="flex flex-col gap-2 border-t border-border px-4 py-3 first:border-t-0"
+          :class="existingProblem(key) ? 'bg-danger/5' : ''"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <AppRadioGroup
+              :model-value="operationOf(key)"
+              :name="`operation-${key}`"
+              :options="EXISTING_OPERATIONS"
+              :ariaLabel="`Operation for ${key}`"
+              :disabled="!canPatch"
+              @update:model-value="setOperation(key, $event)"
+            />
+            <code class="font-mono text-sm">{{ key }}</code>
+            <AppButton
+              class="ml-auto"
+              size="small"
+              variant="ghost"
+              :aria-label="`Discard the staged change to ${key}`"
+              @click="clear(key)"
+            >
+              Discard
+            </AppButton>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <AppSecretInput
+              v-if="operationOf(key) !== 'delete'"
+              v-model="replacements[key]"
+              placeholder="Replacement value"
+              :ariaLabel="`Replacement value for ${key}`"
+              :invalid="!!existingProblem(key)"
+              :describedBy="existingProblem(key) ? `staged-problem-${index}` : ''"
+            />
+            <p v-else class="mb-0 text-sm text-muted">Deletes the key; no value is needed.</p>
+          </div>
+
+          <p v-if="existingProblem(key)" :id="`staged-problem-${index}`" class="mb-0 text-sm text-danger">
+            {{ existingProblem(key) }}
+          </p>
+        </li>
+
+        <li
+          v-for="(row, index) in added"
+          :key="row.id"
+          class="flex flex-col gap-2 border-t border-border px-4 py-3"
+          :class="addNameProblem(row) || addValueProblem(row) ? 'bg-danger/5' : ''"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <AppTag tone="accent">add</AppTag>
+            <span class="flex min-w-[11rem] flex-1 items-center">
+              <input
+                :ref="(element) => setAddInput(row.id, element)"
+                v-model="row.key"
+                :aria-label="`New key name ${index + 1}`"
+                :aria-invalid="addNameProblem(row) ? 'true' : undefined"
+                :aria-describedby="addNameProblem(row) ? `new-problem-${row.id}` : undefined"
+                placeholder="Key name"
+                class="field font-mono"
+              />
+            </span>
+            <AppButton
+              class="ml-auto"
+              size="small"
+              variant="ghost"
+              :aria-label="`Remove new key ${index + 1}`"
+              @click="added.splice(index, 1)"
+            >
+              Remove
+            </AppButton>
+          </div>
+
+          <AppSecretInput
+            v-model="row.value"
+            placeholder="Value"
+            :ariaLabel="`New key value ${index + 1}`"
+            :invalid="!!addValueProblem(row)"
+            :describedBy="addValueProblem(row) ? `new-problem-${row.id}` : ''"
+          />
+
+          <p v-if="addNameProblem(row) || addValueProblem(row)" :id="`new-problem-${row.id}`" class="mb-0 text-sm text-danger">
+            {{ addNameProblem(row) || addValueProblem(row) }}
+          </p>
+        </li>
+      </ul>
+
+      <div class="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
+        <AppButton v-if="canPatch" @click="addRow">Add key</AppButton>
+        <AppButton
+          v-if="batch.length > 0"
+          variant="primary"
+          :loading="reviewing"
+          :disabled="!canReview"
+          @click="reviewBatch"
+        >
+          Review encrypted diff
+        </AppButton>
+        <p v-if="batchProblem" class="mb-0 text-sm text-muted" aria-live="polite">{{ batchProblem }}</p>
+      </div>
     </div>
-    <p v-if="batchProblem" class="mt-2 mb-0 text-sm text-muted">{{ batchProblem }}</p>
 
     <AppAlert v-if="store.currentDiff" type="info" title="Encrypted diff ready" class="mt-3">The server returned encrypted before/after content. Review and delivery controls are in the panel below.</AppAlert>
   </AppCard>

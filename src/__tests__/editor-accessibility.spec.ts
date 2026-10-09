@@ -1,5 +1,5 @@
-// Keyboard reachability, accessible names, masked-by-default values, capability gating,
-// the dry-run gate, and the shared review/delivery state.
+// Keyboard reachability, accessible names, masked-by-default values, capability gating, the
+// staged-changes panel, the dry-run gate, and the shared review/delivery state.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
@@ -90,25 +90,41 @@ describe('secret key editor accessibility', () => {
 
   it('explains drift and keeps the review control disabled', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const wrapper = mountEditor(makeDetail({ git: { ...makeDetail().git, in_sync_with_live: false, drift: 'diverged' } }))
 
     expect(wrapper.text()).toContain('Editing disabled')
-    await findButton(wrapper, 'Reveal one key')!.trigger('click')
-    await flushPromises()
+    await findButton(wrapper, 'Change')!.trigger('click')
 
     const review = wrapper.findAll('button').find((button) => button.text().includes('Review encrypted diff'))
     expect(review?.attributes('disabled')).toBeDefined()
   })
 
+  it('stages nothing when a key is revealed to look at it', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
+    const wrapper = mountEditor(makeDetail())
+
+    await findButton(wrapper, 'Reveal one key')!.trigger('click')
+    await flushPromises()
+
+    // A look is not a change: the revealed value is on screen, nothing is staged, and a
+    // key read on the way past cannot hold the review closed.
+    expect(wrapper.find('input[aria-label="Revealed value for password"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Nothing staged.')
+    expect(findButton(wrapper, 'Review encrypted diff')).toBeFalsy()
+
+    // Conceal drops the value again and leaves the row as it was.
+    await findButton(wrapper, 'Conceal')!.trigger('click')
+    expect(wrapper.find('input[aria-label="Revealed value for password"]').exists()).toBe(false)
+    expect(findButton(wrapper, 'Reveal one key')).toBeTruthy()
+  })
+
   it('reviews the selected operation from keyboard-operable controls', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     const store = useSecretsStore(pinia)
-    vi.spyOn(store, 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
     const wrapper = mountEditor(makeDetail())
-    await findButton(wrapper, 'Reveal one key')!.trigger('click')
-    await flushPromises()
+    await findButton(wrapper, 'Change')!.trigger('click')
 
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
     const remove = wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'delete')
@@ -124,7 +140,6 @@ describe('secret key editor accessibility', () => {
   it('submits every staged change as one batch', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     const store = useSecretsStore(pinia)
-    vi.spyOn(store, 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
     const wrapper = mountEditor(makeDetail())
 
@@ -183,12 +198,64 @@ describe('secret key editor accessibility', () => {
     expect(computeDiff).toHaveBeenCalledTimes(1)
   })
 
+  it('stages a new key in the tray, and the row names its own problem', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const wrapper = mountEditor(makeDetail())
+
+    // The tray is on screen with nothing staged, so its absence never has to be read
+    // as an empty stage.
+    expect(wrapper.text()).toContain('Nothing staged.')
+
+    await findButton(wrapper, 'Add key')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('1 staged change')
+    // The inventory still lists exactly the Secret's keys: the new key is a tray row,
+    // so staging it cannot rearrange the keys above it.
+    expect(wrapper.findAll('code').map((node) => node.text())).toEqual(['password', 'username'])
+
+    // The row asks for what it is missing, marks the field, and takes focus.
+    const name = wrapper.find('input[aria-label="New key name 1"]')
+    expect(document.activeElement).toBe(name.element)
+    expect(name.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.text()).toContain('This new key needs a name.')
+
+    await name.setValue('password')
+    expect(wrapper.text()).toContain('This Secret already has a key named password.')
+
+    await name.setValue('api_key')
+    expect(name.attributes('aria-invalid')).toBeUndefined()
+    expect(wrapper.text()).toContain('This new key needs a value.')
+
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('brand-new')
+    expect(wrapper.text()).not.toContain('This new key needs a value.')
+    expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('discards one staged change without touching the keys around it', async () => {
+    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
+    const wrapper = mountEditor(makeDetail())
+
+    await findButton(wrapper, 'Change')!.trigger('click')
+    expect(wrapper.text()).toContain('1 staged change')
+    // The inventory still lists exactly the Secret's keys: staging is a row in the panel,
+    // not a key that joins the list.
+    expect(wrapper.findAll('code').map((node) => node.text())).toEqual(['password', 'username'])
+
+    // Discarding returns the row to plain inventory: concealed again, with the controls a
+    // key that is not being touched carries.
+    await findButton(wrapper, 'Discard')!.trigger('click')
+    expect(wrapper.text()).toContain('Nothing staged.')
+    expect(findButton(wrapper, 'Reveal one key')).toBeTruthy()
+  })
+
   it('names every control, keeps disabled actions out of the tab order, and focuses what is enabled', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const wrapper = mountEditor(makeDetail())
     await findButton(wrapper, 'Reveal one key')!.trigger('click')
     await flushPromises()
+    await findButton(wrapper, 'Change')!.trigger('click')
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
 
     const controls = wrapper.findAll('button, input, textarea')

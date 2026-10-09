@@ -10,8 +10,11 @@ withDefaults(
     ariaLabel: string
     placeholder?: string
     readonly?: boolean
+    // The field announces its own error; the row around it carries the colour and the text.
+    invalid?: boolean
+    describedBy?: string
   }>(),
-  { modelValue: '', placeholder: '', readonly: false },
+  { modelValue: '', placeholder: '', readonly: false, invalid: false, describedBy: '' },
 )
 
 defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -25,6 +28,8 @@ const shown = ref(false)
       :value="modelValue"
       :type="shown ? 'text' : 'password'"
       :aria-label="ariaLabel"
+      :aria-invalid="invalid || undefined"
+      :aria-describedby="describedBy || undefined"
       :placeholder="placeholder"
       :readonly="readonly"
       autocomplete="off"
