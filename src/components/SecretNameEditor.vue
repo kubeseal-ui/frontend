@@ -148,9 +148,8 @@ onMounted(() => {
   if (!store.gitPaths) store.fetchGitPaths()
 })
 
-// Offering the control and answering the press is what makes the missing piece legible:
-// with a batch to encrypt the operator is asking what is short, and a control greyed out
-// with the reason in a sentence beside it answers nothing.
+// Offering the control and answering the press is what makes the missing piece legible: a
+// control greyed out with the reason in a sentence beside it answers nothing.
 async function encrypt() {
   if (!canCreate.value) return
   shown.name = true; shown.yaml = true
