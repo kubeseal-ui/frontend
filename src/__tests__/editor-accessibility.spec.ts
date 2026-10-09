@@ -411,7 +411,7 @@ describe('delivery panel policy controls', () => {
     // The outcome names what was written; the commit is the seven characters Git
     // prints rather than the whole hash.
     expect(wrapper.text()).toContain('Proposal opened')
-    expect(wrapper.text()).toContain('Pushed 9c1f4a7 at clusters/prod/payments/api.yaml and opened a merge proposal.')
+    expect(wrapper.text()).toContain('Pushed 9c1f4a7 to main at clusters/prod/payments/api.yaml and opened a merge proposal.')
     const proposal = wrapper.find('a[href="https://git.example/pr/7"]')
     expect(proposal.exists()).toBe(true)
     expect(proposal.attributes('rel')).toBe('noopener noreferrer')
