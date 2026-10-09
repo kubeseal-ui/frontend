@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import { type IconName } from '@/components/ui/icons'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore, type ThemePreference } from '@/stores/ui'
 import { LENS_MAP } from '@/theme/lens-map'
@@ -12,7 +13,9 @@ const ui = useUiStore()
 
 const displayName = computed(() => auth.user?.name || auth.user?.username || '')
 
-const themes: { value: ThemePreference; label: string; icon: string }[] = [
+// Typed against the icon set rather than `string`, so a rename in icons.ts
+// breaks here rather than rendering three blank buttons.
+const themes: { value: ThemePreference; label: string; icon: IconName }[] = [
   { value: 'light', label: 'Light', icon: 'sun' },
   { value: 'dark', label: 'Dark', icon: 'moon' },
   { value: 'system', label: 'System', icon: 'monitor' },

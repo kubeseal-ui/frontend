@@ -48,12 +48,26 @@
    The rim highlight is dimmed hard rather than kept at light-mode strength: a
    white rim that reads as a lit edge on a bright surface reads as a glow on a
    dark one. */
+/* The surface ladder, and the one value in it that pointed the wrong way.
+
+   Three tones stack: the page, a well cut into a surface, and the surface
+   itself. Every consumer of the well is a recessed element — the field utility
+   behind every input, the code, alert, and diff blocks, the neutral tag, the
+   key-name chip — so it has to sit a step toward the page from the surface it
+   is nested in, in both themes. It did in light, where it is a step darker
+   than white. It did not in dark, where it was lighter than the surface
+   containing it, so every input on a dark card read as a raised bubble rather
+   than a well. The value below is the light theme's relationship carried over.
+
+   Stating it as a value is safe because the fill never locates the element on
+   its own: the field utility and every chip that uses this token also set a
+   border, so the shape survives whatever the fill does. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
     --app-bg: #0d1017;
     --app-surface: #161a24;
-    --app-surface-raised: #1e2430;
+    --app-surface-raised: #11151e;
     --app-ink: #f2f5fb;
     --app-muted: #a8b2c6;
     --app-border: #2c3446;
@@ -80,7 +94,7 @@
   color-scheme: dark;
   --app-bg: #0d1017;
   --app-surface: #161a24;
-  --app-surface-raised: #1e2430;
+  --app-surface-raised: #11151e;
   --app-ink: #f2f5fb;
   --app-muted: #a8b2c6;
   --app-border: #2c3446;

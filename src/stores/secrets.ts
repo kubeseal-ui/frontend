@@ -16,6 +16,16 @@ export const useSecretsStore = defineStore('secrets', {
     dryRunResult: null as DryRunResult | null,
     deliveryResult: null as DeliveryResult | null, loading: false, error: null as Error | null,
     gitPaths: null as GitPathsConfig | null,
+    /**
+     * Whether the Git path listing was actually fetched.
+     *
+     * It is not derivable from `gitPaths` being null, because fetchGitPaths
+     * stores null on failure as well as on an empty answer. A consumer that
+     * reads the two as the same thing ends up stating a fact it does not have
+     * — see the namespace card, which would otherwise report "no Git mapping"
+     * for a namespace whose listing merely failed to load.
+     */
+    gitPathsLoaded: false,
   }),
   getters: {
     /**
@@ -51,7 +61,7 @@ export const useSecretsStore = defineStore('secrets', {
     async dryRun(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.dryRunResult = response.data; return response.data },
     async deliver(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DeliveryResult>('/api/v1/gitops/deliver', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.deliveryResult = response.data; return response.data },
     async syncToGit(namespace: string, name: string, baseCommit: string) { const response = await api.post<DeliveryResult>('/api/v1/gitops/sync', { namespace, name, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() }); await this.fetchDetail(namespace, name); return response.data },
-    async fetchGitPaths() { try { this.gitPaths = await api.getGitPaths(); return this.gitPaths } catch { this.gitPaths = null; return null } },
+    async fetchGitPaths() { try { const paths = await api.getGitPaths(); this.gitPaths = paths; this.gitPathsLoaded = true; return paths } catch { this.gitPaths = null; this.gitPathsLoaded = false; return null } },
     clearSensitiveState() { this.currentDetail = null; this.currentDiff = null; this.pendingMutation = null; this.newSecretDraft = null; this.dryRunResult = null; this.deliveryResult = null },
   },
 })

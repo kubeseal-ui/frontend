@@ -1,6 +1,8 @@
 // Theme token contrast checks for the light and dark palettes declared in src/style.css.
 // Text tokens must reach WCAG AA (4.5:1); the focus indicator is a non-text UI element
-// and must reach 3:1 against both --app-surface and --app-bg (WCAG 1.4.11 / 2.4.11).
+// and must reach 3:1 against both --app-surface and --app-bg (WCAG 1.4.11 / 2.4.11). The
+// focus ring is not checked against the recessed token: it is drawn with an offset, so it
+// lands on whatever surface the control sits on rather than on the control's own fill.
 //
 // The palettes are read from the stylesheet by regex because the stylesheet, not the
 // browser, is the artifact under test: these assertions have to hold on a machine with
@@ -101,8 +103,14 @@ describe('theme token contrast', () => {
 
   for (const theme of themes) {
     it(`keeps text tokens at AA or better in the ${theme.name} theme`, () => {
+      // The recessed token is in this list because it is the background most
+      // text in this app actually sits on: every field's own text and its
+      // placeholder, the code, alert, and diff blocks, the neutral tag, the
+      // key-name chips. Surfaces that use it at partial alpha composite
+      // somewhere between it and --app-surface, so checking both endpoints
+      // covers those without a second set of arithmetic.
       for (const token of textPairs) {
-        for (const surface of ['--app-surface', '--app-bg']) {
+        for (const surface of ['--app-surface', '--app-surface-raised', '--app-bg']) {
           const ratio = contrast(theme.values[token], theme.values[surface])
           expect(ratio, `${token} on ${surface} in ${theme.name}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
         }

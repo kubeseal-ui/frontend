@@ -9,7 +9,7 @@ import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
-import type { Capability } from '@/types'
+import type { Capability, Namespace, NamespaceGitPaths } from '@/types'
 
 const secrets = useSecretsStore()
 const auth = useAuthStore()
@@ -36,6 +36,27 @@ const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
 ]
 
 /**
+ * The Git summary for one card — what is known about where this namespace's
+ * manifests live, taken from whichever source actually knows it.
+ *
+ * The path count can only come from the Git path listing, and that listing can
+ * be absent for two different reasons: the namespace has no mapping, or the
+ * request failed. Those are not the same fact, so "no mapping" is only claimed
+ * once the listing has genuinely loaded; before that the card says the status
+ * is unknown rather than inventing one. A namespace the payload itself marks as
+ * managed needs no listing to say so, which is why that case is resolved first.
+ */
+function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): string {
+  const mode = paths?.mode || namespace.delivery_mode || ''
+  if (paths) {
+    const count = paths.allowed_paths?.length ?? 0
+    return `${count} ${count === 1 ? 'path' : 'paths'}${mode ? ` · ${mode}` : ''}`
+  }
+  if (namespace.git_managed) return `Git managed${mode ? ` · ${mode}` : ''}`
+  return secrets.gitPathsLoaded ? 'No Git mapping' : 'Git status unavailable'
+}
+
+/**
  * One row of card data per namespace.
  *
  * Assembled here rather than in the template because each card needs three
@@ -46,8 +67,6 @@ const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
 const cards = computed(() =>
   secrets.namespaces.map((namespace) => {
     const paths = secrets.gitPaths?.namespaces?.find((entry) => entry.namespace === namespace.name) ?? null
-    const pathCount = paths?.allowed_paths?.length ?? 0
-    const mode = paths?.mode || namespace.delivery_mode || ''
     const repository = paths?.repository || namespace.git_repository || ''
     const branch = paths?.branch ?? ''
 
@@ -57,16 +76,7 @@ const cards = computed(() =>
         (entry) => entry.label,
       ),
       repository: [repository, branch].filter(Boolean).join(' @ '),
-      // The Git path listing is the only source for the path count, and it can
-      // legitimately be missing: the fetch treats a failure as "no listing" and
-      // stores null rather than raising. Falling back to the namespace payload
-      // keeps the row truthful instead of blank when that happens, and the
-      // last case is the one that says why Create on that page is unavailable.
-      summary: paths
-        ? `${pathCount} ${pathCount === 1 ? 'path' : 'paths'}${mode ? ` · ${mode}` : ''}`
-        : namespace.git_managed
-          ? `Git managed${mode ? ` · ${mode}` : ''}`
-          : 'No Git mapping',
+      summary: gitSummary(namespace, paths),
     }
   }),
 )
