@@ -8,6 +8,7 @@ import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppTag from '@/components/ui/AppTag.vue'
 import SecretNameEditor from '@/components/SecretNameEditor.vue'
 import DeliveryPanel from '@/components/DeliveryPanel.vue'
+import { renderNamespace, templateDirectory } from '@/utils/gitPath'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 
@@ -21,10 +22,13 @@ const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'
 const deliveryMode = computed(() => secrets.namespaceDeliveryMode(props.namespace))
 const hasDeliveryPolicy = computed(() => Boolean(deliveryMode.value))
 
-// Shown here as context only; SecretNameEditor owns the path picker.
+// Shown here as context only; SecretNameEditor owns the path picker. Rendered the way the server
+// renders it, so the rail lists the directories a Secret can actually land in.
 const namespacePaths = computed(() => secrets.namespaceGitPaths(props.namespace))
-const allowedPaths = computed(() => namespacePaths.value?.allowed_paths || [])
-const defaultPath = computed(() => namespacePaths.value?.default_path || '')
+const allowedPaths = computed(() => (namespacePaths.value?.allowed_paths || []).map((directory) => renderNamespace(directory, props.namespace)))
+// The directory the mapping's template renders into. No Secret name is needed for it, which is
+// what lets the rail mark which listed directory the default lands in before one is typed.
+const defaultDirectory = computed(() => templateDirectory(namespacePaths.value?.path_template || '', props.namespace))
 // A wildcard names no paths: the server renders the target from a template the listing
 // does not carry, so the rail can say where the path comes from but not what it is.
 const isWildcard = computed(() => namespacePaths.value?.namespace === '*')
@@ -91,7 +95,7 @@ onUnmounted(() => secrets.discardNewSecretDraft())
                   class="flex items-center gap-1.5 break-all font-mono text-xs"
                 >
                   {{ path }}
-                  <AppTag v-if="path === defaultPath">default</AppTag>
+                  <AppTag v-if="path === defaultDirectory">default</AppTag>
                 </span>
                 <span v-if="allowedPaths.length === 0 && isWildcard" class="text-muted">
                   Rendered per Secret from this namespace's mapping

@@ -83,7 +83,11 @@ export interface GitPathsConfig {
 
 export interface NamespaceGitPaths {
   namespace: string
-  default_path: string
+  // The mapping's raw path template, e.g. `apps/{namespace}/{name}.yaml`. Raw rather than
+  // rendered because a per-namespace listing has no Secret name to render `{name}` with; the
+  // client substitutes it. `allowed_paths` are directories the file name is placed under —
+  // the server refuses a bare directory as a destination.
+  path_template: string
   allowed_paths: string[]
   repository: string
   branch: string

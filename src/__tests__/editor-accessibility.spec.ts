@@ -395,7 +395,7 @@ describe('delivery panel policy controls', () => {
     store.currentDiff = reviewedDiff()
     store.pendingMutation = { namespace: 'payments', name: 'api', mutations: [{ key: 'password', operation: 'replace', value: 'rotated' }] }
     // The mapping the panel reads the branch from, as the detail page would have loaded it.
-    store.gitPaths = { namespaces: [{ namespace: 'payments', default_path: 'clusters/prod/payments', allowed_paths: ['clusters/prod/payments'], repository: 'org/repo', branch: 'main', mode: 'proposal' }] }
+    store.gitPaths = { namespaces: [{ namespace: 'payments', path_template: 'clusters/prod/{name}.yaml', allowed_paths: ['custom/apps'], repository: 'org/repo', branch: 'main', mode: 'proposal' }] }
     vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
       // Mirrors the real action: the pending mutation clears, the reviewed ciphertext
       // and the detail stay.
@@ -584,13 +584,11 @@ describe('new secret draft review', () => {
     await flushPromises()
 
     expect(store.newSecretDraft).toMatchObject({ namespace: 'payments', name: 'new-cred', yaml: 'encrypted-new-secret', base_commit: 'abc123' })
-    // Reset to the template, not to nothing: it holds no values, so no part of the
-    // submitted manifest survives while the document's shape does.
-    const reset = (form.find('textarea').element as HTMLTextAreaElement).value
-    expect(reset).toContain('kind: Secret')
-    expect(reset).toContain('name: new-cred')
-    expect(reset).not.toContain('plaintext-marker')
-    expect(form.html()).not.toContain('plaintext-marker')
+    // The box keeps the manifest the operator wrote: the draft holds ciphertext, so this is
+    // the only copy they could correct and re-encrypt from. The store never sees it.
+    const kept = (form.find('textarea').element as HTMLTextAreaElement).value
+    expect(kept).toContain('kind: Secret')
+    expect(kept).toContain('password: plaintext-marker')
     expect(JSON.stringify(store.$state)).not.toContain('plaintext-marker')
 
     vi.spyOn(store, 'dryRun').mockImplementation(async () => {

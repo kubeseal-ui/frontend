@@ -32,10 +32,10 @@ function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): stri
   const mode = paths?.mode || namespace.delivery_mode || ''
   if (paths) {
     // A wildcard covers every namespace through a template the listing does not expose,
-    // so it has no path count; "0 paths" would read as "nowhere to deliver".
+    // so it has no directory count; "0 directories" would read as "nowhere to deliver".
     if (paths.namespace === '*') return `All namespaces${mode ? ` · ${mode}` : ''}`
     const count = paths.allowed_paths?.length ?? 0
-    return `${count} ${count === 1 ? 'path' : 'paths'}${mode ? ` · ${mode}` : ''}`
+    return `${count} ${count === 1 ? 'directory' : 'directories'}${mode ? ` · ${mode}` : ''}`
   }
   if (namespace.git_managed) return `Git managed${mode ? ` · ${mode}` : ''}`
   return secrets.gitPathsLoaded ? 'No Git mapping' : 'Git status unavailable'

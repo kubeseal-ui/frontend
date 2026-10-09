@@ -20,8 +20,8 @@ import type { Capability, GitPathsConfig } from '@/types'
 const GIT_PATHS: GitPathsConfig = {
   namespaces: [{
     namespace: 'payments',
-    default_path: 'clusters/payments',
-    allowed_paths: ['clusters/payments'],
+    path_template: 'clusters/{namespace}/{name}.yaml',
+    allowed_paths: ['custom/apps'],
     repository: 'org/repo',
     branch: 'main',
     mode: 'proposal',
@@ -113,8 +113,9 @@ describe('the create page', () => {
 
     // The base commit came from the encrypt response, not from another Secret.
     expect(store.newSecretDraft).toMatchObject({ namespace: 'payments', name: 'brand-new', base_commit: 'head-1' })
-    // The plaintext never reaches the component tree or the store.
-    expect(wrapper.html()).not.toContain('plaintext-marker')
+    // The draft holds ciphertext, so the manifest box is the page's only copy of the
+    // plaintext — and the store never sees it.
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toContain('plaintext-marker')
     expect(JSON.stringify(store.$state)).not.toContain('plaintext-marker')
 
     // No detail to read a mode from: it comes from the namespace's fixed Git policy.
@@ -205,6 +206,99 @@ describe('the create page', () => {
 
     wrapper.unmount()
     expect(store.newSecretDraft).toBeNull()
+  })
+
+  it('keeps the manifest behind Edit once a draft is encrypted', async () => {
+    grant(['secret:seal'])
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret', base_commit: 'head-1' } } as never)
+
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+    await encryptDraft(wrapper, 'brand-new')
+
+    // The draft holds ciphertext, so this box is the only copy of what the operator
+    // wrote: reopening the stage on a fresh template leaves them nothing to correct.
+    await findButton(wrapper, 'Edit')!.trigger('click')
+    await flushPromises()
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toContain('plaintext-marker')
+
+    // Discard is what starts the next Secret from a clean template.
+    await findButton(wrapper, 'Discard encrypted draft')!.trigger('click')
+    await flushPromises()
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toContain('key: ""')
+  })
+})
+
+// An allowed path is a directory prefix the destination must sit under, so submitting the
+// entry itself is refused; the file name only exists once a Secret name is typed.
+describe('the target directory picker', () => {
+  function select(wrapper: VueWrapper) {
+    return wrapper.find('select')
+  }
+
+  it('offers the mapped directories and submits the chosen one with the file under it', async () => {
+    grant(['secret:seal'])
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
+
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+
+    expect(select(wrapper).findAll('option').map((option) => option.text())).toEqual(['Use default path', 'custom/apps'])
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('brand-new')
+    // The template's file name needs no directory chosen, so the hint can name the whole
+    // destination the default lands on before the picker is touched.
+    expect(wrapper.text()).toContain('Default: clusters/payments/brand-new.yaml')
+
+    await select(wrapper).setValue('custom/apps')
+    await wrapper.find('textarea').setValue('kind: Secret\nstringData:\n  password: plaintext-marker')
+    await findButton(wrapper, 'Encrypt for review')!.trigger('click')
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ target_path: 'custom/apps/brand-new.yaml' }))
+  })
+
+  it('leaves the destination to the server when no directory is chosen', async () => {
+    grant(['secret:seal'])
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
+
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+    await encryptDraft(wrapper, 'brand-new')
+
+    // The bare default is not a path — sending it would name a directory the server
+    // refuses — so the request carries no target at all and the server renders it.
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ target_path: undefined }))
+  })
+
+  it('renders a namespace placeholder inside an allowed directory', async () => {
+    grant(['secret:seal'])
+    // A prefix may name the namespace itself; the server replaces it before comparing, so the
+    // client has to offer — and submit — the replaced one.
+    vi.spyOn(api, 'getGitPaths').mockResolvedValue({
+      namespaces: [{
+        namespace: 'payments',
+        path_template: 'clusters/{namespace}/{name}.yaml',
+        allowed_paths: ['apps/{namespace}'],
+        repository: 'org/repo',
+        branch: 'main',
+        mode: 'direct',
+      }],
+    })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
+
+    const wrapper = mountNewSecretView()
+    await flushPromises()
+
+    expect(select(wrapper).findAll('option').map((option) => option.text())).toEqual(['Use default path', 'apps/payments'])
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('brand-new')
+    await select(wrapper).setValue('apps/payments')
+    await wrapper.find('textarea').setValue('kind: Secret\nstringData:\n  password: plaintext-marker')
+    await findButton(wrapper, 'Encrypt for review')!.trigger('click')
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ target_path: 'apps/payments/brand-new.yaml' }))
   })
 })
 

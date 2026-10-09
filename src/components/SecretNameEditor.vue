@@ -11,29 +11,50 @@ import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { ApiError, describeError } from '@/api'
 import { refocusAfterCollapse } from '@/utils/refocus'
+import { renderNamespace, renderPathTemplate, renderedFileName } from '@/utils/gitPath'
 import type { NamespaceGitPaths } from '@/types'
 
 // One form for both ways a Secret gets managed: writing it here, and adopting a live one
 // (`kubectl get secret -o yaml` emits exactly the manifest the server seals). This
 // textarea is the only place in the app holding a whole Secret in plaintext — never the
-// store — and it is cleared on submit, discard, and unmount.
+// store — and it is cleared on discard and unmount, not on submit: a folded stage that
+// reopened empty would leave the operator no way back to what they typed.
 const props = defineProps<{ namespace: string; baseCommit?: string }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
 const mode = ref<'create' | 'adopt'>('create')
-const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetPath = ref(''); const error = ref(''); const loading = ref(false)
+const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetDir = ref(''); const error = ref(''); const loading = ref(false)
 const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
 const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace-wide', value: 'namespace-wide' }, { label: 'Cluster-wide', value: 'cluster-wide' }]
 const sources = [{ label: 'Write a new Secret', value: 'create' }, { label: 'Adopt an existing Secret', value: 'adopt' }]
 const adopting = computed(() => mode.value === 'adopt')
 const kubectlCommand = computed(() => `kubectl get secret <name> -n ${props.namespace} -o yaml`)
 
-// A wildcard names no paths, so the picker stays unrendered and no target_path is
-// submitted — the server renders the template path, which the listing does not carry.
+// A mapping with no allowed directories leaves the picker unrendered and the request carrying no
+// target_path, which is what leaves the server rendering its own path template.
 const currentNsPaths = computed((): NamespaceGitPaths | null => store.namespaceGitPaths(props.namespace))
-const allowedPaths = computed(() => currentNsPaths.value?.allowed_paths || [])
-const defaultPath = computed(() => currentNsPaths.value?.default_path || '')
-const pathOptions = computed(() => [{ label: 'Use default path', value: '' }, ...allowedPaths.value.map(p => ({ label: p, value: p }))])
+// An allowed entry is a directory, and may carry `{namespace}`: the server replaces it before
+// matching, so the value offered here has to be the replaced one or nothing could match it.
+const directories = computed(() =>
+  (currentNsPaths.value?.allowed_paths || []).map((directory) => renderNamespace(directory, props.namespace)),
+)
+const pathTemplate = computed(() => currentNsPaths.value?.path_template || '')
+
+// The file a create occupies when no directory is chosen. Empty until a name is typed, because
+// the template renders one and the server refuses a nameless path.
+const defaultDestination = computed(() => renderPathTemplate(pathTemplate.value, props.namespace, name.value))
+
+// The select picks a directory, but the server writes the path it is given: submitting the bare
+// directory is `400 INVALID_TARGET_PATH`, since an allowed entry is a prefix the destination must
+// sit under. So the chosen directory is joined with the file name here, where the name is known.
+const destination = computed(() => {
+  const fileName = renderedFileName(defaultDestination.value)
+  return targetDir.value && fileName ? `${targetDir.value}/${fileName}` : ''
+})
+const pathOptions = computed(() => [
+  { label: 'Use default path', value: '' },
+  ...directories.value.map((directory) => ({ label: directory, value: directory })),
+])
 
 // The one value is empty on purpose: a template that reads like real data is one someone
 // eventually delivers.
@@ -109,7 +130,7 @@ const yamlInput = ref<{ $el?: HTMLElement } | null>(null)
 const summary = computed(() => [
   store.newSecretDraft ? `Encrypted draft for ${store.newSecretDraft.name}` : name.value,
   scope.value,
-  targetPath.value || defaultPath.value,
+  destination.value || defaultDestination.value,
 ].filter(Boolean).join(' · '))
 
 watch(() => store.newSecretDraft, async () => {
@@ -164,10 +185,11 @@ async function encrypt() {
 async function createDraft() {
   error.value = ''; loading.value = true
   try {
-    await store.createNewSecretDraft(props.namespace, name.value, yaml.value, scope.value, props.baseCommit, targetPath.value || undefined)
-    seedTemplate()
-    // The form is back on the template, so it must not carry the answer to a press that
-    // has just been acted on.
+    await store.createNewSecretDraft(props.namespace, name.value, yaml.value, scope.value, props.baseCommit, destination.value || undefined)
+    // The manifest box keeps what the operator wrote, including through the fold: the draft holds
+    // ciphertext, so a reopened stage showing a fresh template leaves them no way back to the
+    // plaintext they typed. Discard is what starts the next Secret from a clean template.
+    // The validation marks go, though — the press they answered has been acted on.
     shown.name = false; shown.yaml = false
   } catch (e) {
     // Both refusals are about which manifest this is, so they are restated in the
@@ -185,7 +207,7 @@ async function createDraft() {
 
 function discard() {
   store.discardNewSecretDraft()
-  name.value = ''; targetPath.value = ''
+  name.value = ''; targetDir.value = ''
   seedTemplate()
   shown.name = false; shown.yaml = false
   // Discarding takes the button that was pressed with it, so focus is carried to the field
@@ -251,10 +273,10 @@ onUnmounted(() => { yaml.value = '' })
       />
 
       <AppSelect
-        v-if="currentNsPaths && allowedPaths.length > 0"
-        v-model="targetPath"
+        v-if="currentNsPaths && directories.length > 0"
+        v-model="targetDir"
         label="Target directory"
-        :hint="`Default: ${defaultPath}`"
+        :hint="defaultDestination ? `Default: ${defaultDestination}` : `Rendered per Secret from ${pathTemplate}`"
         :options="pathOptions"
       />
 
