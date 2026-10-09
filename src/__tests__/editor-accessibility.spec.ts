@@ -188,36 +188,50 @@ describe('secret key editor accessibility', () => {
     ], 'abc123')
   })
 
-  it('withholds review until every staged change is complete', async () => {
+  it('answers an incomplete batch when review is pressed', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     const store = useSecretsStore(pinia)
-    vi.spyOn(store, 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
     const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
     const wrapper = mountEditor(makeDetail())
 
-    // Staged but valueless: the server would refuse it, so the control is closed
-    // and the reason stated rather than left to a 400.
+    // Offered as soon as there is a batch. An incomplete one is answered by pressing the
+    // control, not by a control greyed out with a sentence beside it explaining why.
     await findButton(wrapper, 'Change')!.trigger('click')
-    await flushPromises()
-    expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('Every key being changed needs a value.')
+    const review = findButton(wrapper, 'Review encrypted diff')!
+    expect(review.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('This change needs a value.')
 
-    // A new key colliding with an existing one is refused in the same place.
-    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    // Pressing it asks the row what it is missing and puts the cursor in the field to fix,
+    // so the answer arrives where the operator already is. Nothing reaches the server.
+    await review.trigger('click')
+    await flushPromises()
+    expect(computeDiff).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('This change needs a value.')
+    const replacement = wrapper.find('input[aria-label="Replacement value for password"]')
+    expect(document.activeElement).toBe(replacement.element)
+
+    // Filled, the row stops asking.
+    await replacement.setValue('rotated')
+    expect(wrapper.text()).not.toContain('This change needs a value.')
+
+    // A new key colliding with an existing one is answered the same way, by the row that
+    // holds it: the sentence names the key, so it never has to be matched to a row by eye.
     await findButton(wrapper, 'Add key')!.trigger('click')
     await wrapper.find('input[aria-label="New key name 1"]').setValue('username')
     await wrapper.find('input[aria-label="New key value 1"]').setValue('clash')
-    expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('Every new key needs a name the Secret does not already use: username.')
+    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
+    await flushPromises()
+    expect(computeDiff).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('This Secret already has a key named username.')
 
-    // Renamed to something free, the batch submits.
+    // Renamed to something free, the same press submits the whole batch.
     await wrapper.find('input[aria-label="New key name 1"]').setValue('api_key')
     await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
     await flushPromises()
     expect(computeDiff).toHaveBeenCalledTimes(1)
   })
 
-  it('stages a new key in the tray, and the row names its own problem', async () => {
+  it('stages a new key in the tray, and the row answers once it is left', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
     const wrapper = mountEditor(makeDetail())
 
@@ -233,9 +247,16 @@ describe('secret key editor accessibility', () => {
     // so staging it cannot rearrange the keys above it.
     expect(inventoryKeys(wrapper)).toEqual(['password', 'username'])
 
-    // The row asks for what it is missing, marks the field, and takes focus.
+    // The row takes focus and asks for nothing yet: a field that turns red the moment it
+    // appears reads as a fault rather than a prompt.
     const name = wrapper.find('input[aria-label="New key name 1"]')
+    const value = wrapper.find('input[aria-label="New key value 1"]')
     expect(document.activeElement).toBe(name.element)
+    expect(name.attributes('aria-invalid')).toBeUndefined()
+    expect(wrapper.text()).not.toContain('This new key needs a name.')
+
+    // Leaving the row is what makes it answer, under the field it is about.
+    await wrapper.find('li').trigger('focusout')
     expect(name.attributes('aria-invalid')).toBe('true')
     expect(wrapper.text()).toContain('This new key needs a name.')
 
@@ -246,7 +267,7 @@ describe('secret key editor accessibility', () => {
     expect(name.attributes('aria-invalid')).toBeUndefined()
     expect(wrapper.text()).toContain('This new key needs a value.')
 
-    await wrapper.find('input[aria-label="New key value 1"]').setValue('brand-new')
+    await value.setValue('brand-new')
     expect(wrapper.text()).not.toContain('This new key needs a value.')
     expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeUndefined()
   })

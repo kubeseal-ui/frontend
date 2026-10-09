@@ -28,6 +28,7 @@ const reviewing = ref(false)
 const message = ref('')
 const error = ref('')
 const addInputs = ref<Record<number, HTMLInputElement | null>>({})
+const keyRows = ref<Record<string, HTMLLIElement | null>>({})
 const tray = ref<HTMLElement | null>(null)
 const canReveal = computed(() => auth.hasCapability(props.detail.namespace, 'secret:decrypt'))
 const canPatch = computed(() => auth.hasCapability(props.detail.namespace, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
@@ -88,13 +89,17 @@ function conceal(key: string) {
   delete revealed[key]
 }
 
-function startEdit(key: string) {
+// Focus follows the row that was just opened. Change is the button that opened this one, and it
+// is gone the moment it is clicked, so without this focus falls to the body and the keyboard user
+// tabs back through the inventory to reach the field they just asked for.
+async function startEdit(key: string) {
   editing[key] = true
   operation[key] = operationOf(key)
+  await nextTick()
+  keyRows.value[key]?.querySelector<HTMLInputElement>('input[type="password"]')?.focus()
 }
 
-// Focus follows the new row: the tray is where the typing happens, and a click that leaves
-// focus on the button makes the keyboard user tab back through the inventory to reach it.
+// Focus follows the new row, for the same reason: the tray is where the typing happens.
 async function addRow() {
   const id = nextRowId++
   added.value.push({ id, key: '', value: '' })
@@ -109,6 +114,10 @@ function removeAdded(index: number) {
 
 function setAddInput(id: number, element: unknown) {
   addInputs.value[id] = element instanceof HTMLInputElement ? element : null
+}
+
+function setKeyRow(key: string, element: unknown) {
+  keyRows.value[key] = element instanceof HTMLLIElement ? element : null
 }
 
 const batch = computed<Mutation[]>(() => {
@@ -142,9 +151,9 @@ const batchProblem = computed(() => {
   return ''
 })
 
-// A row states its own problem, under the field it belongs to: the sentence above names no
-// key, so with several rows staged it is a scan rather than an answer. That is why the batch
-// sentence is never rendered — it survives only as the question "is there anything to answer".
+// A row states its own problem, under the field it belongs to. `batchProblem` is what decides
+// whether anything is missing; its sentence is never rendered, because it names no key and with
+// several rows staged it is a scan rather than an answer.
 function addNameProblem(row: { id: number; key: string }) {
   if (!shown[addedRowId(row)]) return ''
   const key = row.key.trim()
@@ -244,8 +253,7 @@ onBeforeUnmount(() => clear())
 
     <!-- The inventory is read-only: a row says what the Secret has — and, while revealed, what
          one value is — never what is being changed, so staging an add cannot rearrange the keys
-         already here. The badge reads the same state the row renders, so it cannot say
-         "concealed" over a value that is on screen. -->
+         already here. The badge reads the same state the row renders. -->
     <div
       v-for="key in detail.keys || []"
       v-show="open"
@@ -298,14 +306,14 @@ onBeforeUnmount(() => clear())
         Nothing staged. Reveal or change a key, or add one the Secret does not have.
       </p>
 
-      <!-- Every staged row is one grid — the operation, the key, the value, the way to drop the
-           row — so the columns line up down the list and a row reads left to right as one change.
-           Narrow screens put the operation and its discard on one line and stack the rest under
-           them: four columns at 400px would leave the value too narrow to type in. -->
+      <!-- Every staged row is one grid — operation, key, value, the way to drop the row — so the
+           columns line up down the list. Narrow screens put the operation and its discard on one
+           line and stack the rest: four columns at 400px leave the value too narrow to type in. -->
       <ul v-else class="flex flex-col">
         <li
           v-for="(key, index) in stagedKeys"
           :key="key"
+          :ref="(element: unknown) => setKeyRow(key, element)"
           class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-2 border-t border-border px-4 py-3 first:border-t-0 sm:grid-cols-[auto_minmax(0,1fr)_minmax(11rem,1.4fr)_auto]"
           :class="existingProblem(key) ? 'bg-danger/5' : ''"
           @focusout="leave(stagedRowId(key), $event)"
@@ -358,7 +366,7 @@ onBeforeUnmount(() => clear())
         >
           <AppTag tone="accent" class="col-start-1 col-end-2 row-start-1 justify-self-start">add</AppTag>
           <input
-            :ref="(element) => setAddInput(row.id, element)"
+            :ref="(element: unknown) => setAddInput(row.id, element)"
             v-model="row.key"
             :aria-label="`New key name ${index + 1}`"
             :aria-invalid="addNameProblem(row) ? 'true' : undefined"
