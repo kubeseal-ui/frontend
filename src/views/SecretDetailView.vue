@@ -125,7 +125,7 @@ watch(() => [route.params.namespace, route.params.name], load)
     <template v-else>
       <AppAlert v-if="error" type="error" title="Could not load SealedSecret">
         <p class="m-0">{{ error }}</p>
-        <AppButton class="mt-2" @click="load">Retry</AppButton>
+        <AppButton class="mt-2" icon="refresh" @click="load">Retry</AppButton>
       </AppAlert>
 
       <AppEmpty v-else-if="!store.currentDetail" icon="lock" description="SealedSecret not found" />
@@ -168,6 +168,7 @@ watch(() => [route.params.namespace, route.params.name], load)
             v-else-if="canSync && syncBaseCommit"
             variant="primary"
             size="small"
+            icon="git-branch"
             class="mt-2"
             :loading="syncing"
             @click="onSync"

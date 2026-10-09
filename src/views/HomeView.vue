@@ -83,7 +83,7 @@ onMounted(async () => {
     <div v-if="secrets.error" class="grid gap-2 rounded-card-inner border border-danger bg-surface/60 p-4" role="alert">
       <strong>Unable to load namespaces.</strong>
       <p class="mb-1 text-muted">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
-      <AppButton @click="secrets.fetchNamespaces">Try again</AppButton>
+      <AppButton icon="refresh" @click="secrets.fetchNamespaces">Try again</AppButton>
     </div>
 
     <AppEmpty

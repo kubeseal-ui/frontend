@@ -106,7 +106,7 @@ onMounted(load)
     <div v-if="secrets.error" class="grid gap-2 rounded-card-inner border border-danger bg-surface/60 p-4" role="alert">
       <strong>Unable to load secrets.</strong>
       <p class="mb-1 text-muted">{{ describeError(secrets.error, 'Unable to load secrets') }}</p>
-      <AppButton @click="load">Try again</AppButton>
+      <AppButton icon="refresh" @click="load">Try again</AppButton>
     </div>
 
     <AppEmpty
