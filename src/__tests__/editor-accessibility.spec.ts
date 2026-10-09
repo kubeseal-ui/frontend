@@ -59,6 +59,18 @@ function findButton(wrapper: ReturnType<typeof mountEditor> | ReturnType<typeof 
   return wrapper.findAll('button').find((button) => button.text() === label)
 }
 
+/**
+ * The inventory's keys. The tray's rows name their key as well, so a plain
+ * `findAll('code')` counts a staged key as though it had joined the list — which is the
+ * one thing these assertions exist to rule out. The tray is a `ul` of `li` rows; the
+ * inventory is not.
+ */
+function inventoryKeys(wrapper: ReturnType<typeof mountEditor>) {
+  return wrapper.findAll('code')
+    .filter((node) => !node.element.closest('li'))
+    .map((node) => node.text())
+}
+
 describe('secret key editor accessibility', () => {
   it('conceals every value until one key is revealed', async () => {
     grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
@@ -212,7 +224,7 @@ describe('secret key editor accessibility', () => {
     expect(wrapper.text()).toContain('1 staged change')
     // The inventory still lists exactly the Secret's keys: the new key is a tray row,
     // so staging it cannot rearrange the keys above it.
-    expect(wrapper.findAll('code').map((node) => node.text())).toEqual(['password', 'username'])
+    expect(inventoryKeys(wrapper)).toEqual(['password', 'username'])
 
     // The row asks for what it is missing, marks the field, and takes focus.
     const name = wrapper.find('input[aria-label="New key name 1"]')
@@ -240,7 +252,7 @@ describe('secret key editor accessibility', () => {
     expect(wrapper.text()).toContain('1 staged change')
     // The inventory still lists exactly the Secret's keys: staging is a row in the panel,
     // not a key that joins the list.
-    expect(wrapper.findAll('code').map((node) => node.text())).toEqual(['password', 'username'])
+    expect(inventoryKeys(wrapper)).toEqual(['password', 'username'])
 
     // Discarding returns the row to plain inventory: concealed again, with the controls a
     // key that is not being touched carries.
