@@ -28,8 +28,10 @@ const reviewing = ref(false)
 const message = ref('')
 const error = ref('')
 const addInputs = ref<Record<number, HTMLInputElement | null>>({})
+const tray = ref<HTMLElement | null>(null)
 const canReveal = computed(() => auth.hasCapability(props.detail.namespace, 'secret:decrypt'))
 const canPatch = computed(() => auth.hasCapability(props.detail.namespace, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
+const hasBaseCommit = computed(() => Boolean(props.detail.git.base_commit))
 
 // An add over a key that is present is refused by the API, so it is not offered.
 const EXISTING_OPERATIONS = [
@@ -38,6 +40,20 @@ const EXISTING_OPERATIONS = [
 ]
 
 let nextRowId = 0
+
+// Which rows have been left, or have had review pressed on them. A row just created is not yet
+// wrong, and a field that turns red the moment it appears reads as a fault rather than a prompt.
+const shown = reactive<Record<string, boolean>>({})
+const stagedRowId = (key: string) => `key-${key}`
+const addedRowId = (row: { id: number }) => `add-${row.id}`
+
+// Leaving the row is what turns its problems on. Moving between the row's own fields is not
+// leaving it, so tabbing from the name to the value does not answer a value not yet typed.
+function leave(id: string, event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (next && (event.currentTarget as HTMLElement).contains(next)) return
+  shown[id] = true
+}
 
 function setOperation(key: string, value: string) {
   operation[key] = value as MutationOperation
@@ -86,6 +102,11 @@ async function addRow() {
   addInputs.value[id]?.focus()
 }
 
+function removeAdded(index: number) {
+  const [row] = added.value.splice(index, 1)
+  if (row) delete shown[addedRowId(row)]
+}
+
 function setAddInput(id: number, element: unknown) {
   addInputs.value[id] = element instanceof HTMLInputElement ? element : null
 }
@@ -120,11 +141,12 @@ const batchProblem = computed(() => {
   if (collisions.size > 0) return `Every new key needs a name the Secret does not already use: ${[...collisions].join(', ')}.`
   return ''
 })
-const canReview = computed(() => canPatch.value && batchProblem.value === '')
 
 // A row states its own problem, under the field it belongs to: the sentence above names no
-// key, so with several rows staged it is a scan rather than an answer.
-function addNameProblem(row: { key: string }) {
+// key, so with several rows staged it is a scan rather than an answer. That is why the batch
+// sentence is never rendered — it survives only as the question "is there anything to answer".
+function addNameProblem(row: { id: number; key: string }) {
+  if (!shown[addedRowId(row)]) return ''
   const key = row.key.trim()
   if (key === '') return 'This new key needs a name.'
   if ((props.detail.keys || []).includes(key)) return `This Secret already has a key named ${key}.`
@@ -132,16 +154,37 @@ function addNameProblem(row: { key: string }) {
   return ''
 }
 
-function addValueProblem(row: { key: string; value: string }) {
+function addValueProblem(row: { id: number; key: string; value: string }) {
+  if (!shown[addedRowId(row)]) return ''
   return addNameProblem(row) === '' && row.value === '' ? 'This new key needs a value.' : ''
 }
 
+function addProblem(row: { id: number; key: string; value: string }) {
+  return addNameProblem(row) || addValueProblem(row)
+}
+
 function existingProblem(key: string) {
+  if (!shown[stagedRowId(key)]) return ''
   return operationOf(key) !== 'delete' && !(replacements[key] || '') ? 'This change needs a value.' : ''
 }
 
+// Offered whenever there is a batch to review. An incomplete one is answered by pressing the
+// control, not by a control that sits greyed out with a sentence beside it explaining why.
+const canReview = computed(() => canPatch.value && hasBaseCommit.value && batch.value.length > 0)
+
+// Pressing review on an incomplete batch is the operator asking what is missing: every row
+// says so at once, and focus lands on the first field to fix, which announces its own problem
+// through the aria-invalid and aria-describedby it already carries.
+async function showProblems() {
+  stagedKeys.value.forEach((key) => { shown[stagedRowId(key)] = true })
+  added.value.forEach((row) => { shown[addedRowId(row)] = true })
+  await nextTick()
+  tray.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+}
+
 async function reviewBatch() {
-  if (!canReview.value || !props.detail.git.base_commit) return
+  if (!canReview.value) return
+  if (batchProblem.value) { await showProblems(); return }
   error.value = ''; reviewing.value = true
   try {
     await store.computeDiff(props.detail.namespace, props.detail.name, batch.value, props.detail.git.base_commit)
@@ -154,11 +197,13 @@ async function reviewBatch() {
 function clear(key?: string) {
   if (key) {
     delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
+    delete shown[stagedRowId(key)]
   } else {
     Object.keys(revealed).forEach((item) => delete revealed[item])
     Object.keys(replacements).forEach((item) => delete replacements[item])
     Object.keys(operation).forEach((item) => delete operation[item])
     Object.keys(editing).forEach((item) => delete editing[item])
+    Object.keys(shown).forEach((item) => delete shown[item])
     added.value = []
   }
   if (store.currentDiff) { store.currentDiff = null; store.pendingMutation = null }
@@ -199,7 +244,8 @@ onBeforeUnmount(() => clear())
 
     <!-- The inventory is read-only: a row says what the Secret has — and, while revealed, what
          one value is — never what is being changed, so staging an add cannot rearrange the keys
-         already here. -->
+         already here. The badge reads the same state the row renders, so it cannot say
+         "concealed" over a value that is on screen. -->
     <div
       v-for="key in detail.keys || []"
       v-show="open"
@@ -209,6 +255,7 @@ onBeforeUnmount(() => clear())
       <div class="flex items-center gap-2">
         <code class="font-mono text-sm">{{ key }}</code>
         <AppTag v-if="editing[key]" tone="accent">{{ operationOf(key) }}</AppTag>
+        <AppTag v-else-if="hasRevealed(key)">revealed</AppTag>
         <AppTag v-else>concealed</AppTag>
       </div>
 
@@ -236,6 +283,7 @@ onBeforeUnmount(() => clear())
     <div
       v-if="canReveal"
       v-show="open"
+      ref="tray"
       class="mt-4 rounded-card-inner border"
       :class="stagedCount > 0 ? 'border-accent/40 bg-accent/5' : 'border-border'"
     >
@@ -250,47 +298,53 @@ onBeforeUnmount(() => clear())
         Nothing staged. Reveal or change a key, or add one the Secret does not have.
       </p>
 
+      <!-- Every staged row is one grid — the operation, the key, the value, the way to drop the
+           row — so the columns line up down the list and a row reads left to right as one change.
+           Narrow screens put the operation and its discard on one line and stack the rest under
+           them: four columns at 400px would leave the value too narrow to type in. -->
       <ul v-else class="flex flex-col">
         <li
           v-for="(key, index) in stagedKeys"
           :key="key"
-          class="flex flex-col gap-2 border-t border-border px-4 py-3 first:border-t-0"
+          class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-2 border-t border-border px-4 py-3 first:border-t-0 sm:grid-cols-[auto_minmax(0,1fr)_minmax(11rem,1.4fr)_auto]"
           :class="existingProblem(key) ? 'bg-danger/5' : ''"
+          @focusout="leave(stagedRowId(key), $event)"
         >
-          <div class="flex flex-wrap items-center gap-2">
-            <AppRadioGroup
-              :model-value="operationOf(key)"
-              :name="`operation-${key}`"
-              :options="EXISTING_OPERATIONS"
-              :ariaLabel="`Operation for ${key}`"
-              :disabled="!canPatch"
-              @update:model-value="setOperation(key, $event)"
-            />
-            <code class="font-mono text-sm">{{ key }}</code>
-            <AppButton
-              class="ml-auto"
-              size="small"
-              variant="ghost"
-              :aria-label="`Discard the staged change to ${key}`"
-              @click="clear(key)"
-            >
-              Discard
-            </AppButton>
-          </div>
+          <AppRadioGroup
+            class="col-start-1 col-end-2 row-start-1"
+            :model-value="operationOf(key)"
+            :name="`operation-${key}`"
+            :options="EXISTING_OPERATIONS"
+            :ariaLabel="`Operation for ${key}`"
+            :disabled="!canPatch"
+            @update:model-value="setOperation(key, $event)"
+          />
+          <code class="col-start-1 col-end-3 row-start-2 truncate font-mono text-sm sm:col-start-2 sm:col-end-3 sm:row-start-1">{{ key }}</code>
 
-          <div class="flex flex-wrap items-center gap-2">
-            <AppSecretInput
-              v-if="operationOf(key) !== 'delete'"
-              v-model="replacements[key]"
-              placeholder="Replacement value"
-              :ariaLabel="`Replacement value for ${key}`"
-              :invalid="!!existingProblem(key)"
-              :describedBy="existingProblem(key) ? `staged-problem-${index}` : ''"
-            />
-            <p v-else class="mb-0 text-sm text-muted">Deletes the key; no value is needed.</p>
-          </div>
+          <AppSecretInput
+            v-if="operationOf(key) !== 'delete'"
+            v-model="replacements[key]"
+            class="col-start-1 col-end-3 row-start-3 sm:col-start-3 sm:col-end-4 sm:row-start-1"
+            placeholder="Replacement value"
+            :ariaLabel="`Replacement value for ${key}`"
+            :invalid="!!existingProblem(key)"
+            :describedBy="existingProblem(key) ? `staged-problem-${index}` : ''"
+          />
+          <p v-else class="col-start-1 col-end-3 row-start-3 mb-0 text-sm text-muted sm:col-start-3 sm:col-end-4 sm:row-start-1">
+            Deletes the key; no value is needed.
+          </p>
 
-          <p v-if="existingProblem(key)" :id="`staged-problem-${index}`" class="mb-0 text-sm text-danger">
+          <AppButton
+            class="col-start-2 col-end-3 row-start-1 justify-self-end sm:col-start-4 sm:col-end-5"
+            size="small"
+            variant="ghost"
+            :aria-label="`Discard the staged change to ${key}`"
+            @click="clear(key)"
+          >
+            Discard
+          </AppButton>
+
+          <p v-if="existingProblem(key)" :id="`staged-problem-${index}`" class="col-start-1 col-end-3 mb-0 text-sm text-danger sm:col-end-5">
             {{ existingProblem(key) }}
           </p>
         </li>
@@ -298,43 +352,44 @@ onBeforeUnmount(() => clear())
         <li
           v-for="(row, index) in added"
           :key="row.id"
-          class="flex flex-col gap-2 border-t border-border px-4 py-3"
-          :class="addNameProblem(row) || addValueProblem(row) ? 'bg-danger/5' : ''"
+          class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-2 border-t border-border px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(11rem,1.4fr)_auto]"
+          :class="addProblem(row) ? 'bg-danger/5' : ''"
+          @focusout="leave(addedRowId(row), $event)"
         >
-          <div class="flex flex-wrap items-center gap-2">
-            <AppTag tone="accent">add</AppTag>
-            <span class="flex min-w-[11rem] flex-1 items-center">
-              <input
-                :ref="(element) => setAddInput(row.id, element)"
-                v-model="row.key"
-                :aria-label="`New key name ${index + 1}`"
-                :aria-invalid="addNameProblem(row) ? 'true' : undefined"
-                :aria-describedby="addNameProblem(row) ? `new-problem-${row.id}` : undefined"
-                placeholder="Key name"
-                class="field font-mono"
-              />
-            </span>
-            <AppButton
-              class="ml-auto"
-              size="small"
-              variant="ghost"
-              :aria-label="`Remove new key ${index + 1}`"
-              @click="added.splice(index, 1)"
-            >
-              Remove
-            </AppButton>
-          </div>
+          <AppTag tone="accent" class="col-start-1 col-end-2 row-start-1 justify-self-start">add</AppTag>
+          <input
+            :ref="(element) => setAddInput(row.id, element)"
+            v-model="row.key"
+            :aria-label="`New key name ${index + 1}`"
+            :aria-invalid="addNameProblem(row) ? 'true' : undefined"
+            :aria-describedby="addNameProblem(row) ? `new-problem-${row.id}` : undefined"
+            placeholder="Key name"
+            class="field col-start-1 col-end-3 row-start-2 min-w-0 font-mono sm:col-start-2 sm:col-end-3 sm:row-start-1"
+          />
 
           <AppSecretInput
             v-model="row.value"
+            class="col-start-1 col-end-3 row-start-3 sm:col-start-3 sm:col-end-4 sm:row-start-1"
             placeholder="Value"
             :ariaLabel="`New key value ${index + 1}`"
             :invalid="!!addValueProblem(row)"
             :describedBy="addValueProblem(row) ? `new-problem-${row.id}` : ''"
           />
 
-          <p v-if="addNameProblem(row) || addValueProblem(row)" :id="`new-problem-${row.id}`" class="mb-0 text-sm text-danger">
-            {{ addNameProblem(row) || addValueProblem(row) }}
+          <!-- Destructive, and in the column of the row it drops rather than at the container's
+               far edge: an x means "this row" only because of where it sits, and the accessible
+               name is what says which row that is. -->
+          <AppButton
+            class="col-start-2 col-end-3 row-start-1 justify-self-end sm:col-start-4 sm:col-end-5"
+            size="small"
+            variant="ghost"
+            icon="x"
+            :aria-label="`Remove new key ${index + 1}`"
+            @click="removeAdded(index)"
+          />
+
+          <p v-if="addProblem(row)" :id="`new-problem-${row.id}`" class="col-start-1 col-end-3 mb-0 text-sm text-danger sm:col-end-5">
+            {{ addProblem(row) }}
           </p>
         </li>
       </ul>
@@ -343,6 +398,7 @@ onBeforeUnmount(() => clear())
         <AppButton v-if="canPatch" @click="addRow">Add key</AppButton>
         <AppButton
           v-if="batch.length > 0"
+          class="ml-auto"
           variant="primary"
           :loading="reviewing"
           :disabled="!canReview"
@@ -350,7 +406,6 @@ onBeforeUnmount(() => clear())
         >
           Review encrypted diff
         </AppButton>
-        <p v-if="batchProblem" class="mb-0 text-sm text-muted" aria-live="polite">{{ batchProblem }}</p>
       </div>
     </div>
 

@@ -1,7 +1,7 @@
 // Keyboard reachability, accessible names, masked-by-default values, capability gating, the
 // staged-changes panel, the dry-run gate, and the shared review/delivery state.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { api } from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -57,6 +57,13 @@ function mountPanel(detail: SealedSecretDetail) {
 
 function findButton(wrapper: ReturnType<typeof mountEditor> | ReturnType<typeof mountPanel>, label: string) {
   return wrapper.findAll('button').find((button) => button.text() === label)
+}
+
+/** A rail row's header, by its title. Only a row the flow has reached carries `aria-expanded`. */
+function railRow(wrapper: VueWrapper, title: string) {
+  return wrapper.findAll('button')
+    .filter((button) => button.attributes('aria-expanded') !== undefined)
+    .find((button) => button.text().startsWith(title))
 }
 
 /**
@@ -317,6 +324,8 @@ describe('delivery panel policy controls', () => {
     const store = useSecretsStore(pinia)
     store.currentDiff = reviewedDiff()
     store.pendingMutation = { namespace: 'payments', name: 'api', mutations: [{ key: 'password', operation: 'replace', value: 'rotated' }] }
+    // The mapping the panel reads the branch from, as the detail page would have loaded it.
+    store.gitPaths = { namespaces: [{ namespace: 'payments', default_path: 'clusters/prod/payments', allowed_paths: ['clusters/prod/payments'], repository: 'org/repo', branch: 'main', mode: 'proposal' }] }
     vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
       // Mirrors the real action: the pending mutation clears, the reviewed ciphertext
       // and the detail stay.
@@ -339,12 +348,14 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Apply reviewed patch')!.trigger('click')
     await flushPromises()
 
-    // Stage 'dry-run': the dry-run control replaces the apply control.
+    // Stage 'dry-run': the dry-run control replaces the apply control, and the row that now
+    // holds it stops claiming it is still waiting on the review above.
     expect(wrapper.text()).toContain('Reviewed patch applied.')
     expect(wrapper.text()).toContain('Nothing is written to Git yet')
     expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
     expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
     expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
+    expect(railRow(wrapper, 'Check against the branch')!.text()).not.toContain('Waiting on the review above')
 
     await findButton(wrapper, 'Run dry run')!.trigger('click')
     await flushPromises()
@@ -357,6 +368,14 @@ describe('delivery panel policy controls', () => {
     expect(wrapper.text()).toContain('base commit abc123')
     expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
     expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
+
+    // The open row is the one carrying the delivery button, so it is the one that has to name
+    // the file it writes — the row that resolved the path folded two stages ago — and it is the
+    // one row that must not still be telling the operator to run the dry run it just ran.
+    const deliverRow = railRow(wrapper, 'Deliver')!
+    expect(deliverRow.text()).toContain('Path: clusters/prod/payments/api.yaml')
+    expect(deliverRow.text()).toContain('branch main')
+    expect(deliverRow.text()).not.toContain('Run dry run before delivery')
 
     await findButton(wrapper, 'Create proposal')!.trigger('click')
     await flushPromises()

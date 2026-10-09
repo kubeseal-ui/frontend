@@ -21,6 +21,9 @@ const emit = defineEmits<{ 'update:open': [boolean] }>()
 const bodyId = `stage-body-${useId()}`
 const header = ref<HTMLButtonElement | null>(null)
 const isPending = computed(() => props.state === 'pending')
+// The lock text is why a row is shut, so it stops being true the moment the flow reaches the
+// row — an open row still saying "run the dry run first" would contradict the button in it.
+const note = computed(() => props.summary || (isPending.value ? props.locked : ''))
 
 watch(() => props.open, (opened, was) => {
   // The stage that just closed took the control pressed to advance it, so focus is on `<body>`
@@ -55,7 +58,7 @@ watch(() => props.open, (opened, was) => {
 
       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="text-sm font-semibold" :class="isPending ? 'text-muted' : 'text-ink'">{{ title }}</span>
-        <span v-if="summary || locked" class="text-sm text-muted">{{ summary || locked }}</span>
+        <span v-if="note" class="text-sm text-muted">{{ note }}</span>
       </span>
 
       <span v-if="!isPending" class="shrink-0 text-xs font-medium text-accent">{{ open ? 'Hide' : 'Show' }}</span>

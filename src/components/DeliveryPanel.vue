@@ -113,6 +113,17 @@ const reviewSummary = computed(() => store.newSecretDraft
 const checkSummary = computed(() => store.dryRunResult
   ? `Path: ${store.dryRunResult.path} · base commit ${shortBase.value}`
   : '')
+// The row the delivery button sits on names the file it writes. The path is resolved by the dry
+// run, and the row that resolved it is folded by the time this one is open and asking to be
+// pressed — which is the moment the destination has to be legible. It reads only the dry run's
+// path: the detail's file_path is known before the dry run, and a still-locked row that named a
+// destination would be claiming a file nothing has checked yet.
+const deliverSummary = computed(() => {
+  const path = store.dryRunResult?.path
+  if (!path) return ''
+  const branch = resolvedPaths.value?.branch
+  return `Path: ${path}${branch ? ` · branch ${branch}` : ''}`
+})
 
 async function applyPatch() {
   if (!store.currentDiff) return
@@ -219,6 +230,7 @@ async function deliver() {
         <StageRow
           title="Deliver"
           :state="rowState('deliver')"
+          :summary="deliverSummary"
           locked="Run dry run before delivery."
           :open="isOpen('deliver')"
           @update:open="setOpen('deliver', $event)"
