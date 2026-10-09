@@ -32,7 +32,10 @@ const keyRows = ref<Record<string, HTMLLIElement | null>>({})
 const tray = ref<HTMLElement | null>(null)
 const canReveal = computed(() => auth.hasCapability(props.detail.namespace, 'secret:decrypt'))
 const canPatch = computed(() => auth.hasCapability(props.detail.namespace, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
-const hasBaseCommit = computed(() => Boolean(props.detail.git.base_commit))
+// The commit every reveal and review is made against. Absent means the server did not report
+// one, which the controls that need it refuse rather than send.
+const baseCommit = computed(() => props.detail.git.base_commit || '')
+const hasBaseCommit = computed(() => baseCommit.value !== '')
 
 // An add over a key that is present is refused by the API, so it is not offered.
 const EXISTING_OPERATIONS = [
@@ -75,10 +78,10 @@ const stagedCount = computed(() => stagedKeys.value.length + added.value.length)
 // never block the review with a change nobody asked for. Only Change stages a key, and a
 // replacement or a delete still needs no reveal at all.
 async function reveal(key: string) {
-  if (!canReveal.value || !props.detail.git.base_commit) return
+  if (!canReveal.value || !hasBaseCommit.value) return
   error.value = ''; activeKey.value = key
   try {
-    revealed[key] = (await store.reveal(props.detail.namespace, props.detail.name, key, props.detail.git.base_commit)).value
+    revealed[key] = (await store.reveal(props.detail.namespace, props.detail.name, key, baseCommit.value)).value
   }
   catch (e) { error.value = describeError(e, 'The key could not be revealed') }
   finally { activeKey.value = '' }
@@ -196,7 +199,7 @@ async function reviewBatch() {
   if (batchProblem.value) { await showProblems(); return }
   error.value = ''; reviewing.value = true
   try {
-    await store.computeDiff(props.detail.namespace, props.detail.name, batch.value, props.detail.git.base_commit)
+    await store.computeDiff(props.detail.namespace, props.detail.name, batch.value, baseCommit.value)
     message.value = 'Encrypted diff is ready for review.'
   }
   catch (e) { error.value = describeError(e, 'The encrypted diff could not be computed') }
