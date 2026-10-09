@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppIcon from './AppIcon.vue'
+import { type IconName } from './icons'
 
 /**
  * A status message.
@@ -25,7 +26,7 @@ const props = withDefaults(
 
 defineEmits<{ close: [] }>()
 
-const TONES: Record<string, { frame: string; icon: string }> = {
+const TONES: Record<string, { frame: string; icon: IconName }> = {
   info: { frame: 'border-info/40 text-info', icon: 'info' },
   success: { frame: 'border-success/40 text-success', icon: 'check' },
   warning: { frame: 'border-warning/40 text-warning', icon: 'alert' },

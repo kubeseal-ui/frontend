@@ -1,12 +1,35 @@
 import { defineStore } from 'pinia'
 import { api } from '@/api'
-import type { SealedSecretDetail, SealedSecretSummary, Namespace, DryRunResult, EncryptedDiff, DeliveryResult, NewSecretDraft, ListResponse, GitPathsConfig } from '@/types'
+import type { SealedSecretDetail, SealedSecretSummary, Namespace, DryRunResult, EncryptedDiff, DeliveryResult, NewSecretDraft, ListResponse, GitPathsConfig, NamespaceGitPaths } from '@/types'
 export type { SealedSecretDetail, SealedSecretSummary } from '@/types'
 
 /** Ciphertext-only draft for a brand new SealedSecret. The plaintext Secret never enters the store. */
 export type { NewSecretDraft, DryRunResult, EncryptedDiff, DeliveryResult, GitPathsConfig }
 
 function idempotencyKey() { return crypto.randomUUID() }
+
+/**
+ * The Git path entry that applies to one namespace.
+ *
+ * The server resolves a namespace through its own mapping first and then
+ * through a `*` wildcard — `PolicyStore.GetGitMapping` rewrites the wildcard's
+ * namespace on the way out — which is how a single mapping covers every
+ * namespace. This listing is the raw store, so a wildcard arrives as the
+ * literal entry `namespace: "*"` with nothing expanded around it, and a
+ * namespace it covers has no entry of its own. Without the same fallback here
+ * the UI reads a covered namespace as unmapped and refuses to deliver for one
+ * the server would happily accept.
+ *
+ * The fallback is deliberately in the store rather than at each call site:
+ * four consumers read this listing and every one of them needs the same
+ * answer the server would give.
+ */
+function resolveGitPaths(config: GitPathsConfig | null, namespace: string): NamespaceGitPaths | null {
+  const entries = config?.namespaces
+  return entries?.find((entry) => entry.namespace === namespace)
+    ?? entries?.find((entry) => entry.namespace === '*')
+    ?? null
+}
 
 export const useSecretsStore = defineStore('secrets', {
   state: () => ({
@@ -29,6 +52,15 @@ export const useSecretsStore = defineStore('secrets', {
   }),
   getters: {
     /**
+     * The Git path listing entry for a namespace, wildcard included.
+     *
+     * Prefer this over scanning `gitPaths` directly: a mapping stored against
+     * `*` is what the server applies to a namespace with no mapping of its own,
+     * and a raw scan cannot see that.
+     */
+    namespaceGitPaths: (state) => (namespace: string): NamespaceGitPaths | null =>
+      resolveGitPaths(state.gitPaths, namespace),
+    /**
      * The fixed delivery mode for a namespace, from the Git path listing.
      *
      * Delivery mode is never a user choice — it comes from the authorization
@@ -36,7 +68,7 @@ export const useSecretsStore = defineStore('secrets', {
      * it for a Secret that does not exist yet and therefore has no detail.
      */
     namespaceDeliveryMode: (state) => (namespace: string): 'direct' | 'proposal' | '' =>
-      state.gitPaths?.namespaces?.find((entry) => entry.namespace === namespace)?.mode ?? '',
+      resolveGitPaths(state.gitPaths, namespace)?.mode ?? '',
   },
   actions: {
     async fetchNamespaces() { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<Namespace>>('/api/v1/namespaces'); this.namespaces = response.data.namespaces || []; return this.namespaces } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load namespaces'); throw error } finally { this.loading = false } },

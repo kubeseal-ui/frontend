@@ -49,6 +49,11 @@ const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
 function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): string {
   const mode = paths?.mode || namespace.delivery_mode || ''
   if (paths) {
+    // A wildcard mapping covers every namespace and derives its target path per
+    // namespace from a template the listing does not expose, so it has no path
+    // count and no default path to report. Naming it as the wildcard it is
+    // says the useful thing; "0 paths" would read as "nowhere to deliver".
+    if (paths.namespace === '*') return `All namespaces${mode ? ` · ${mode}` : ''}`
     const count = paths.allowed_paths?.length ?? 0
     return `${count} ${count === 1 ? 'path' : 'paths'}${mode ? ` · ${mode}` : ''}`
   }
@@ -66,7 +71,7 @@ function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): stri
  */
 const cards = computed(() =>
   secrets.namespaces.map((namespace) => {
-    const paths = secrets.gitPaths?.namespaces?.find((entry) => entry.namespace === namespace.name) ?? null
+    const paths = secrets.namespaceGitPaths(namespace.name)
     const repository = paths?.repository || namespace.git_repository || ''
     const branch = paths?.branch ?? ''
 

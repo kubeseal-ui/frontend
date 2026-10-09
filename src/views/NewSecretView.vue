@@ -25,15 +25,22 @@ const deliveryMode = computed(() => secrets.namespaceDeliveryMode(props.namespac
 const hasDeliveryPolicy = computed(() => Boolean(deliveryMode.value))
 
 // The same listing SecretNameEditor's path picker reads, shown here as context
-// rather than as a second set of controls.
-const namespacePaths = computed(() => secrets.gitPaths?.namespaces?.find(entry => entry.namespace === props.namespace))
+// rather than as a second set of controls. It resolves through the store, so a
+// namespace covered by a `*` mapping reports that mapping's mode and repository
+// instead of looking unmapped.
+const namespacePaths = computed(() => secrets.namespaceGitPaths(props.namespace))
 const allowedPaths = computed(() => namespacePaths.value?.allowed_paths || [])
 const defaultPath = computed(() => namespacePaths.value?.default_path || '')
+// A wildcard mapping names no paths and no default: the server renders the
+// target from the mapping's template for this namespace, and the listing does
+// not carry that template. So the rail can say where the path comes from but
+// not what it is — which is not the same as there being none.
+const isWildcard = computed(() => namespacePaths.value?.namespace === '*')
 
 onMounted(() => {
-  // SecretNameEditor also loads these for the allowed-path picker; the rail
-  // reads the mode and the paths from the same listing.
-  secrets.fetchGitPaths()
+  // SecretNameEditor's path picker reads the same listing. Either component
+  // may mount first, so each asks only if the other has not already.
+  if (!secrets.gitPaths) secrets.fetchGitPaths()
 })
 
 // A half-finished encrypted draft belongs to this page. Leaving it in the
@@ -98,7 +105,10 @@ onUnmounted(() => secrets.discardNewSecretDraft())
                   {{ path }}
                   <AppTag v-if="path === defaultPath">default</AppTag>
                 </span>
-                <span v-if="allowedPaths.length === 0" class="text-muted">No paths mapped</span>
+                <span v-if="allowedPaths.length === 0 && isWildcard" class="text-muted">
+                  Rendered per Secret from this namespace's mapping
+                </span>
+                <span v-else-if="allowedPaths.length === 0" class="text-muted">No paths mapped</span>
               </dd>
             </div>
           </dl>

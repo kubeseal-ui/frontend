@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import AppIcon from './AppIcon.vue'
 import AppSpinner from './AppSpinner.vue'
+import { type IconName } from './icons'
 
 /**
  * A native button with three weights.
@@ -17,12 +18,15 @@ const props = withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'ghost'
     size?: 'small' | 'medium'
-    icon?: string
+    // Typed from the icon set, not `string`: this value is forwarded straight
+    // to AppIcon, so a plain string here would push the check off the call site
+    // and onto a runtime lookup that renders an empty svg.
+    icon?: IconName
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
     loading?: boolean
   }>(),
-  { variant: 'secondary', size: 'medium', icon: '', type: 'button', disabled: false, loading: false },
+  { variant: 'secondary', size: 'medium', type: 'button', disabled: false, loading: false },
 )
 
 const VARIANTS: Record<string, string> = {

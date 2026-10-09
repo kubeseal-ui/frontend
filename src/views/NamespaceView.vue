@@ -7,6 +7,7 @@ import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
+import { type IconName } from '@/components/ui/icons'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 
@@ -36,7 +37,7 @@ function createSecret() {
  * these literals straight out of this file, which is what keeps
  * border-success/40 a real utility rather than a generated-name lookalike.
  */
-const driftStates: Record<string, { icon: string; label: string; classes: string }> = {
+const driftStates: Record<string, { icon: IconName; label: string; classes: string }> = {
   'in-sync': { icon: 'check', label: 'In sync', classes: 'text-success border-success/40' },
   diverged: { icon: 'alert', label: 'Diverged', classes: 'text-danger border-danger/40' },
   live_only: { icon: 'info', label: 'Live only', classes: 'text-warning border-warning/40' },

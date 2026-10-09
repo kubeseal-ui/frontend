@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppIcon from './AppIcon.vue'
+import { type IconName } from './icons'
 
 /**
  * The one surface. Every panel in the app is this, so the glass material is
@@ -10,7 +11,7 @@ import AppIcon from './AppIcon.vue'
  * `mt-auto`. That is what keeps metadata rows aligned across a row when one
  * card's title wraps to two lines.
  */
-withDefaults(defineProps<{ title?: string; icon?: string }>(), { title: '', icon: '' })
+withDefaults(defineProps<{ title?: string; icon?: IconName }>(), { title: '' })
 </script>
 
 <template>

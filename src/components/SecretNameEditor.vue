@@ -21,19 +21,23 @@ const auth = useAuthStore()
 const store = useSecretsStore()
 const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetPath = ref(''); const error = ref(''); const loading = ref(false)
 const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
-const gitPaths = computed(() => store.gitPaths)
 const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace-wide', value: 'namespace-wide' }, { label: 'Cluster-wide', value: 'cluster-wide' }]
 
-// Get allowed paths for the current namespace
-const currentNsPaths = computed((): NamespaceGitPaths | undefined => {
-  return gitPaths.value?.namespaces?.find(ns => ns.namespace === props.namespace)
-})
+// The allowed paths for this namespace, resolved through the store so a `*`
+// mapping counts. A wildcard names no paths, which leaves the picker below
+// unrendered and submits no target_path at all — the server then renders the
+// path from the mapping's template, which is the only correct answer here
+// because the template is not in the listing.
+const currentNsPaths = computed((): NamespaceGitPaths | null => store.namespaceGitPaths(props.namespace))
 const allowedPaths = computed(() => currentNsPaths.value?.allowed_paths || [])
 const defaultPath = computed(() => currentNsPaths.value?.default_path || '')
 const pathOptions = computed(() => [{ label: 'Use default path', value: '' }, ...allowedPaths.value.map(p => ({ label: p, value: p }))])
 
 onMounted(() => {
-  store.fetchGitPaths()
+  // Shared with the create page's rail, which reads the same listing. Only the
+  // first of the two to mount needs to ask; a failed attempt leaves gitPaths
+  // null and so is retried here.
+  if (!store.gitPaths) store.fetchGitPaths()
 })
 
 async function createDraft() {
