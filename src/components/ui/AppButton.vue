@@ -4,23 +4,16 @@ import AppIcon from './AppIcon.vue'
 import AppSpinner from './AppSpinner.vue'
 import { type IconName } from './icons'
 
-/**
- * A native button with three weights.
- *
- * The label is the default slot and nothing else is added to the button's text
- * content — not even while loading, because the spinner is an svg. The specs
- * match buttons by exact text, so this is a contract rather than a preference.
- *
- * `type` defaults to "button": every control here performs an action in place,
- * and an accidental submit would be a real defect, not a styling one.
- */
+// The label is the default slot and nothing else joins the button's text, not even while
+// loading (the spinner is an svg): the specs match buttons by exact text, so this is a
+// contract. `type` defaults to "button", because an accidental submit would be a real
+// defect rather than a styling one.
 const props = withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'ghost'
     size?: 'small' | 'medium'
-    // Typed from the icon set, not `string`: this value is forwarded straight
-    // to AppIcon, so a plain string here would push the check off the call site
-    // and onto a runtime lookup that renders an empty svg.
+    // Typed from the icon set: this forwards straight to AppIcon, so a plain string would
+    // push the check to a runtime lookup that renders an empty svg.
     icon?: IconName
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -30,9 +23,8 @@ const props = withDefaults(
 )
 
 const VARIANTS: Record<string, string> = {
-  // `text-bg` rather than a fixed white: the accent is a dark blue on the light
-  // theme and a pale blue on the dark one, so the readable foreground inverts
-  // with it. A literal white would fail contrast on the dark palette.
+  // `text-bg`, not a fixed white: the accent is dark on the light theme and pale on
+  // the dark one, so the readable foreground inverts with it.
   primary: 'border-transparent bg-accent font-semibold text-bg hover:brightness-110',
   secondary: 'border-border-strong bg-surface/70 font-medium text-ink hover:bg-surface',
   ghost: 'border-transparent bg-transparent font-medium text-accent hover:bg-surface/60',

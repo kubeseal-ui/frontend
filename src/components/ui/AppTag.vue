@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * A small pill. Used for the scope badge and for the concealed-value marker.
- *
- * The tone prop exists so the tag can borrow a semantic colour without the
- * caller writing a class — but it is only ever additive: the label text is
- * what carries the meaning.
- */
 withDefaults(defineProps<{ tone?: 'neutral' | 'accent' }>(), { tone: 'neutral' })
 </script>
 

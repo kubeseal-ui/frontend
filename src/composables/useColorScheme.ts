@@ -1,34 +1,21 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch } from 'vue'
 import { useUiStore } from '@/stores/ui'
 
-/**
- * The theme actually in force — the two states the stylesheet can express.
- * The three-state *preference* (`light | dark | system`) belongs to the UI
- * store, which owns it; this is only what it resolves to.
- */
+// What the three-state *preference* (`light | dark | system`) resolves to.
 type ThemeMode = 'light' | 'dark'
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 
 function darkMediaQuery(): MediaQueryList | null {
-  // Read through globalThis rather than window so the lookup is the same one a
-  // test can replace; window and globalThis are the same object in a browser.
+  // globalThis, not window, so a test can replace the lookup.
   const media = globalThis.matchMedia
   if (typeof media !== 'function') return null
   return media.call(globalThis, DARK_QUERY)
 }
 
-/**
- * Resolves the stored theme preference into the theme actually in use.
- *
- * While the preference is `system` the OS setting is followed live; an explicit
- * choice outranks it. The resolved theme is published as `data-theme` on the
- * document element so the stylesheet's non-media palette blocks can override
- * the host's own preference.
- *
- * Every browser API here is optional: unit tests and any non-browser caller get
- * a light theme and a no-op instead of a crash.
- */
+// Follows the OS live while the preference is `system`; an explicit choice outranks it.
+// Publishing the result as `data-theme` is what lets the stylesheet's non-media palette
+// blocks override the host's preference.
 export function useColorScheme() {
   const ui = useUiStore()
   const query = darkMediaQuery()

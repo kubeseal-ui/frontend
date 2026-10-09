@@ -1,12 +1,8 @@
-// Theme token contrast checks for the light and dark palettes declared in src/style.css.
-// Text tokens must reach WCAG AA (4.5:1); the focus indicator is a non-text UI element
-// and must reach 3:1 against both --app-surface and --app-bg (WCAG 1.4.11 / 2.4.11). The
-// focus ring is not checked against the recessed token: it is drawn with an offset, so it
-// lands on whatever surface the control sits on rather than on the control's own fill.
-//
-// The palettes are read from the stylesheet by regex because the stylesheet, not the
-// browser, is the artifact under test: these assertions have to hold on a machine with
-// no rendering engine, and they have to fail when someone edits a hex value.
+// Contrast floors for the palettes in src/style.css. Text tokens must reach WCAG AA
+// (4.5:1); the focus ring is a non-text UI element and must reach 3:1, checked against
+// --app-surface and --app-bg only because its offset lands it on whatever the control
+// sits on, not on the control's own fill. Read by regex: the stylesheet, not the
+// browser, is the artifact under test, so these hold without a rendering engine.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -14,11 +10,9 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8')
 
 /**
- * The colour declarations in a block. Both hex and rgb()/rgba() forms are
- * captured: the palette uses 6-digit hex, but the glass rim colours carry
- * alpha and can only be written as rgb(). Non-colour declarations — geometry,
- * blur radii, durations — are deliberately not captured, which is why they are
- * required to be literals rather than tokens.
+ * The colour declarations in a block. rgb() is captured as well as hex because the
+ * glass rim colours carry alpha. Non-colour declarations are deliberately not captured,
+ * which is why geometry and durations must stay literals rather than tokens.
  */
 function tokens(block: string): Record<string, string> {
   const found: Record<string, string> = {}
@@ -64,19 +58,15 @@ describe('theme token contrast', () => {
   })
 
   it('resolves every custom property referenced by the stylesheet', () => {
-    // Declared anywhere, not only in the light block: the geometry and
-    // interaction tokens (--radius-*, --glass-x) are legitimately declared
-    // outside the palettes, and the parity check above already stops a colour
-    // token from going missing from one theme.
+    // Declared anywhere: --radius-* and --glass-x legitimately live outside the palettes.
     const referenced = new Set([...css.matchAll(/var\((--[a-z-]+)\)/g)].map((match) => match[1]))
     expect(referenced.size).toBeGreaterThan(0)
     for (const token of referenced) expect([...declared]).toContain(token)
   })
 
   it('exposes every palette token to Tailwind as a utility name', () => {
-    // Without this, a token can be declared and used through `var()` while
-    // silently having no `bg-*` / `text-*` class, which is how a utility-first
-    // template ends up needing bespoke CSS again.
+    // Without the bridge a token can be declared and used via var() while having no
+    // bg-*/text-* class at all.
     const bridge = css.match(/@theme inline \{([^}]*)\}/)?.[1] ?? ''
     expect(bridge).not.toBe('')
 
@@ -91,9 +81,6 @@ describe('theme token contrast', () => {
   })
 
   it('derives the inner radius from the outer radius and the inset', () => {
-    // Concentric radii are what make a nested surface look machined rather than
-    // arbitrary, and expressing the relation as arithmetic stops the two numbers
-    // drifting apart when either is edited.
     const geometry = css.match(/@theme \{([^}]*)\}/)?.[1] ?? ''
     const inner = geometry.match(/--radius-card-inner:\s*([^;]+);/)?.[1].trim() ?? ''
     expect(inner).toBe('calc(var(--radius-card) - var(--glass-inset))')
@@ -103,12 +90,8 @@ describe('theme token contrast', () => {
 
   for (const theme of themes) {
     it(`keeps text tokens at AA or better in the ${theme.name} theme`, () => {
-      // The recessed token is in this list because it is the background most
-      // text in this app actually sits on: every field's own text and its
-      // placeholder, the code, alert, and diff blocks, the neutral tag, the
-      // key-name chips. Surfaces that use it at partial alpha composite
-      // somewhere between it and --app-surface, so checking both endpoints
-      // covers those without a second set of arithmetic.
+      // --app-surface-raised is the background most text actually sits on, and partial-alpha
+      // surfaces composite between it and --app-surface, so both endpoints are checked.
       for (const token of textPairs) {
         for (const surface of ['--app-surface', '--app-surface-raised', '--app-bg']) {
           const ratio = contrast(theme.values[token], theme.values[surface])

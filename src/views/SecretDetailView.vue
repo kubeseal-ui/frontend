@@ -22,34 +22,20 @@ const route = useRoute(); const router = useRouter(); const auth = useAuthStore(
 const loading = ref(true); const error = ref('')
 /** The last sync's failure, or empty. It belongs to the Secret it happened on. */
 const syncError = ref('')
-/**
- * The last sync's outcome, kept whole.
- *
- * The sync endpoint answers with the same DeliveryResult the delivery endpoint
- * does — mode, commit, branch, file, and a proposal URL in proposal mode — and
- * this page used to print "(direct mode, commit abc1234)" and drop the rest, so
- * a proposal-mode sync named neither the branch nor the file and never linked
- * the proposal it opened. Both sentences come from the shared builders the
- * delivery panel uses, which is what keeps the two controls that write to Git
- * from reporting the same push differently.
- */
+// Printing one field of the sync result dropped the branch, file, and proposal link, so
+// both sentences come from the shared builders — the two controls that write to Git must
+// report the same push the same way.
 const syncOutcome = ref<DeliveryResult | null>(null)
 const namespace = () => String(route.params.namespace); const name = () => String(route.params.name)
 const canPatch = computed(() => auth.hasCapability(namespace(), 'secret:seal') && auth.hasCapability(namespace(), 'secret:decrypt'))
-// Review and delivery on this page now only ever follow a one-key patch.
-// Creating a new Secret is an action on the namespace, not on someone else's
-// Secret, and lives at /namespaces/:namespace/new.
 const showReview = computed(() => canPatch.value)
 
 async function load() {
   loading.value = true;
   error.value = '';
-  // The sync report belongs to the Secret it was made for. A route change reuses
-  // this view instance — the route record is the same one and the router view is
-  // unkeyed — so without this the previous Secret's banner would be rendered
-  // above the next one's metadata, claiming a sync that never happened to it.
-  syncOutcome.value = null;
-  syncError.value = '';
+  // A route change reuses this view instance, so without clearing this the previous
+  // Secret's banner would render above the next one's metadata.
+  syncOutcome.value = null;  syncError.value = '';
   store.clearSensitiveState();
   try {
     await Promise.all([
@@ -65,52 +51,25 @@ async function load() {
 
 function driftStatus() { const git = store.currentDetail?.git; return git?.drift || (git?.in_sync_with_live ? 'in-sync' : 'unknown') }
 
-/**
- * The drift state as a word.
- *
- * The API sends the underscored enum, and this page used to print it as it
- * arrived — "Status: live_only" in a warning addressed to an operator. It reads
- * from the same vocabulary the namespace cards and their filter chips use, so a
- * state cannot be called one thing there and another here.
- */
+// The API sends the underscored enum; same vocabulary as the namespace cards.
 const driftLabel = computed(() => driftPresentation(driftStatus()).label)
 
 const syncing = ref(false)
 
-/**
- * The commit the sync would be built on.
- *
- * The sync endpoint compares it against the branch head and refuses an empty
- * one, so an absent value is not something to send empty: it is the reason not
- * to offer the control, which would otherwise be a button whose only outcome is
- * a refusal. It comes from the same Git read that produced the drift, and the
- * server reports the branch head for a manifest Git does not hold yet — which is
- * exactly the live-only Secret this control exists for.
- */
+// The sync endpoint compares this against the branch head and refuses an empty one, so an
+// absent value is the reason not to offer the control rather than something to send
+// empty. The server reports a head even for a manifest Git does not hold yet — exactly
+// the live-only Secret this control exists for.
 const syncBaseCommit = computed(() => store.currentDetail?.git.base_commit || '')
 
-/**
- * Whether this caller may write this namespace's Git source.
- *
- * The capability follows from the namespace's fixed delivery mode and is read
- * through the same rule the delivery panel gates on. An unknown mode means the
- * namespace has no Git mapping at all — the server reports the mode alongside
- * every mapping it resolves — and there is then nothing to sync to.
- */
+// Read through the same rule the delivery panel gates on.
 const canSync = computed(() => {
   const required = requiredDeliveryCapability(store.currentDetail?.git.delivery_mode || '')
   return required ? auth.hasCapability(namespace(), required) : false
 })
 
-/**
- * Why the sync control is not offered, when it is not.
- *
- * Three situations reach this page and they need three different answers: no
- * Git policy at all, a policy whose source could not be read far enough to
- * produce a branch head, and a caller without the capability the namespace's
- * mode requires. Saying which one it is turns a missing button into an
- * instruction.
- */
+// Three situations, three answers: no Git policy, no branch head, no capability. Saying
+// which turns a missing button into an instruction.
 const syncUnavailable = computed(() => {
   const mode = store.currentDetail?.git.delivery_mode
   if (!mode) return 'This namespace has no Git delivery policy, so there is nowhere in Git for this Secret to be synced to.'
@@ -119,12 +78,6 @@ const syncUnavailable = computed(() => {
 })
 
 const syncTitle = computed(() => syncOutcome.value ? deliveryHeading(syncOutcome.value, 'Synced to Git') : '')
-/**
- * What the sync wrote, in the same sentence the delivery panel would print.
- *
- * The branch and file fall back to the ones this Secret's Git state already
- * named, which are the values the server resolved when it read the source.
- */
 const syncSummary = computed(() => syncOutcome.value
   ? summarizeDelivery(syncOutcome.value, {
       verb: 'Synced',
@@ -167,9 +120,8 @@ watch(() => [route.params.namespace, route.params.name], load)
       Loading SealedSecret…
     </p>
 
-    <!-- The detail is cleared before every load, so nothing below can be
-         rendered until the fetch has settled; an empty result and a failed one
-         are then told apart rather than both reading as "not found". -->
+    <!-- The detail is cleared before every load, so an empty result and a failed one are
+         told apart rather than both reading as "not found". -->
     <template v-else>
       <AppAlert v-if="error" type="error" title="Could not load SealedSecret">
         <p class="m-0">{{ error }}</p>
@@ -188,14 +140,7 @@ watch(() => [route.params.namespace, route.params.name], load)
           </template>
         </AppPageHeader>
 
-        <!--
-          The sync's outcome, reported the way the delivery panel reports one:
-          the endpoint answers with the commit, the branch, the file it wrote,
-          and the proposal it opened when the namespace's policy is proposal
-          mode. Naming all of them is what makes the report checkable against
-          the repository, and the proposal URL is a link to the thing itself
-          rather than inert text.
-        -->
+        <!-- Reported like a delivery, because it is the same result shape. -->
         <AppAlert v-if="syncOutcome" type="success" closable :title="syncTitle" class="mb-4" @close="syncOutcome = null">
           <span class="block">{{ syncSummary }}</span>
           <a
@@ -209,30 +154,16 @@ watch(() => [route.params.namespace, route.params.name], load)
         </AppAlert>
         <AppAlert v-if="syncError" type="error" closable class="mb-4" @close="syncError = ''">{{ syncError }}</AppAlert>
 
-        <!--
-          Drift gates editing, so it is stated above both columns rather than
-          inside one of them: a reader who only ever looks at the rail still has
-          to be told why the key rows refuse to open.
-        -->
+        <!-- Drift gates editing, so it is stated above both columns: a reader who only
+             looks at the rail still has to be told why the rows refuse to open. -->
         <AppAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync" class="mb-6">
           <p class="m-0">Status: {{ driftLabel }}. Reveal, editing, and delivery are disabled.</p>
-          <!--
-            Git-only is the one drift nothing here can act on: this page writes
-            to Git and never to the cluster, so a manifest with no live Secret is
-            not something any control on it could create. Whether a cluster-side
-            GitOps controller then applies it is not something the browser can
-            observe, so it is named as the condition it would take rather than
-            reported as an event already in flight.
-          -->
+          <!-- Git-only is the one drift nothing here can act on: this page never writes
+               to the cluster. -->
           <p v-if="driftStatus() === 'git_only'" class="mt-2 mb-0">
             The manifest is in Git and there is no Secret for it in the cluster. Nothing on this page writes to the
             cluster — a GitOps controller managing this namespace is what would apply it.
           </p>
-          <!--
-            The sync control needs a branch head to build on. Without one the
-            button could only ever be refused for an empty base commit, so the
-            reason takes its place.
-          -->
           <AppButton
             v-else-if="canSync && syncBaseCommit"
             variant="primary"
@@ -252,10 +183,8 @@ watch(() => [route.params.namespace, route.params.name], load)
             <DeliveryPanel v-if="showReview" :detail="store.currentDetail" />
           </div>
 
-          <!-- The rail is a wrapper rather than the card itself: the card is
-               `h-full`, and a sticky box cannot be as tall as its own scroll
-               range. In an auto-height wrapper that percentage resolves to
-               auto, which leaves the card its own height to travel within. -->
+          <!-- A wrapper, not the card: the card is `h-full`, and a sticky box cannot be
+               as tall as its own scroll range. -->
           <div class="lg:sticky lg:top-24">
             <AppCard title="Metadata" icon="database">
               <dl class="m-0 flex flex-col gap-4 text-sm">

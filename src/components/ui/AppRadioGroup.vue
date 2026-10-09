@@ -1,15 +1,6 @@
 <script setup lang="ts">
-/**
- * A group of native radios.
- *
- * Real `<input type="radio">` elements inside `<label>`s, rather than styled
- * divs: the browser then supplies arrow-key movement within the group, the
- * single-tab-stop behaviour, and the checked-state announcement for free. The
- * label wrapper is also what gives each input its accessible name.
- *
- * The group carries `role="radiogroup"` with a name of its own, so the set is
- * announced as one control with a purpose rather than as three loose radios.
- */
+// Real radios inside `<label>`s rather than styled divs, so the browser supplies
+// arrow-key movement, the single tab stop, and the checked-state announcement.
 withDefaults(
   defineProps<{
     modelValue: string
@@ -32,19 +23,10 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
       class="flex cursor-pointer items-center gap-1.5 text-sm"
       :class="disabled ? 'cursor-not-allowed opacity-60' : ''"
     >
-      <!-- `accent-color` alone could only ever tint the checked state: the
-           unchecked circle is drawn by the platform from `color-scheme`, not
-           from our palette, so on a dark card it rendered as the browser's own
-           grey rather than our border token. `appearance-none` takes the whole
-           control over — the ring is `border-border-strong`, and checking it
-           widens that border to 4px in the accent colour, which leaves the
-           centre showing the surface behind it. That is the ordinary radio
-           read, drawn entirely from tokens.
-
-           The element stays a real `input[type=radio]`: the browser keeps the
-           arrow-key movement, the single tab stop, and the checked-state
-           announcement, and editor-accessibility.spec.ts still finds it by
-           value. The focus ring is the global `:focus-visible` rule. -->
+      <!-- `accent-color` could only tint the checked state: the unchecked circle is drawn
+           by the platform from `color-scheme`, not our palette. `appearance-none` takes
+           the control over while it stays a real input[type=radio], so the keyboard and
+           screen-reader behaviour above stands. -->
       <input
         type="radio"
         :name="name"

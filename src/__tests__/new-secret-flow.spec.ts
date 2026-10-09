@@ -1,12 +1,8 @@
-// The create-a-Secret flow lives on the namespace, not on an existing Secret's
-// detail page. These checks cover the entry point, the deep link, and the fact
-// that the flow works in a namespace with no secrets at all — the case the
-// detail-page placement could never reach, because the form used to inherit a
-// base commit from whichever Secret happened to be open.
-//
-// Mounting uses the application's real router and pinia singleton, as
-// router.spec.ts does: the router guard reads the session from that store, and
-// RouterLink needs a router installed to resolve its target.
+// The create-a-Secret flow lives on the namespace, not on an existing Secret's detail
+// page: it must work in a namespace with no secrets at all, and must not inherit a base
+// commit from whichever Secret happened to be open. Mounting uses the real router and
+// pinia singleton, as the guard reads the session from that store and RouterLink needs a
+// router installed.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
@@ -35,13 +31,9 @@ const GIT_PATHS: GitPathsConfig = {
 beforeEach(() => {
   setActivePinia(pinia)
   vi.restoreAllMocks()
-  // Every mount of the create page resolves the namespace's Git paths. Left
-  // unmocked that is a real request to the happy-dom document origin
-  // (http://localhost:3000), and because the store is a singleton shared across
-  // these tests, its connection failure lands *after* the test that started it
-  // — running fetchGitPaths's catch and clearing gitPaths out from under a
-  // later test, which surfaces as a missing delivery control rather than as a
-  // failed fetch. Mocking it here means no test can leak a real request.
+  // Left unmocked, resolving Git paths is a real request to the happy-dom origin: the
+  // singleton store's failure lands after the test that started it and clears gitPaths
+  // under a later one, surfacing as a missing control rather than a failed fetch.
   vi.spyOn(api, 'getGitPaths').mockResolvedValue(GIT_PATHS)
   useSecretsStore(pinia).$reset()
   document.body.innerHTML = ''
@@ -125,12 +117,10 @@ describe('the create page', () => {
     expect(wrapper.html()).not.toContain('plaintext-marker')
     expect(JSON.stringify(store.$state)).not.toContain('plaintext-marker')
 
-    // The delivery panel has no detail to read a mode from; the mode comes from
-    // the namespace's fixed Git policy.
+    // No detail to read a mode from: it comes from the namespace's fixed Git policy.
     expect(wrapper.findComponent(DeliveryPanel).exists()).toBe(true)
-    // The review alert states the destination the server resolved, so the
-    // operator can see where this is going without any control offering to
-    // change it.
+    // The alert states the destination the server resolved, with no control offering
+    // to change it.
     expect(wrapper.text()).toContain('repository org/repo')
     expect(wrapper.text()).toContain('branch main')
     expect(wrapper.text()).toContain('proposal delivery')
@@ -149,9 +139,8 @@ describe('the create page', () => {
     await flushPromises()
     expect(deliver).toHaveBeenCalledWith('payments', 'brand-new', 'encrypted-new-secret', 'head-1', undefined)
     expect(wrapper.text()).toContain('https://git.example/pr/11')
-    // The outcome names the commit, the branch it went to, and the file it
-    // wrote — the file being the dry run's resolved path, since a new Secret has
-    // no detail to read one from — and the proposal URL is a link to it.
+    // The outcome names the commit, the branch, and the file it wrote — the dry run's
+    // resolved path, since a new Secret has no detail to read one from.
     expect(wrapper.text()).toContain('Proposal opened')
     expect(wrapper.text()).toContain('Pushed cafe to main at clusters/payments/brand-new.yaml and opened a merge proposal.')
     const opened = wrapper.find('a[href="https://git.example/pr/11"]')
@@ -159,10 +148,15 @@ describe('the create page', () => {
     expect(opened.attributes('target')).toBe('_blank')
     expect(opened.attributes('rel')).toBe('noopener noreferrer')
 
-    // The delivery consumed the draft, and the base commit came from it. This
-    // panel has no detail to fall back to, so what is left is the outcome — not
-    // the availability warning, which would announce that there is nothing to
-    // deliver against immediately after a delivery that succeeded.
+    // The destination stays whole after the push: the delivery clears the draft the
+    // panel read the namespace, and with it the destination, from, so recomputing the
+    // sentence afterwards would empty it while the change went exactly where it said.
+    expect(wrapper.text()).toContain('repository org/repo')
+    expect(wrapper.text()).toContain('branch main')
+    expect(wrapper.text()).toContain('proposal delivery')
+
+    // The delivery consumed the draft, and this panel has no detail to fall back to,
+    // so what is left is the outcome — not an availability warning.
     expect(store.newSecretDraft).toBeNull()
     expect(wrapper.text()).not.toContain('Delivery unavailable')
     expect(wrapper.text()).not.toContain('did not report a base commit')
@@ -179,10 +173,9 @@ describe('the create page', () => {
     await encryptDraft(wrapper, 'brand-new')
 
     expect(store.newSecretDraft?.base_commit).toBe('')
-    // Both GitOps endpoints reject an empty base commit, so neither control is
-    // offered rather than being offered and then refused with a 400. The
-    // namespace is mapped, so the alert must be the missing-head one, not the
-    // no-delivery-policy one — both carry the same "Delivery unavailable" title.
+    // An empty base commit is refused by both GitOps endpoints, so neither control is
+    // offered. The namespace is mapped, so this must be the missing-head alert rather
+    // than the no-policy one — both carry the same title.
     expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
     expect(wrapper.text()).toContain('Delivery unavailable')
     expect(wrapper.text()).toContain('did not report a base commit')
@@ -215,10 +208,8 @@ describe('the create page', () => {
   })
 })
 
-// The box starts from a Secret manifest with the frame already written, so the
-// operator supplies values rather than the document. These checks pin the three
-// things that makes possible to get wrong: a name written in two places, a
-// template that submits itself, and a template that eats a pasted manifest.
+// The template pins three things that are easy to get wrong: a name written in two
+// places, a template that submits itself, and a template that eats a pasted manifest.
 describe('the manifest template', () => {
   function textarea(wrapper: VueWrapper) {
     return wrapper.find('textarea').element as HTMLTextAreaElement
@@ -236,9 +227,8 @@ describe('the manifest template', () => {
 
     await wrapper.find('input[aria-label="New secret name"]').setValue('api-credentials')
 
-    // One authority for the name: the server refuses a manifest whose
-    // metadata.name disagrees with the request, so this line follows the field
-    // rather than being a second place to write it.
+    // One authority for the name: the server refuses a manifest whose metadata.name
+    // disagrees with the request, so this line follows the field.
     expect(textarea(wrapper).value).toContain('name: api-credentials')
     expect(textarea(wrapper).value.match(/name:/g)).toHaveLength(1)
   })
@@ -252,8 +242,7 @@ describe('the manifest template', () => {
     await wrapper.find('input[aria-label="New secret name"]').setValue('brand-new')
     const encrypt = findButton(wrapper, 'Encrypt for review')!
 
-    // A template that seals one empty value is one keystroke from being
-    // delivered, so the control stays withheld and the page says why.
+    // A template that seals one empty value is one keystroke from being delivered.
     expect(encrypt.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('Fill in the template')
 
@@ -281,8 +270,8 @@ describe('the manifest template', () => {
     const pasted = 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: live\nstringData:\n  password: pasted-marker'
     await wrapper.find('textarea').setValue(pasted)
 
-    // Back to writing a new one: a manifest already in the box is not the
-    // component's to overwrite, even though the source changed underneath it.
+    // A manifest already in the box is not the component's to overwrite, even though
+    // the source changed underneath it.
     const create = wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'create')
     await create!.setValue()
 

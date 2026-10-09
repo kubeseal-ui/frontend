@@ -1,25 +1,9 @@
-/**
- * The displacement map behind the Liquid Glass lens.
- *
- * `feDisplacementMap` shifts each pixel of the backdrop by
- * `scale * (channel - 0.5)`, reading the amount of shift out of a map image:
- * red drives x, green drives y, and either channel at 128 means "do not move".
- * The whole difference between a lens and a smear is *where* the map is not
- * neutral — a uniform map displaces every pixel equally and reads as a blur,
- * while a map that is neutral in the middle and pushed outward in a band near
- * the edge bends the backdrop only where a real lens would.
- *
- * So this is a bevelled rounded rectangle drawn as four gradient bands over a
- * neutral field: left and right drive red, top and bottom drive green, each
- * ramping from neutral at the inner edge of the band to fully displaced at the
- * rim. The filter that consumes it blurs the result before displacing, which
- * turns those hard band boundaries into the smooth ramp a bevel needs.
- *
- * It is an SVG data URI rather than a PNG so the profile is reviewable as
- * source instead of as an opaque binary, and so there is no asset to ship or
- * build step to add. `preserveAspectRatio` is left to the filter, which
- * stretches the map to whatever shape it is applied to.
- */
+// The displacement map behind the Liquid Glass lens. `feDisplacementMap` shifts each pixel
+// by `scale * (channel - 0.5)` — red drives x, green drives y, 128 means "do not move" —
+// so the map is a bevelled rounded rectangle: four gradient bands over a neutral field,
+// ramping to fully displaced at the rim. A uniform map would displace every pixel equally
+// and read as a blur. An SVG data URI rather than a PNG, so the profile is reviewable as
+// source.
 const MAP = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
   <defs>
     <linearGradient id="lens-left" x1="0" y1="0" x2="1" y2="0">

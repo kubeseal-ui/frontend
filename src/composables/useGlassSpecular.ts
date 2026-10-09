@@ -3,10 +3,7 @@ import { onScopeDispose } from 'vue'
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 const REDUCED_TRANSPARENCY = '(prefers-reduced-transparency: reduce)'
 
-/**
- * Reads through globalThis rather than window so the lookup is the same one a
- * test can replace, and so a non-browser caller gets null instead of throwing.
- */
+// globalThis, not window, so a test can replace the lookup.
 function mediaQuery(query: string): MediaQueryList | null {
   const match = globalThis.matchMedia
   if (typeof match !== 'function') return null
@@ -17,21 +14,10 @@ function mediaQuery(query: string): MediaQueryList | null {
   }
 }
 
-/**
- * Moves the specular highlight of each glass surface to the pointer.
- *
- * It writes `--glass-x` / `--glass-y` onto the surface the pointer is over, not
- * onto the document, because the highlight is a position *within* a surface:
- * one shared page coordinate would park every card's highlight in the same
- * relative spot no matter where the pointer crossed it. Only the element under
- * the pointer is written, and only once per frame.
- *
- * The highlight is decoration on top of decoration, so it stands down entirely
- * when the user has asked for less motion or less transparency — in the latter
- * case the material is not being drawn at all, and a highlight that still
- * tracked the pointer would advertise glass that is not there. No-ops where
- * there is no document, which is what keeps it harmless under test.
- */
+// The highlight is a position *within* a surface, so `--glass-x`/`--glass-y` are written
+// on the element under the pointer, never on the document. It stands down under reduced
+// motion or transparency: with the material undrawn, a tracking highlight would advertise
+// glass that is not there.
 export function useGlassSpecular(): void {
   if (typeof document === 'undefined' || !document.documentElement) return
 
@@ -44,9 +30,8 @@ export function useGlassSpecular(): void {
   let x = 50
   let y = 0
 
-  // A frame's worth of coalescing where the environment can schedule one, and
-  // an immediate write where it cannot — the write is one style property on one
-  // element, so doing it synchronously is cheap rather than a correctness risk.
+  // Coalesce per frame where the environment can schedule one; elsewhere write
+  // immediately, which is one style property on one element.
   const canSchedule = typeof globalThis.requestAnimationFrame === 'function'
 
   function paint() {
@@ -73,8 +58,6 @@ export function useGlassSpecular(): void {
     if (!surface) return
 
     const rect = surface.getBoundingClientRect()
-    // A surface with no box (not laid out, or a test environment with no
-    // renderer) has no meaningful position to report.
     if (rect.width === 0 || rect.height === 0) return
 
     target = surface

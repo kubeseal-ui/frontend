@@ -1,11 +1,5 @@
 <script setup lang="ts">
-/**
- * The page heading every route shares.
- *
- * Four views had grown their own copy of the same eyebrow / title / subtitle
- * stack, which is why they had drifted apart. The title id is a prop because
- * each view points its landmark's `aria-labelledby` at it.
- */
+// `titleId` is a prop because each view points its landmark's `aria-labelledby` at it.
 withDefaults(defineProps<{ title: string; eyebrow?: string; subtitle?: string; titleId?: string }>(), {
   eyebrow: '',
   subtitle: '',

@@ -1,16 +1,6 @@
 <script setup lang="ts">
-/**
- * A select.
- *
- * Native on purpose. The only list in the app is a handful of Git paths from a
- * namespace policy, and a native `<select>` gives keyboard type-ahead,
- * platform-consistent pickers, and correct screen-reader announcement without
- * any of it being reimplemented.
- *
- * The wrapping `<label>` is what names the control; `hideLabel` exists for the
- * cases where the heading above already says it, and the label is then kept
- * visually hidden rather than dropped.
- */
+// Native on purpose: the only list in the app is a handful of Git paths, and a native
+// `<select>` gives keyboard type-ahead, platform pickers, and correct announcement free.
 withDefaults(
   defineProps<{
     modelValue: string

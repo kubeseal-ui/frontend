@@ -2,18 +2,8 @@
 import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 
-/**
- * A password field with a reveal control.
- *
- * The value is masked by default and the control is a real `type="password"`
- * input, so the plaintext is never in the DOM as text and is not offered back
- * by autofill. Revealing swaps the input's type in place rather than copying
- * the value somewhere visible — nothing is duplicated, so nothing has to be
- * cleaned up afterwards.
- *
- * The toggle is a button with its own accessible name: it is icon-only, so
- * without one it would be an unnamed control in the accessibility sweep.
- */
+// Masking is a real `type="password"` input and revealing swaps the type in place, so the
+// plaintext is never rendered as text or offered to autofill.
 withDefaults(
   defineProps<{
     modelValue: string
@@ -21,7 +11,7 @@ withDefaults(
     placeholder?: string
     readonly?: boolean
   }>(),
-  { placeholder: '', readonly: false },
+  { modelValue: '', placeholder: '', readonly: false },
 )
 
 defineEmits<{ 'update:modelValue': [value: string] }>()

@@ -3,18 +3,8 @@ import { computed } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { type IconName } from './icons'
 
-/**
- * A status message.
- *
- * The role follows the tone rather than being fixed: an error or a warning
- * interrupts, so it is `role="alert"`; an informational or success note does
- * not, so it is `role="status"`. Both are announced; only the first is
- * assertive, which matters because these panels appear next to a form the user
- * is mid-way through.
- *
- * The close control carries an explicit name — it is icon-only, so without one
- * it would be an unnamed button in the accessibility sweep.
- */
+// The role follows the tone: an error or warning interrupts (`role="alert"`), an
+// informational or success note does not (`role="status"`).
 const props = withDefaults(
   defineProps<{
     type?: 'info' | 'success' | 'warning' | 'error'

@@ -1,14 +1,8 @@
 <script setup lang="ts">
 import AppIcon from './AppIcon.vue'
 
-/**
- * A ciphertext block.
- *
- * The heading is not decorative: several of these stack inside the delivery
- * panel, and without a label a reader cannot tell the before from the after.
- * The block scrolls rather than wraps, because a wrapped manifest line reads as
- * a different manifest line.
- */
+// The label is not decorative: several of these stack in the delivery panel, and without
+// one a reader cannot tell before from after.
 defineProps<{ code: string; label?: string }>()
 </script>
 

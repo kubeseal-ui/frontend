@@ -1,6 +1,5 @@
-// Browser-level component checks for the Phase 3 secret editor.
-// Covers keyboard reachability, accessible names, masked-by-default values,
-// capability-gated controls, the dry-run gate, and the shared review/delivery state.
+// Keyboard reachability, accessible names, masked-by-default values, capability gating,
+// the dry-run gate, and the shared review/delivery state.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
@@ -133,14 +132,12 @@ describe('secret key editor accessibility', () => {
     await findButton(wrapper, 'Change')!.trigger('click')
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
 
-    // A deletion of the other key, also without a reveal. The radios are found
-    // by the group name, which is unique per row — so this addresses the
-    // username row rather than whichever delete radio happens to come first.
+    // A deletion staged without a reveal; the radios are addressed by the per-row
+    // group name.
     await findButton(wrapper, 'Change')!.trigger('click')
     await wrapper.find('input[name="operation-username"][value="delete"]').setValue()
 
-    // A brand new key: the capability the editor did not have at all before,
-    // because the add controls only ever rendered inside a revealed row.
+    // A brand new key.
     await findButton(wrapper, 'Add key')!.trigger('click')
     await wrapper.find('input[aria-label="New key name 1"]').setValue('api_key')
     await wrapper.find('input[aria-label="New key value 1"]').setValue('brand-new')
@@ -164,15 +161,14 @@ describe('secret key editor accessibility', () => {
     const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
     const wrapper = mountEditor(makeDetail())
 
-    // Staged but valueless: the server would refuse it, so the review control
-    // is closed and the reason is stated rather than left to a 400.
+    // Staged but valueless: the server would refuse it, so the control is closed
+    // and the reason stated rather than left to a 400.
     await findButton(wrapper, 'Change')!.trigger('click')
     await flushPromises()
     expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('Every key being changed needs a value.')
 
-    // A new key that collides with one already in the Secret is refused in the
-    // same place, because the API refuses an add over an existing key.
+    // A new key colliding with an existing one is refused in the same place.
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
     await findButton(wrapper, 'Add key')!.trigger('click')
     await wrapper.find('input[aria-label="New key name 1"]').setValue('username')
@@ -221,10 +217,8 @@ describe('delivery panel policy controls', () => {
     store.currentDiff = reviewedDiff()
     store.pendingMutation = { namespace: 'payments', name: 'api', mutations: [{ key: 'password', operation: 'replace', value: 'rotated' }] }
     vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
-      // The real action advances the workflow: the pending mutation is cleared
-      // and the reviewed ciphertext stays in currentDiff for the dry run. The
-      // detail stays too, as the real action leaves it — a mock that nulled it
-      // would be modelling the blanked page this workflow was fixed for.
+      // Mirrors the real action: the pending mutation clears, the reviewed ciphertext
+      // and the detail stay.
       store.pendingMutation = null
       return { yaml: 'encrypted-after', checksum: 'sum', diff_before: 'encrypted-before', diff_after: 'encrypted-after' }
     })
@@ -232,10 +226,10 @@ describe('delivery panel policy controls', () => {
       store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
       return store.dryRunResult
     })
-    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: 'deadbeef', proposal_url: 'https://git.example/pr/7', argocd_sync_verified: false })
+    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: '9c1f4a7b2e3d5a6f8091b2c3d4e5f6a7b8c9d0e1', proposal_url: 'https://git.example/pr/7', argocd_sync_verified: false })
     const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
 
-    // Stage 'apply': the dry-run gate warns and the apply control is the only primary action.
+    // Stage 'apply': the dry-run gate warns and apply is the only primary action.
     expect(wrapper.text()).toContain('Run dry run before delivery')
     expect(findButton(wrapper, 'Apply reviewed patch')).toBeTruthy()
     expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
@@ -244,7 +238,7 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Apply reviewed patch')!.trigger('click')
     await flushPromises()
 
-    // Stage 'dry-run': the patch is applied, and the dry-run control replaces the apply control.
+    // Stage 'dry-run': the dry-run control replaces the apply control.
     expect(wrapper.text()).toContain('Reviewed patch applied.')
     expect(wrapper.text()).toContain('Nothing is written to Git yet')
     expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
@@ -254,11 +248,10 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Run dry run')!.trigger('click')
     await flushPromises()
 
-    // Stage 'deliver': the dry-run result is shown, the deliver control is gated on it.
+    // Stage 'deliver': delivery is gated on the dry-run result.
     expect(wrapper.text()).toContain('Dry run complete.')
     expect(wrapper.text()).toContain('wrote nothing')
-    // The path line names the base commit the change was checked against in the
-    // form Git prints it, rather than the full hash the server sent.
+    // The base commit is shown as Git prints it, not as the server sent it.
     expect(wrapper.text()).toContain('Path: clusters/prod/payments/api.yaml')
     expect(wrapper.text()).toContain('base commit abc123')
     expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
@@ -268,26 +261,22 @@ describe('delivery panel policy controls', () => {
     await flushPromises()
 
     expect(deliver).toHaveBeenCalledTimes(1)
-    // The panel names the file it reviewed. This diff carries no target_path, so
-    // the name comes from the detail's discovered file_path — the file the
-    // server found the manifest in, which is where the delivery must land.
+    // The diff carries no target_path, so the file name comes from the detail's
+    // discovered file_path.
     expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(wrapper.text()).toContain('https://git.example/pr/7')
     expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
 
-    // The outcome says what was written, and the proposal URL is the link to
-    // what was opened rather than inert text.
+    // The outcome names what was written; the commit is the seven characters Git
+    // prints rather than the whole hash.
     expect(wrapper.text()).toContain('Proposal opened')
-    expect(wrapper.text()).toContain('Pushed deadbeef at clusters/prod/payments/api.yaml and opened a merge proposal.')
+    expect(wrapper.text()).toContain('Pushed 9c1f4a7 at clusters/prod/payments/api.yaml and opened a merge proposal.')
     const proposal = wrapper.find('a[href="https://git.example/pr/7"]')
     expect(proposal.exists()).toBe(true)
     expect(proposal.attributes('rel')).toBe('noopener noreferrer')
 
-    // The delivery consumed the review it was made from. The detail keeps a base
-    // commit, so without a delivered state the panel would offer the same
-    // controls again against the ciphertext it has just pushed — a second
-    // delivery the server would refuse as a base-commit conflict — and would
-    // report the change as still awaiting delivery.
+    // The delivery consumed the review: without the delivered state the panel would
+    // offer the same push again against ciphertext it has already sent.
     expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
     expect(wrapper.text()).not.toContain('Delivery unavailable')
   })
@@ -302,7 +291,7 @@ describe('delivery panel policy controls', () => {
     })
     const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
 
-    // No pending mutation: the apply step is skipped, the dry-run control leads.
+    // No pending mutation: the apply step is skipped.
     expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
     expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
 
@@ -330,10 +319,8 @@ describe('delivery panel policy controls', () => {
     await flushPromises()
 
     expect(deliver).toHaveBeenCalledTimes(1)
-    // A direct push has no proposal URL, so this is the case that used to end at
-    // `proposal_url || commit_sha` — a bare forty-character hash with nothing
-    // saying what it was. Every field the server sent is now reported, and the
-    // commit is shortened to the seven characters Git prints.
+    // A direct push has no proposal URL, so every field the server sent is reported
+    // rather than a bare hash.
     expect(wrapper.text()).toContain('Delivered directly')
     expect(wrapper.text()).toContain('Committed 2a0a5dd to main at kube/immich/tet-cred.yml.')
     expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
@@ -375,10 +362,8 @@ describe('new secret draft review', () => {
     await flushPromises()
 
     expect(store.newSecretDraft).toMatchObject({ namespace: 'payments', name: 'new-cred', yaml: 'encrypted-new-secret', base_commit: 'abc123' })
-    // Reset to the template, not to nothing: the template holds no values, so
-    // no part of the submitted manifest survives, and the next Secret starts
-    // from the document's shape rather than from a blank page. The name is kept
-    // because the field is, and the template's name line follows it.
+    // Reset to the template, not to nothing: it holds no values, so no part of the
+    // submitted manifest survives while the document's shape does.
     const reset = (form.find('textarea').element as HTMLTextAreaElement).value
     expect(reset).toContain('kind: Secret')
     expect(reset).toContain('name: new-cred')
@@ -394,8 +379,7 @@ describe('new secret draft review', () => {
     const panel = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
     expect(panel.html()).toContain('encrypted-new-secret')
 
-    // New-secret drafts skip the apply step: there is no keyed patch, so the
-    // dry-run runs straight off the encrypted draft ciphertext.
+    // New-secret drafts skip the apply step: there is no keyed patch.
     expect(findButton(panel, 'Apply reviewed patch')).toBeFalsy()
     expect(findButton(panel, 'Run dry run')).toBeTruthy()
 

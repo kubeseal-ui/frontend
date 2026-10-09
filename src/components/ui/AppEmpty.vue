@@ -2,11 +2,6 @@
 import AppIcon from './AppIcon.vue'
 import { type IconName } from './icons'
 
-/**
- * An empty result. The description is prose rather than a terse label, because
- * every place this appears is explaining why there is nothing to show — which
- * is the whole job of the element.
- */
 withDefaults(defineProps<{ description: string; icon?: IconName }>(), { icon: 'namespace' })
 </script>
 

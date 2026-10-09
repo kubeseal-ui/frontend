@@ -33,21 +33,15 @@ describe('phase 3 secret workflow', () => {
     await store.applyReviewedMutation()
     // The keys travel in the body: a batch has no single key to name in a path.
     expect(patch).toHaveBeenCalledWith('/api/v1/secrets/payments/api/values', { mutations, base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
-    // Applying writes nothing, so the detail the page renders from is still
-    // valid — and clearing it would take the delivery panel off the page with
-    // it, leaving the operator unable to dry-run or deliver what they confirmed.
-    //
-    // Deep equality rather than identity: the store holds the detail reactively,
-    // so reading it back hands out a proxy of the object that was assigned. Null
-    // is the value this must not become, which is what the assertion is for.
+    // Applying writes nothing, so clearing the detail would take the delivery panel
+    // off the page with it, leaving the operator unable to dry-run or deliver. Deep
+    // equality because the store hands back a reactive proxy, not the object assigned.
     expect(store.currentDetail).not.toBeNull()
     expect(store.currentDetail).toEqual(detail)
     expect(store.pendingMutation).toBeNull()
   })
 
   it('carries the reviewed path from the diff, not the mapping template', async () => {
-    // The manifest lives in an application subdirectory, so the diff names the
-    // file the tree walk found rather than the path the mapping renders.
     vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'before', after: 'after', mutations: [{ key: 'password', operation: 'replace' }], base_commit: 'abc', checksum: 'sum', target_path: 'custom/apps/secrets/api.yaml' } } as never)
     const store = useSecretsStore()
     await store.computeDiff('payments', 'api', [{ key: 'password', operation: 'replace' as const, value: 'new' }], 'abc')
@@ -61,9 +55,8 @@ describe('phase 3 secret workflow', () => {
     const store = useSecretsStore()
     await store.computeDiff('payments', 'api', reviewed, 'abc')
 
-    // The caller keeps its own reference and mutates it afterwards. What was
-    // reviewed is what must be applied: a diff the operator approved for one
-    // value cannot be silently spent on another.
+    // The caller keeps its reference and mutates it after the review: a diff approved
+    // for one value must not be silently spent on another.
     reviewed[0].value = 'something-else'
     await store.applyReviewedMutation()
     expect(patch).toHaveBeenCalledWith('/api/v1/secrets/payments/api/values', { mutations: [{ key: 'password', operation: 'replace', value: 'reviewed-value' }], base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))

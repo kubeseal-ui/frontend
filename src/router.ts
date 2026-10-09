@@ -32,19 +32,8 @@ export const router = createRouter({
   ],
 })
 
-/**
- * The session gate.
- *
- * Only a 401 means the caller has no session: that is the status the auth
- * middleware answers an unauthenticated request with, and it is the one case
- * where sending the browser to the identity provider is the right answer.
- *
- * Any other failure — a server that is down, a gateway that timed out — would
- * be told to the operator as an ended session if it took the same branch, and
- * they would sign in again to find the same broken page. Letting the route
- * through instead is what puts the real failure in front of them: every view
- * loads its own data and reports that failure in its own error state.
- */
+// Only 401 means "no session"; anything else is let through so the view reports the
+// real failure instead of sending the operator to sign in again on a broken page.
 router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) return true
   const auth = useAuthStore(pinia)

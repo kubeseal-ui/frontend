@@ -19,25 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * The message to show for a failed operation, carrying the server's request id.
- *
- * Every error the API writes carries one — `errorBody` in
- * api/internal/handlers/errors.go puts it in the envelope, and the middleware
- * logs the same id against the same request — and it is the only handle tying
- * what the operator saw to the line in the server log that explains it. The
- * client has always parsed it into ApiError.requestId and then rendered none of
- * it, so a failure arrived with the one piece of evidence that would let
- * somebody look it up left behind.
- *
- * It is appended to the message rather than shown separately because every
- * surface already has a place for the message: five components render
- * `e.message` into an alert, and a helper they all call puts the id on all five
- * at once instead of only on whichever one somebody remembered.
- *
- * A thrown value that is not an Error carries no message, so the caller's
- * fallback is what the operator reads.
- */
+// The request id ties what the operator saw to the server log line that explains it.
 export function describeError(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback
   const message = error.message || fallback
@@ -82,7 +64,6 @@ class ApiClient {
     return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', ...headers } })
   }
 
-  // Git paths
   async getGitPaths(): Promise<GitPathsConfig> {
     const response = await this.get<GitPathsConfig>('/api/v1/gitops/paths')
     return response.data

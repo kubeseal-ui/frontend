@@ -15,19 +15,8 @@ import type { Capability, Namespace, NamespaceGitPaths } from '@/types'
 const secrets = useSecretsStore()
 const auth = useAuthStore()
 
-/**
- * The capabilities worth naming on a card, in the order a reader scanning the
- * grid cares about them.
- *
- * `metadata:read` is deliberately absent. It is the grant that puts a namespace
- * on this page at all, so naming it would print the same chip on every card —
- * which is the mistake the row being replaced already made.
- *
- * These are read through the auth store rather than taken from the namespace
- * payload, and that is the point: `hasCapability` is the call every button in
- * the app is gated on, so a card cannot advertise something the page it links
- * to would then refuse.
- */
+// `metadata:read` is deliberately absent: it is the grant that puts a namespace on this
+// page at all, so it would print the same chip on every card.
 const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
   { capability: 'secret:seal', label: 'Seal' },
   { capability: 'secret:decrypt', label: 'Reveal' },
@@ -36,24 +25,13 @@ const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
   { capability: 'access:manage', label: 'Admin' },
 ]
 
-/**
- * The Git summary for one card — what is known about where this namespace's
- * manifests live, taken from whichever source actually knows it.
- *
- * The path count can only come from the Git path listing, and that listing can
- * be absent for two different reasons: the namespace has no mapping, or the
- * request failed. Those are not the same fact, so "no mapping" is only claimed
- * once the listing has genuinely loaded; before that the card says the status
- * is unknown rather than inventing one. A namespace the payload itself marks as
- * managed needs no listing to say so, which is why that case is resolved first.
- */
+// "No mapping" is claimed only once the listing has loaded: an absent listing also means
+// the request failed, and those are not the same fact.
 function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): string {
   const mode = paths?.mode || namespace.delivery_mode || ''
   if (paths) {
-    // A wildcard mapping covers every namespace and derives its target path per
-    // namespace from a template the listing does not expose, so it has no path
-    // count and no default path to report. Naming it as the wildcard it is
-    // says the useful thing; "0 paths" would read as "nowhere to deliver".
+    // A wildcard covers every namespace through a template the listing does not expose,
+    // so it has no path count; "0 paths" would read as "nowhere to deliver".
     if (paths.namespace === '*') return `All namespaces${mode ? ` · ${mode}` : ''}`
     const count = paths.allowed_paths?.length ?? 0
     return `${count} ${count === 1 ? 'path' : 'paths'}${mode ? ` · ${mode}` : ''}`
@@ -62,14 +40,6 @@ function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): stri
   return secrets.gitPathsLoaded ? 'No Git mapping' : 'Git status unavailable'
 }
 
-/**
- * One row of card data per namespace.
- *
- * Assembled here rather than in the template because each card needs three
- * lookups — its capabilities, its entry in the Git path listing, and the
- * sentence built from both — and resolving them inline would do all of it once
- * per binding.
- */
 const cards = computed(() =>
   secrets.namespaces.map((namespace) => {
     const paths = secrets.namespaceGitPaths(namespace.name)
@@ -89,9 +59,8 @@ const cards = computed(() =>
 
 onMounted(async () => {
   await Promise.all([
-    // A listing failure is still reported through the store, which the error
-    // branch below renders. Catching it here only stops it leaving this hook as
-    // an unhandled rejection.
+    // Reported through the store, which the error branch renders; catching here only
+    // stops it leaving this hook as an unhandled rejection.
     secrets.namespaces.length === 0 ? secrets.fetchNamespaces().catch(() => {}) : Promise.resolve(),
     secrets.gitPaths ? Promise.resolve() : secrets.fetchGitPaths(),
   ])
@@ -122,20 +91,10 @@ onMounted(async () => {
       description="No authorized namespaces. Your account has authenticated, but no namespace grants it a capability yet — ask an administrator to map one."
     />
 
-    <!--
-      auto-fill rather than auto-fit: with auto-fit an empty grid track
-      collapses, so three namespaces render as three wide cards and ten
-      render as ten narrow ones. auto-fill keeps every card the same size
-      whatever the count, which is what makes a grid of them scannable.
-    -->
+    <!-- auto-fill, not auto-fit: auto-fit collapses empty tracks, so three cards
+         would render wide and ten narrow. -->
     <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
       <li v-for="card in cards" :key="card.namespace.name">
-        <!--
-          The link covers the whole card rather than wrapping only the text.
-          The card lifts as a whole under the pointer, so an inner-text-only
-          target makes the affordance a lie: the card responds and then does
-          nothing when clicked at its edge.
-        -->
         <AppCard class="group">
           <RouterLink
             :to="`/namespaces/${encodeURIComponent(card.namespace.name)}`"
@@ -150,11 +109,6 @@ onMounted(async () => {
               <span class="min-w-0 break-words">{{ card.namespace.name }}</span>
             </h2>
 
-            <!-- What this account can do here. Chips rather than a sentence
-                 because the set varies per namespace and a reader is scanning
-                 for one of them, not reading. A namespace with none of the five
-                 is not empty information — it is read-only, which is worth
-                 saying outright. -->
             <div class="flex flex-wrap gap-1">
               <span
                 v-for="grant in card.grants"
@@ -167,9 +121,6 @@ onMounted(async () => {
               >Read only</span>
             </div>
 
-            <!-- mt-auto pins the bottom block, so a card whose name wraps to
-                 two lines or whose chips wrap to a second row does not push its
-                 own footer out of line with the cards beside it. -->
             <div class="mt-auto flex flex-col gap-1">
               <p v-if="card.repository" class="m-0 truncate font-mono text-xs text-muted" :title="card.repository">
                 {{ card.repository }}

@@ -1,6 +1,4 @@
-// Type barrel — no component re-exports. Components are imported from their
-// own files to keep each route's import graph small and avoid pulling the
-// editor tree into unrelated modules.
+// Type barrel — no component re-exports, so each route's import graph stays small.
 export type Capability =
   | 'metadata:read'
   | 'secret:seal'
@@ -13,9 +11,8 @@ export interface User {
   email: string
   name: string
   username: string
-  // Grants that apply in named namespaces only. The flat list below applies
-  // everywhere, and the two union: an effective grant in a namespace is
-  // capabilities ∪ namespaces[namespace]. The map is present but may be empty.
+  // Scoped grants, unioned with the flat list below: the effective grant in a
+  // namespace is capabilities ∪ namespaces[namespace]. Present, but may be empty.
   namespaces: Record<string, Capability[]>
   capabilities?: Capability[]
 }
@@ -56,7 +53,7 @@ export interface SealedSecretDetail extends SealedSecretSummary {
   sealed_secret_yaml?: string
 }
 
-/** Ciphertext-only draft for a brand new SealedSecret. The plaintext Secret never enters the store. */
+// Ciphertext only; the plaintext Secret never enters the store.
 export interface NewSecretDraft {
   namespace: string
   name: string
@@ -93,22 +90,16 @@ export interface NamespaceGitPaths {
 /** The operations one entry of a reviewed batch can carry. */
 export type MutationOperation = 'replace' | 'add' | 'delete'
 
-/**
- * One entry change in a reviewed batch. A batch is one reviewed diff and one
- * commit, so several of these travel together rather than one per round trip.
- * `value` is empty for a delete.
- */
+// One entry change in a reviewed batch: one diff, one commit, so several travel
+// together. `value` is empty for a delete.
 export interface Mutation {
   key: string
   operation: MutationOperation
   value: string
 }
 
-/**
- * The keys and operations the API echoes back for a reviewed batch — never
- * their values. The caller already holds the values it submitted, and
- * plaintext has no place in a response body.
- */
+// What the API echoes back for a reviewed batch — never the values, which the caller
+// already holds and which have no place in a response body.
 export interface MutationSummary {
   key: string
   operation: MutationOperation

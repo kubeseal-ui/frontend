@@ -1,18 +1,11 @@
 // The edit flow's delivery path.
 //
-// The server resolves a SealedSecret's file through two-tier discovery: the
-// mapping's templated path first, then a walk of the repository tree. A Secret
-// kept in an application subdirectory is found by the walk, so the templated
-// path is *vacant* for it. Delivery that falls back to the template therefore
-// does not update the reviewed file — it creates a second one claiming the same
-// SealedSecret identity, and the application keeps reading the stale ciphertext
-// from the file that was never touched.
-//
-// The path is named on the wire, and the server resolves the destination from it
-// and its own discovery: a name that is not where this Secret already lives is
-// refused, so naming the reviewed file can neither write outside the namespace's
-// grant nor land the change in a second file beside the reviewed one. These
-// checks pin the client half: which path the panel sends.
+// Discovery is two-tier: the mapping's templated path first, then a walk of the
+// repository tree. A Secret kept in an application subdirectory is found by the walk, so
+// the templated path is *vacant* for it — delivering to the template would create a
+// second file claiming the same identity and leave the application reading stale
+// ciphertext. The server resolves the destination from the name on the wire and refuses
+// one that is not where the Secret already lives; these checks pin the client half.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
@@ -83,8 +76,8 @@ describe('the edit flow names the file it reviewed', () => {
     await deliverButton(wrapper)!.trigger('click')
     await flushPromises()
 
-    // The detail's file_path is the discovered file too — a client that has a
-    // detail and no diff path still must not send the template.
+    // The detail's file_path is the discovered file too: a client that has a detail
+    // and no diff path still must not send the template.
     expect(deliver).toHaveBeenCalledWith('payments', 'api', 'after', 'head-1', REVIEWED)
     expect(deliver).not.toHaveBeenCalledWith('payments', 'api', 'after', 'head-1', TEMPLATED)
   })
@@ -103,9 +96,8 @@ describe('the edit flow names the file it reviewed', () => {
     await button!.trigger('click')
     await flushPromises()
 
-    // The dry run previews the file the delivery will then write. Two different
-    // files here would make the review describe a change that is not the one
-    // delivered.
+    // The dry run must preview the file the delivery will write: two different files
+    // here would make the review describe a change that is not the one delivered.
     expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'after', 'head-1', REVIEWED)
   })
 })

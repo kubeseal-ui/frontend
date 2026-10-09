@@ -20,41 +20,19 @@ const secrets = useSecretsStore()
 const auth = useAuthStore()
 const loaded = ref(false)
 
-// Hiding the control is a usability affordance; the server refuses an
-// unauthorized seal independently.
+// A usability affordance only: the server refuses an unauthorized seal independently.
 const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
 
 function createSecret() {
   router.push(`/namespaces/${encodeURIComponent(props.namespace)}/new`)
 }
 
-/**
- * The drift vocabulary — the glyphs, the words, and the colours — lives in
- * utils/drift.ts, because the detail page names the same states in prose above
- * the editor and two copies of the table would let one page call a Secret
- * "Live only" while the next printed the raw enum the API sends.
- *
- * This page adds one thing to it: the colours are read from there as literals
- * so Tailwind sees them where they are written, and the rollup below borrows
- * the same treatment for its "Out of sync" chip.
- */
 function drift(status: string) {
   return driftPresentation(status)
 }
 
-/**
- * The drift rollup, and the filter built from it.
- *
- * Drift is legible one card at a time today, which means a namespace of forty
- * Secrets tells you nothing about itself: you cannot see that six are out of
- * sync without reading forty cards. The counts are derived from the listing the
- * grid already renders, so the summary costs no extra request.
- *
- * "Out of sync" is deliberately everything that is not in-sync rather than one
- * chip per state. Diverged, live-only and git-only all want the same thing from
- * the person reading this page — a look — and a chip per state would put a
- * filter row the width of the page in front of a grid that is mostly cards.
- */
+// "Out of sync" covers every non-in-sync state: they all want the same thing from the
+// reader, and a chip per state would put a full-width filter row before a grid of cards.
 type DriftFilter = 'all' | 'in-sync' | 'out-of-sync'
 
 interface DriftFilterChip {
@@ -73,21 +51,15 @@ const driftCounts = computed(() => {
   return { total, inSync, outOfSync: total - inSync }
 })
 
-/**
- * The chips take their labels, glyphs and colours from the shared drift
- * vocabulary, so a chip cannot drift away from the card it filters. The
- * out-of-sync chip borrows the diverged treatment even though its label is
- * broader: it is the chip that shows what needs attention, and inventing a
- * second colour for "something is wrong" would say less, not more.
- */
+// Labels, glyphs and colours come from the shared vocabulary, so a chip cannot drift
+// away from the card it filters.
 const filters = computed<DriftFilterChip[]>(() => [
   { value: 'all', label: 'All', icon: 'database', classes: drift('unknown').classes, count: driftCounts.value.total },
   { value: 'in-sync', label: drift('in-sync').label, icon: drift('in-sync').icon, classes: drift('in-sync').classes, count: driftCounts.value.inSync },
   { value: 'out-of-sync', label: 'Out of sync', icon: drift('diverged').icon, classes: drift('diverged').classes, count: driftCounts.value.outOfSync },
 ])
 
-// One predicate for both sides of the filter, so a Secret cannot appear under
-// neither chip or under both.
+// One predicate for both sides, so a Secret cannot fall under neither chip nor both.
 const visibleSecrets = computed(() => {
   if (filter.value === 'all') return secrets.secrets
   const wantSync = filter.value === 'in-sync'
@@ -144,11 +116,8 @@ onMounted(load)
     />
 
     <template v-else>
-      <!-- The summary doubles as the filter. They are real buttons carrying
-           aria-pressed, so the pressed state is announced and the summary is
-           reachable by keyboard rather than being a read-only decoration that
-           looks interactive. Selection is not colour alone either: the chosen
-           chip is fully opaque and ringed, the others are dimmed. -->
+      <!-- Real buttons with aria-pressed, so the state is announced and keyboard-
+           reachable, and selection is not colour alone. -->
       <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by drift">
         <button
           v-for="chip in filters"
@@ -173,8 +142,6 @@ onMounted(load)
 
       <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4" aria-label="SealedSecrets">
         <li v-for="secret in visibleSecrets" :key="secret.name">
-          <!-- The link covers the card, not just its text: the card's hover
-               affordance applies to the whole surface. -->
           <AppCard class="group">
             <RouterLink
               :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
@@ -188,8 +155,6 @@ onMounted(load)
                 <AppIcon name="key" :size="16" class="mt-1 text-accent" />
                 <span class="min-w-0 break-words">{{ secret.name }}</span>
               </h2>
-              <!-- mt-auto keeps the status row on one baseline across the row
-                   even when a neighbouring name wraps to two lines. -->
               <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
                 <span class="text-sm text-muted">{{ countLabel(secret.key_count, 'key') }} · {{ secret.scope || 'strict' }} scope</span>
                 <span

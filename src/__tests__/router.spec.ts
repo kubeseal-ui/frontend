@@ -1,6 +1,3 @@
-// Smoke test for the kubeseal-ui frontend router.
-//
-// MVP only exposes a single "home" route. Phase 3 adds the secret detail route.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia } from 'pinia'
 import { useAuthStore } from '../stores/auth'
@@ -24,8 +21,7 @@ describe('router', () => {
     expect(secretDetail?.path).toBe('/secrets/:namespace/:name')
   })
 
-  // Creating a Secret is an action on the namespace, not on an existing Secret,
-  // so it needs its own address rather than living under /secrets/.
+  // Creating acts on the namespace, not an existing Secret, so it is not under /secrets/.
   it('exposes the new-secret route at /namespaces/:namespace/new', () => {
     const newSecret = router.getRoutes().find((r) => r.name === 'new-secret')
     expect(newSecret).toBeDefined()

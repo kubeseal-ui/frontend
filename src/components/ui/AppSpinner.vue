@@ -1,14 +1,7 @@
 <script setup lang="ts">
-/**
- * The busy indicator, in two forms.
- *
- * With a `label` it is a live region announcing the wait; without one it is
- * purely decorative and hidden from assistive technology.
- *
- * It renders no text in either form, and that is load-bearing: the component
- * specs find buttons by exact text (`button.text() === 'Encrypt for review'`),
- * so a spinner that contributed a word would break every one of them.
- */
+// With a `label` it is a live region announcing the wait; without one it is decorative.
+// It renders no text in either form: the specs find buttons by exact text, so a spinner
+// contributing a word would break every one of them.
 withDefaults(defineProps<{ label?: string; size?: number }>(), { size: 14 })
 </script>
 

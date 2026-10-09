@@ -11,28 +11,16 @@ import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { Mutation, MutationOperation, SealedSecretDetail } from '@/types'
 
-/**
- * Edits a SealedSecret's entries as one reviewed batch.
- *
- * Every change the operator stages — a replacement, a deletion, a whole new
- * key — lands in a single diff and a single commit, rather than one round trip
- * per key. The batch models the finished Secret, so it is submitted whole and
- * the server validates it against the state as it stood before the batch.
- *
- * Revealing stays what it was: one key at a time, on demand, and only where the
- * namespace grants decrypt. Nothing here holds a value the operator did not ask
- * to see, and a delete needs no reveal at all — disclosing a value in order to
- * remove it was the old flow's most pointless disclosure.
- */
+// Every staged change — replacement, deletion, new key — lands in one diff and one
+// commit. Revealing stays one key at a time, and a delete needs no reveal.
 const props = defineProps<{ detail: SealedSecretDetail }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
 const revealed = reactive<Record<string, string>>({})
 const replacements = reactive<Record<string, string>>({})
 const operation = reactive<Record<string, MutationOperation>>({})
-/** Keys whose edit controls are open: revealed, or opened to change without revealing. */
+/** Open edit controls: revealed, or opened to change without revealing. */
 const editing = reactive<Record<string, boolean>>({})
-/** Keys that do not exist yet, being added in this batch. */
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const reviewing = ref(false)
@@ -41,11 +29,7 @@ const error = ref('')
 const canReveal = computed(() => auth.hasCapability(props.detail.namespace, 'secret:decrypt'))
 const canPatch = computed(() => auth.hasCapability(props.detail.namespace, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
 
-/**
- * A key that already exists can be replaced or deleted, never added — an add
- * over a key that is present is refused by the API. Offering the option here
- * would be offering a control whose only outcome is a rejection.
- */
+// An add over a key that is present is refused by the API, so it is not offered.
 const EXISTING_OPERATIONS = [
   { label: 'Replace', value: 'replace' },
   { label: 'Delete', value: 'delete' },
@@ -53,9 +37,6 @@ const EXISTING_OPERATIONS = [
 
 let nextRowId = 0
 
-// The radio group is a string-valued control, but the record it feeds is the
-// closed set the store accepts. Narrowing here keeps the assignment honest
-// instead of widening `operation` and losing the union everywhere downstream.
 function setOperation(key: string, value: string) {
   operation[key] = value as MutationOperation
 }
@@ -69,7 +50,6 @@ async function reveal(key: string) {
   error.value = ''; activeKey.value = key
   try {
     revealed[key] = (await store.reveal(props.detail.namespace, props.detail.name, key, props.detail.git.base_commit)).value
-    // A revealed key is being changed; the edit controls come with it.
     editing[key] = true
     operation[key] = operation[key] || 'replace'
   }
@@ -77,7 +57,6 @@ async function reveal(key: string) {
   finally { activeKey.value = '' }
 }
 
-/** Opens the edit controls for a key without disclosing its value. */
 function startEdit(key: string) {
   editing[key] = true
   operation[key] = operation[key] || 'replace'
@@ -87,7 +66,6 @@ function addRow() {
   added.value.push({ id: nextRowId++, key: '', value: '' })
 }
 
-/** The batch as it stands: what Review submits and what the server will judge. */
 const batch = computed<Mutation[]>(() => {
   const out: Mutation[] = []
   for (const key of props.detail.keys || []) {
@@ -101,21 +79,12 @@ const batch = computed<Mutation[]>(() => {
   return out
 })
 
-/**
- * Why the batch could not be submitted, or '' when it could.
- *
- * The server refuses all of these, so catching them here is not a second set of
- * rules — it is not spending a round trip, and not leaving a decrypt's worth of
- * audit trail, on a request that was already known to fail.
- */
+// The server refuses all of these too, so this is not a second set of rules — it avoids
+// a round trip, and a decrypt's worth of audit trail, on a request already known to fail.
 const batchProblem = computed(() => {
   if (batch.value.length === 0) return ''
   if (batch.value.some((entry) => entry.key === '')) return 'Every key being added needs a name.'
   if (batch.value.some((entry) => entry.operation !== 'delete' && entry.value === '')) return 'Every key being changed needs a value.'
-  // A staged existing key appears once by construction — the edit set is keyed
-  // by name. The collisions left to catch are among the new keys: the server
-  // refuses an add over a key the Secret already has, and two new rows cannot
-  // share a name with each other either.
   const taken = new Set(props.detail.keys || [])
   const collisions = new Set<string>()
   for (const row of added.value) {
@@ -163,9 +132,6 @@ onBeforeUnmount(() => clear())
     <AppAlert v-if="error" type="error" title="Operation failed" closable class="mb-3" @close="error = ''">{{ error }}</AppAlert>
     <AppAlert v-if="message" type="success" closable class="mb-3" @close="message = ''">{{ message }}</AppAlert>
 
-    <!-- border-t rather than a divider element: the first row is the one that
-         must not draw one, which reads as a rule between rows and no rule
-         above the list. -->
     <div
       v-for="key in detail.keys || []"
       :key="key"
@@ -180,8 +146,6 @@ onBeforeUnmount(() => clear())
         <AppButton v-if="canReveal && !hasRevealed(key)" :disabled="!!activeKey" @click="reveal(key)">
           Reveal one key
         </AppButton>
-        <!-- Changing or deleting a key needs no reveal, so the control that
-             starts an edit is separate from the one that discloses a value. -->
         <AppButton v-if="canReveal && !editing[key]" :aria-label="`Change ${key}`" @click="startEdit(key)">
           Change
         </AppButton>
@@ -217,8 +181,7 @@ onBeforeUnmount(() => clear())
       class="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3"
     >
       <div class="flex flex-wrap items-center gap-2">
-        <!-- The same flex wrapper the field primitives use: `field` is `w-full`,
-             so it needs a sized flex parent rather than the row itself. -->
+        <!-- `field` is `w-full`, so it needs a sized flex parent, not the row itself. -->
         <span class="flex min-w-[11rem] flex-1 items-center">
           <input v-model="row.key" :aria-label="`New key name ${index + 1}`" placeholder="Key name" class="field font-mono" />
         </span>
@@ -232,8 +195,6 @@ onBeforeUnmount(() => clear())
 
     <div v-if="canReveal" class="mt-4 flex flex-wrap items-center gap-2">
       <AppButton v-if="canPatch" @click="addRow">Add key</AppButton>
-      <!-- One control for the whole batch: everything staged is submitted
-           together, reviewed once, and committed once. -->
       <AppButton
         v-if="batch.length > 0"
         variant="primary"

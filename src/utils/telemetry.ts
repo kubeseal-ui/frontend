@@ -1,15 +1,12 @@
-// Web vitals reporting: CLS, INP, FCP, LCP, and TTFB flow to the API's
-// telemetry endpoint so operators can correlate browser experience with
-// server-side traces. The module is opt-in via VITE_TELEMETRY_ENDPOINT:
-// unset (the default) keeps every call a no-op, so local dev and tests
-// never make network requests. Values never carry identifiers; the
-// attribution data web-vitals reports is bounded and sanitized here.
+// Web vitals go to the API's telemetry endpoint so operators can correlate browser
+// experience with server-side traces. Opt-in via VITE_TELEMETRY_ENDPOINT: unset (the
+// default) makes every call a no-op, so local dev and tests make no network requests.
+// Nothing here carries an identifier.
 import { onCLS, onINP, onFCP, onLCP, onTTFB, type Metric } from 'web-vitals'
 
 const endpoint: string = import.meta.env.VITE_TELEMETRY_ENDPOINT ?? ''
 
-// vitalsBuffer batches metrics so a burst of navigation metrics lands in
-// one request instead of five.
+// Batched: a burst of navigation metrics lands in one request instead of five.
 const vitalsBuffer: Metric[] = []
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -29,13 +26,11 @@ function flushBuffer(): void {
       name: metric.name,
       value: Math.round(metric.value * 1000) / 1000,
       rating: metric.rating,
-      // attribution can carry element selectors; only the stable parts
-      // are forwarded.
+      // attribution carries element selectors; only the stable part is forwarded.
       navigation_type: metric.navigationType ?? '',
     })),
-    // The page path is bounded (a route, not a URL with a query).
+    // Bounded: a route, not a URL with a query.
     path: location.pathname,
-    // time_zone is the browser's IANA zone; no identifiers.
     timestamp: new Date().toISOString(),
   })
   // keepalive so the batch survives a page unload mid-navigation.
@@ -49,9 +44,7 @@ function flushBuffer(): void {
   })
 }
 
-// reportWebVitals registers the web-vitals callbacks. It is safe to call
-// once at boot; calling it again would double-register, so main.ts calls
-// it exactly once.
+// Registers the web-vitals callbacks once at boot; calling it again would double-register.
 export function reportWebVitals(): void {
   if (!endpoint) return
   onCLS(bufferedSend)

@@ -1,14 +1,6 @@
 <script setup lang="ts">
-/**
- * A single-line text field.
- *
- * `aria-label` is required rather than optional: every input in this app is
- * labelled by an attribute rather than a wrapping element, because the labels
- * are rendered inside dense key rows where a visible `<label>` would not fit.
- *
- * `autocomplete` defaults to "off" so a value is never offered back by the
- * browser. Secret-bearing fields go through AppSecretInput, which does the same.
- */
+// `aria-label` is required: these sit inside dense key rows, so they are labelled by
+// attribute rather than by a wrapping element.
 withDefaults(
   defineProps<{
     modelValue: string

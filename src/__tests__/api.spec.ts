@@ -23,16 +23,10 @@ describe('API client', () => {
     expect(auth.isAuthenticated).toBe(false)
   })
 
-  // The server writes a request_id into every error envelope and logs the same
-  // id against the same request. It is the only handle tying what the operator
-  // saw to the line that explains it, so it travels with the message rather
-  // than being parsed and dropped.
   it('carries the server request id into the message the operator is shown', () => {
     const withID = new ApiError(500, { error: { code: 'INTERNAL', message: 'Something broke', request_id: 'req-9' } })
     expect(describeError(withID, 'fallback')).toBe('Something broke (request id req-9)')
 
-    // A failure with no id, and a thrown value that is not an Error at all,
-    // both still produce something readable.
     expect(describeError(new ApiError(500, { error: { message: 'Something broke' } }), 'fallback')).toBe('Something broke')
     expect(describeError('not an error', 'fallback')).toBe('fallback')
   })

@@ -1,10 +1,8 @@
-// Guards for the visual layer's non-negotiable invariants (ADR-004).
-//
-// These assert that the rules exist, not that a browser honoured them. Whether
-// an engine actually applies a fallback is a manual check; what a test can
-// catch is a fallback being deleted, a palette losing a token, the two copies
-// of the dark palette drifting apart, or the two halves of the lens — the CSS
-// that references the filter and the SVG that defines it — losing each other.
+// Guards for the visual layer's invariants (ADR-004). These assert the rules exist, not
+// that a browser honoured them; what a test can catch is a fallback deleted, a palette
+// losing a token, the two copies of the dark palette drifting, or the two halves of the
+// lens — the CSS that references the filter and the SVG that defines it — losing each
+// other.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -46,16 +44,11 @@ describe('the material degrades in three tiers', () => {
   it('tier 1 defines the default material with an edge highlight and a blur', () => {
     const block = css.match(/@utility glass \{([^}]*)\}/)?.[1] ?? ''
     expect(block).not.toBe('')
-    // The blur comes from a Tailwind utility, so the material speaks the same
-    // vocabulary as the templates that use it.
     expect(block).toContain('backdrop-blur')
-    // The fill, rim, and lift come from shared tokens rather than being spelled
-    // out here, so the derived material resolves against whatever palette is in
-    // force at use time: one definition, both themes, no second copy of a value.
+    // The fill, rim, and lift come from shared tokens so the material resolves against
+    // whichever palette is in force at use time.
     expect(block).toContain('var(--glass-fill)')
     expect(block).toContain('var(--glass-shadow)')
-    // The rim is what separates glass from a flat translucent fill: without a
-    // highlight the surface reads as frosted plastic.
     expect(block).toContain('var(--glass-edge)')
   })
 
@@ -70,19 +63,19 @@ describe('the material degrades in three tiers', () => {
     const marker = '@supports (backdrop-filter: url(#liquid-lens))'
     expect(css).toContain(marker)
     expect(regionAfter(marker)).toContain('url(#liquid-lens)')
-    // Safari rejects url() inside backdrop-filter, so this must stay gated:
-    // an ungated reference would take the blur down with it on that engine.
+    // Safari rejects url() inside backdrop-filter, so this must stay gated: an
+    // ungated reference would take the blur down with it on that engine.
     expect(css.indexOf(marker)).toBeGreaterThan(css.indexOf('@utility glass'))
   })
 
   it('tier 2 pairs the CSS with a filter definition that actually exists', () => {
-    // The support query and the filter live in different files; a rename on
-    // either side would silently disable the lens with nothing to catch it.
+    // The query and the filter live in different files; a rename on either side would
+    // silently disable the lens with nothing to catch it.
     expect(shell).toContain('id="liquid-lens"')
     expect(shell).toContain('feDisplacementMap')
     expect(shell).toContain('feImage')
-    // Edge-only displacement is the whole difference between a lens and a
-    // smear, so the neutral-centred map must be blurred before it is applied.
+    // Edge-only displacement is the difference between a lens and a smear, so the
+    // neutral-centred map must be blurred before it is applied.
     expect(shell).toContain('feGaussianBlur')
   })
 
@@ -112,8 +105,8 @@ describe('the material degrades in three tiers', () => {
   })
 
   it('suppresses the pointer highlight wherever the material is opaque', () => {
-    // A highlight that still responds to the pointer on a surface that has
-    // fallen back to flat would advertise glass that is not being drawn.
+    // A highlight that still tracked the pointer on a surface that fell back to flat
+    // would advertise glass that is not being drawn.
     for (const marker of OPAQUE_TRIGGERS) expect(regionAfter(marker)).toContain('.glass::before')
   })
 })
@@ -128,14 +121,13 @@ describe('palette parity', () => {
 
   it('keeps the two copies of the dark palette identical', () => {
     // The media form cannot express a stored preference, so the dark palette is
-    // declared twice. This is the assertion that stops the copies drifting.
+    // declared twice; this assertion is what stops the copies drifting.
     expect(darkOverride).toEqual(darkMedia)
   })
 
   it('keeps the light palette the first root block in the file', () => {
-    // theme-contrast.spec.ts slices the light tokens from the first `:root` to
-    // the first `}`, so anything declared before it is read as part of the
-    // palette — or silently excluded from it.
+    // theme-contrast.spec.ts slices the light tokens from the first `:root` to the
+    // first `}`, so anything declared before it is read as part of the palette.
     expect(css.indexOf(':root')).toBeLessThan(css.indexOf('@theme'))
     expect(css.slice(css.indexOf(':root'), css.indexOf('}'))).toContain('--app-bg')
   })

@@ -1,6 +1,5 @@
-// The theme preference: what is stored, how `system` resolves, and what reaches
-// the document element. The composable is called from App.vue's setup, so it
-// must also survive being called with no component scope and no matchMedia.
+// The composable is called from App.vue's setup, so it must also survive being called
+// with no component scope and no matchMedia.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
@@ -9,7 +8,6 @@ import { useColorScheme } from '@/composables/useColorScheme'
 
 let pinia: Pinia
 
-/** Minimal matchMedia stand-in exposing a way to emit a change. */
 function stubMatchMedia(initialMatches: boolean) {
   const listeners = new Set<(event: MediaQueryListEvent) => void>()
   vi.stubGlobal('matchMedia', (query: string) => ({

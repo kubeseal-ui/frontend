@@ -2,15 +2,8 @@
 import AppIcon from './AppIcon.vue'
 import { type IconName } from './icons'
 
-/**
- * The one surface. Every panel in the app is this, so the glass material is
- * applied in exactly one place and there is no second selector restating it.
- *
- * The element is a flex column that fills its container, so a card in a grid
- * row stretches to the row height and its children can pin themselves with
- * `mt-auto`. That is what keeps metadata rows aligned across a row when one
- * card's title wraps to two lines.
- */
+// The one surface: the glass material is applied here and nowhere else. A flex column
+// filling its container, so a card stretches to its grid row and children pin with `mt-auto`.
 withDefaults(defineProps<{ title?: string; icon?: IconName }>(), { title: '' })
 </script>
 

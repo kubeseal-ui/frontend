@@ -16,35 +16,26 @@ const auth = useAuthStore()
 const secrets = useSecretsStore()
 
 const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
-/**
- * Delivery mode is fixed per namespace by the authorization ConfigMap. An
- * unmapped namespace can still be encrypted, but nothing can be delivered from
- * here, so say that before the user writes a manifest rather than after.
- */
+// Fixed per namespace. An unmapped namespace can still be encrypted, so the rail says so
+// before the user writes a manifest rather than after.
 const deliveryMode = computed(() => secrets.namespaceDeliveryMode(props.namespace))
 const hasDeliveryPolicy = computed(() => Boolean(deliveryMode.value))
 
-// The same listing SecretNameEditor's path picker reads, shown here as context
-// rather than as a second set of controls. It resolves through the store, so a
-// namespace covered by a `*` mapping reports that mapping's mode and repository
-// instead of looking unmapped.
+// Shown here as context only; SecretNameEditor owns the path picker.
 const namespacePaths = computed(() => secrets.namespaceGitPaths(props.namespace))
 const allowedPaths = computed(() => namespacePaths.value?.allowed_paths || [])
 const defaultPath = computed(() => namespacePaths.value?.default_path || '')
-// A wildcard mapping names no paths and no default: the server renders the
-// target from the mapping's template for this namespace, and the listing does
-// not carry that template. So the rail can say where the path comes from but
-// not what it is — which is not the same as there being none.
+// A wildcard names no paths: the server renders the target from a template the listing
+// does not carry, so the rail can say where the path comes from but not what it is.
 const isWildcard = computed(() => namespacePaths.value?.namespace === '*')
 
 onMounted(() => {
-  // SecretNameEditor's path picker reads the same listing. Either component
-  // may mount first, so each asks only if the other has not already.
+  // SecretNameEditor reads the same listing; either may mount first.
   if (!secrets.gitPaths) secrets.fetchGitPaths()
 })
 
-// A half-finished encrypted draft belongs to this page. Leaving it in the
-// store would follow the user to the next page, where it has no meaning.
+// A half-finished encrypted draft belongs to this page and would follow the user to the
+// next one, where it has no meaning.
 onUnmounted(() => secrets.discardNewSecretDraft())
 </script>
 
@@ -78,8 +69,6 @@ onUnmounted(() => secrets.discardNewSecretDraft())
         <DeliveryPanel />
       </div>
 
-      <!-- Context, not a form: the rail states where this Secret will land so
-           the wide column stays the only place there is to type. -->
       <div class="lg:sticky lg:top-24">
         <AppCard title="Namespace context" icon="namespace">
           <dl class="m-0 flex flex-col gap-4 text-sm">

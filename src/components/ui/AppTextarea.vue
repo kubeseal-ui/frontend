@@ -1,8 +1,5 @@
 <script setup lang="ts">
-/**
- * A multi-line field. Monospaced and spellcheck-free, because the only thing it
- * ever holds is a Kubernetes manifest.
- */
+// Monospaced and spellcheck-free: the only thing it holds is a Kubernetes manifest.
 withDefaults(
   defineProps<{
     modelValue: string

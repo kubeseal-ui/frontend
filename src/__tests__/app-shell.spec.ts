@@ -1,6 +1,3 @@
-// The shared chrome every route renders inside. A view cannot render without
-// it and cannot render a competing header, so this spec is the guard on the
-// header's contents and the skip-link contract.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
@@ -35,9 +32,6 @@ describe('app shell', () => {
   it('renders the brand, the signed-in user, and sign out', () => {
     const wrapper = mountShell()
 
-    // Located by content and role rather than by a styling class: the shell is
-    // utility-first now, so the classes that used to double as test hooks are
-    // gone and the text is the stable part.
     expect(wrapper.findAll('a').map((link) => link.text())).toContain('kubeseal-ui')
     expect(wrapper.text()).toContain('Ada')
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('Sign out')
@@ -50,9 +44,7 @@ describe('app shell', () => {
     expect(group.exists()).toBe(true)
     expect(group.attributes('aria-label')).toBe('Colour theme')
 
-    // Located by aria-label, not by text: the options are glyph-only, and the
-    // svg inside them is aria-hidden, so the label attribute is the only name
-    // these controls have. Asserting it here is what keeps that true.
+    // Glyph-only options whose svg is aria-hidden: aria-label is their only name.
     const options = wrapper.findAll('[aria-pressed]')
     expect(options.map((option) => option.attributes('aria-label'))).toEqual(['Light', 'Dark', 'System'])
     for (const option of options) expect(option.attributes('aria-pressed')).toBeDefined()

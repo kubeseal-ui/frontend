@@ -1,22 +1,17 @@
 /**
  * Test-environment shim for Web Storage.
  *
- * Node 22+ defines `globalThis.localStorage` as a lazy accessor: without
- * `--localstorage-file` it returns undefined and prints an ExperimentalWarning.
- * That global therefore already exists by the time Vitest's happy-dom
- * environment populates globals, happy-dom's own Storage never lands, and
- * `window` — which is `globalThis` under happy-dom — ends up with no working
- * `localStorage`. Specs then throw in `beforeEach` on `window.localStorage.clear()`
- * before a single assertion runs.
+ * Node 22+ defines `globalThis.localStorage` as a lazy accessor that returns undefined
+ * without `--localstorage-file`. That global already exists by the time happy-dom
+ * populates globals, so happy-dom's own Storage never lands and `window` — which is
+ * `globalThis` under happy-dom — ends up with no working `localStorage`; specs then
+ * throw in `beforeEach` before a single assertion runs.
  *
- * The application is unaffected: `stores/ui.ts` reads through
- * `globalThis.localStorage?.getItem` and degrades to in-memory defaults, which
- * is the behaviour private-mode browsers need. That guard is also why these
- * specs must supply real storage — they verify persistence, so the fallback
- * would let them pass for the wrong reason.
- *
- * Storage is installed only where the environment did not already provide a
- * usable one, so a happy-dom that stops being shadowed still takes precedence.
+ * The application is unaffected: `stores/ui.ts` reads through `globalThis.localStorage?.`
+ * and falls back to in-memory defaults, which is what private-mode browsers need. That
+ * guard is also why the specs must supply real storage — a fallback would let them pass
+ * for the wrong reason. Installed only where the environment did not already provide a
+ * usable one.
  */
 function createMemoryStorage(): Storage {
   const entries = new Map<string, string>()
@@ -38,7 +33,6 @@ function createMemoryStorage(): Storage {
   } as unknown as Storage
 }
 
-/** A value is usable only if it is an object exposing the Storage methods. */
 function isWorkingStorage(value: unknown): value is Storage {
   return typeof value === 'object' && value !== null && typeof (value as Storage).getItem === 'function'
 }

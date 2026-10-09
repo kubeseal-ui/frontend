@@ -1,25 +1,7 @@
-/**
- * The icon set. Inline SVG, no dependency and no sprite request.
- *
- * Every glyph is expressed as path data only — circles and rounded rectangles
- * included — so AppIcon's renderer is a single `v-for` over `path` elements.
- * That keeps it free of `v-html` and identical between a browser and happy-dom,
- * which matters because the component tests mount these.
- *
- * Geometry is authored on a 24x24 grid and drawn with `currentColor`, so an
- * icon takes the text colour of whatever it sits in and follows the theme with
- * no second definition.
- *
- * The record carries `as const` for one reason: it makes `IconName` below a
- * union of the keys it actually holds, so `:name="'arrow-rght'"` is a build
- * error rather than an svg that renders nothing. Anything naming an icon —
- * AppIcon's prop, AppShell's theme table — types it as `IconName` and gets the
- * same guarantee. A typo used to be invisible: the lookup returned undefined
- * and the component quietly drew an empty box.
- */
+// Path data only, on a 24x24 grid in currentColor, so AppIcon is a single v-for over
+// `path` elements — no v-html, identical in a browser and happy-dom. `as const` makes
+// IconName a union of the keys, so a misspelled `:name` is a build error.
 export const ICONS = {
-  // A box: a namespace is a container, and the isometric form says that faster
-  // than a folder or a grid of squares does at 18px.
   namespace: ['M12 3l9 4.5-9 4.5-9-4.5z', 'M3 7.5v9L12 21v-9', 'M21 7.5v9L12 21'],
   key: ['M19.5 8a3.5 3.5 0 1 0-7 0 3.5 3.5 0 0 0 7 0Z', 'M13.5 10.5 4 20', 'm7.5 16.5 2 2'],
   lock: [
@@ -53,10 +35,8 @@ export const ICONS = {
     'M21.5 12S18 18.5 12 18.5a10 10 0 0 1-4.3-1',
     'm4 4 16 16',
   ],
-  // The three theme states. Sun and moon are read as light and dark without a
-  // legend; the display says "whatever the system is doing", which is the one
-  // state with no conventional glyph and therefore the one whose word the
-  // control most needs to keep as its accessible name.
+  // The display is the one state with no conventional glyph, so its word must survive as
+  // a label.
   sun: [
     'M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z',
     'M12 2.5v2',
@@ -76,6 +56,4 @@ export const ICONS = {
   ],
 } as const
 
-/** Every name the set provides. Anything that names an icon should use this and
-    not `string`, which is the whole point of holding the record here. */
 export type IconName = keyof typeof ICONS

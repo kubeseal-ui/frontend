@@ -23,10 +23,8 @@ describe('capability policy', () => {
       capabilities: ['metadata:read'],
       namespaces: { payments: ['secret:seal'] },
     })
-    // The scoped grant does not replace the global one...
     expect(auth.hasCapability('payments', 'metadata:read')).toBe(true)
     expect(auth.hasCapability('payments', 'secret:seal')).toBe(true)
-    // ...and it does not leak into a namespace that does not name it.
     expect(auth.hasCapability('other', 'metadata:read')).toBe(true)
     expect(auth.hasCapability('other', 'secret:seal')).toBe(false)
   })

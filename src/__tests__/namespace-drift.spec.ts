@@ -1,9 +1,5 @@
-// The namespace drift rollup and the filter it doubles as.
-//
-// Drift used to be legible only one card at a time, so a namespace of forty
-// Secrets could not tell you how many of them had drifted away from Git. The
-// counts come from the listing the grid already renders — so these checks also
-// pin that the summary costs no second request.
+// The drift rollup and the filter it doubles as. The counts come from the listing the
+// grid already renders, so these checks also pin that the summary costs no second request.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
@@ -57,11 +53,7 @@ function chip(wrapper: VueWrapper, label: string) {
   return wrapper.findAll('button').find((button) => button.text().startsWith(label))
 }
 
-/**
- * The count a chip reports. Read from the count's own node rather than from the
- * button's text, which carries the template's line breaks between the label and
- * the number.
- */
+// Read from the count's own node: the button's text carries the template's line breaks.
 function chipCount(wrapper: VueWrapper, label: string) {
   return chip(wrapper, label)!.find('span').text()
 }
@@ -74,7 +66,6 @@ describe('namespace drift rollup', () => {
   it('summarises every drift state from the listing it already has', async () => {
     const { wrapper, get } = await mountNamespaceView()
 
-    // One request for the grid, and nothing extra for the summary.
     expect(get).toHaveBeenCalledTimes(1)
     expect(chipCount(wrapper, 'All')).toBe('6')
     expect(chipCount(wrapper, 'In sync')).toBe('3')
@@ -86,8 +77,6 @@ describe('namespace drift rollup', () => {
 
     expect(cardNames(wrapper)).toHaveLength(6)
     expect(chip(wrapper, 'All')!.attributes('aria-pressed')).toBe('true')
-    // Each state is named on the card as well as coloured, so it survives a
-    // monochrome display and a screen reader.
     expect(wrapper.text()).toContain('Diverged')
     expect(wrapper.text()).toContain('Live only')
     expect(wrapper.text()).toContain('Git only')
@@ -96,9 +85,6 @@ describe('namespace drift rollup', () => {
   it('counts keys correctly at one and names what the scope is', async () => {
     const { wrapper } = await mountNamespaceView([{ ...summary('api', 'in-sync'), key_count: 1, scope: 'namespace-wide' }])
 
-    // A SealedSecret holding one value used to read as "1 keys", and the scope
-    // was printed as a bare word beside the count with nothing saying what it
-    // described.
     expect(wrapper.text()).toContain('1 key · namespace-wide scope')
     expect(wrapper.text()).not.toContain('1 keys')
   })
@@ -130,8 +116,6 @@ describe('namespace drift rollup', () => {
     expect(cardNames(wrapper)).toHaveLength(6)
   })
 
-  // A filter that matches nothing must say so rather than rendering an empty
-  // grid that reads as "this namespace has no Secrets".
   it('explains a filter that matches nothing', async () => {
     const { wrapper } = await mountNamespaceView([summary('api', 'in-sync')])
 

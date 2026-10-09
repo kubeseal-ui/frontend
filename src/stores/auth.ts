@@ -2,12 +2,8 @@ import { defineStore } from 'pinia'
 import { api } from '@/api'
 import type { Capability, Namespace, User } from '@/types'
 
-/**
- * The doc contract's /auth/me shape is a flat "capabilities" list plus a
- * "namespaces" map of per-namespace grants. The backend sends both; tolerate a
- * response missing the map (an older server) by defaulting it to empty, which
- * leaves the flat list as the whole answer.
- */
+// Tolerates an older server that omits `namespaces`: without the map, the flat
+// capability list is the whole answer.
 function normalizeUser(raw: { email: string; name: string; username: string; capabilities?: Capability[]; namespaces?: Record<string, Capability[]> }): User {
   if (raw.namespaces) return raw as User
   return { ...raw, namespaces: {} }
@@ -39,10 +35,8 @@ export const useAuthStore = defineStore('auth', {
       this.activeNamespace = null
     },
     hasCapability(namespace: string, capability: Capability): boolean {
-      // Additive, matching the server's rule: the effective grant in a
-      // namespace is the global set unioned with that namespace's own grants.
-      // Testing the scoped list alone would drop a '*' grant for any user who
-      // also has one namespace scoped to them.
+      // Additive, matching the server: the effective grant is the global set unioned
+      // with the namespace's own, so testing the scoped list alone would drop a '*'.
       return this.capabilities.includes(capability)
         || (this.user?.namespaces[namespace] ?? []).includes(capability)
     },
