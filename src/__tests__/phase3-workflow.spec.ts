@@ -36,7 +36,12 @@ describe('phase 3 secret workflow', () => {
     // Applying writes nothing, so the detail the page renders from is still
     // valid — and clearing it would take the delivery panel off the page with
     // it, leaving the operator unable to dry-run or deliver what they confirmed.
-    expect(store.currentDetail).toBe(detail)
+    //
+    // Deep equality rather than identity: the store holds the detail reactively,
+    // so reading it back hands out a proxy of the object that was assigned. Null
+    // is the value this must not become, which is what the assertion is for.
+    expect(store.currentDetail).not.toBeNull()
+    expect(store.currentDetail).toEqual(detail)
     expect(store.pendingMutation).toBeNull()
   })
 

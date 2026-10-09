@@ -222,8 +222,9 @@ describe('delivery panel policy controls', () => {
     store.pendingMutation = { namespace: 'payments', name: 'api', mutations: [{ key: 'password', operation: 'replace', value: 'rotated' }] }
     vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
       // The real action advances the workflow: the pending mutation is cleared
-      // and the reviewed ciphertext stays in currentDiff for the dry run.
-      store.currentDetail = null
+      // and the reviewed ciphertext stays in currentDiff for the dry run. The
+      // detail stays too, as the real action leaves it — a mock that nulled it
+      // would be modelling the blanked page this workflow was fixed for.
       store.pendingMutation = null
       return { yaml: 'encrypted-after', checksum: 'sum', diff_before: 'encrypted-before', diff_after: 'encrypted-after' }
     })
@@ -243,8 +244,8 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Apply reviewed patch')!.trigger('click')
     await flushPromises()
 
-    // Stage 'dry-run': the patch is applied, the dry-run control replaces the apply control.
-    expect(wrapper.text()).toContain('Encrypted patch applied and ready for dry run.')
+    // Stage 'dry-run': the patch is confirmed, and the dry-run control replaces the apply control.
+    expect(wrapper.text()).toContain('Encrypted patch confirmed and ready for dry run.')
     expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
     expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
     expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
@@ -262,7 +263,10 @@ describe('delivery panel policy controls', () => {
     await flushPromises()
 
     expect(deliver).toHaveBeenCalledTimes(1)
-    expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', undefined)
+    // The panel names the file it reviewed. This diff carries no target_path, so
+    // the name comes from the detail's discovered file_path — the file the
+    // server found the manifest in, which is where the delivery must land.
+    expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(wrapper.text()).toContain('https://git.example/pr/7')
     expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
   })
@@ -284,7 +288,7 @@ describe('delivery panel policy controls', () => {
     await findButton(wrapper, 'Run dry run')!.trigger('click')
     await flushPromises()
 
-    expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', undefined)
+    expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
     expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
   })
 
