@@ -152,6 +152,52 @@ describe('syncing a live Secret into Git', () => {
     expect(wrapper.text()).not.toContain('Synced abcdef1')
   })
 
+  it('withholds the sync and names what it would discard when Git moved past the Secret', async () => {
+    grant(['metadata:read', 'secret:seal', 'secret:decrypt', 'gitops:push'])
+    const { wrapper, store } = await mountDetail(detail({
+      drift: 'diverged',
+      base_commit: 'head-2',
+      file_path: 'clusters/payments/api.yaml',
+      branch: 'main',
+      delivery_mode: 'direct',
+      git_moved_ahead: true,
+    }))
+    const sync = vi.spyOn(store, 'syncToGit').mockResolvedValue({
+      mode: 'direct',
+      commit_sha: 'abcdef1234',
+      branch: 'main',
+      file_path: 'clusters/payments/api.yaml',
+      argocd_sync_verified: false,
+    })
+
+    // The plain control would read as "publish this Secret", which is the opposite of what it does.
+    expect(findButton(wrapper, 'Sync Live Secret to Git')).toBeFalsy()
+    expect(wrapper.text()).toContain('the mapped file was rewritten after the version in the cluster')
+    expect(wrapper.text()).toContain('Syncing would overwrite that change')
+
+    // Withheld, not removed: the operator who means it can still say so.
+    await findButton(wrapper, 'Sync anyway')!.trigger('click')
+    await flushPromises()
+    expect(sync).toHaveBeenCalledWith('payments', 'api', 'head-2')
+    expect(wrapper.text()).toContain('Synced abcdef1 to main at clusters/payments/api.yaml.')
+  })
+
+  it('offers the plain sync when the live Secret was edited in the cluster', async () => {
+    grant(['metadata:read', 'secret:seal', 'secret:decrypt', 'gitops:push'])
+    // Diverged with no claim about which side moved: the server read no earlier version that
+    // matches the live Secret, so Git did not move past it.
+    const { wrapper } = await mountDetail(detail({
+      drift: 'diverged',
+      base_commit: 'head-2',
+      delivery_mode: 'direct',
+      git_moved_ahead: false,
+    }))
+
+    expect(findButton(wrapper, 'Sync Live Secret to Git')).toBeTruthy()
+    expect(findButton(wrapper, 'Sync anyway')).toBeFalsy()
+    expect(wrapper.text()).not.toContain('Syncing would overwrite that change')
+  })
+
   it('reports the server’s request id when the page cannot load the Secret', async () => {
     grant(['metadata:read'])
     const store = useSecretsStore(pinia)

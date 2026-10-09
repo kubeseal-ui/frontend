@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
@@ -80,11 +81,10 @@ onMounted(async () => {
       Loading namespaces…
     </p>
 
-    <div v-if="secrets.error" class="grid gap-2 rounded-card-inner border border-danger bg-surface/60 p-4" role="alert">
-      <strong>Unable to load namespaces.</strong>
-      <p class="mb-1 text-muted">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
-      <AppButton icon="refresh" @click="secrets.fetchNamespaces">Try again</AppButton>
-    </div>
+    <AppAlert v-if="secrets.error" type="error" title="Unable to load namespaces">
+      <p class="m-0">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
+      <AppButton class="mt-2" icon="refresh" @click="secrets.fetchNamespaces">Try again</AppButton>
+    </AppAlert>
 
     <AppEmpty
       v-else-if="!secrets.loading && secrets.namespaces.length === 0"

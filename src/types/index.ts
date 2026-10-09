@@ -36,6 +36,9 @@ export interface GitState {
   repository?: string
   branch?: string
   delivery_mode?: 'direct' | 'proposal'
+  // Set with `diverged` only, and only when the live Secret still matches the version the file
+  // held before its last change: Git moved ahead of the cluster, so syncing would discard that.
+  git_moved_ahead?: boolean
 }
 
 export interface SealedSecretSummary {

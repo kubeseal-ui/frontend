@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { describeError } from '@/api'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppTag from '@/components/ui/AppTag.vue'
@@ -18,7 +19,7 @@ import { driftPresentation } from '@/utils/drift'
 import { countLabel } from '@/utils/format'
 import type { DeliveryResult } from '@/types'
 
-const route = useRoute(); const router = useRouter(); const auth = useAuthStore(); const store = useSecretsStore()
+const route = useRoute(); const auth = useAuthStore(); const store = useSecretsStore()
 const loading = ref(true); const error = ref('')
 /** The last sync's failure, or empty. It belongs to the Secret it happened on. */
 const syncError = ref('')
@@ -29,6 +30,9 @@ const syncOutcome = ref<DeliveryResult | null>(null)
 const namespace = () => String(route.params.namespace); const name = () => String(route.params.name)
 const canPatch = computed(() => auth.hasCapability(namespace(), 'secret:seal') && auth.hasCapability(namespace(), 'secret:decrypt'))
 const showReview = computed(() => canPatch.value)
+// The route names the Secret before the fetch answers, so the heading — and the region the
+// landmark points at — stand while loading and after a failure, not only on success.
+const title = computed(() => store.currentDetail?.name || name())
 
 async function load() {
   loading.value = true;
@@ -61,6 +65,10 @@ const syncing = ref(false)
 // empty. The server reports a head even for a manifest Git does not hold yet — exactly
 // the live-only Secret this control exists for.
 const syncBaseCommit = computed(() => store.currentDetail?.git.base_commit || '')
+
+// The live Secret still holds the version the Git file had before its last change, so the file has
+// moved on without the cluster and the sync would overwrite whatever replaced it.
+const gitMovedAhead = computed(() => Boolean(store.currentDetail?.git.git_moved_ahead))
 
 // Read through the same rule the delivery panel gates on.
 const canSync = computed(() => {
@@ -105,15 +113,25 @@ watch(() => [route.params.namespace, route.params.name], load)
 </script>
 
 <template>
-  <div>
-    <AppButton
-      variant="ghost"
-      icon="chevron-left"
-      class="mb-4"
-      @click="router.push({ name: 'namespace', params: { namespace: namespace() } })"
+  <section aria-labelledby="page-title">
+    <RouterLink
+      :to="`/namespaces/${encodeURIComponent(namespace())}`"
+      class="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent no-underline hover:underline"
     >
-      Back to namespace
-    </AppButton>
+      <AppIcon name="chevron-left" :size="14" />
+      {{ namespace() }}
+    </RouterLink>
+
+    <AppPageHeader :title="title" title-id="page-title">
+      <template #eyebrow>
+        <AppTag v-if="store.currentDetail" tone="accent">{{ store.currentDetail.scope || 'strict' }}</AppTag>
+      </template>
+      <template #subtitle>
+        <p v-if="store.currentDetail" class="m-0 text-muted">
+          {{ store.currentDetail.namespace }} · {{ countLabel(store.currentDetail.key_count, 'encrypted key') }}
+        </p>
+      </template>
+    </AppPageHeader>
 
     <p v-if="loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
       <AppSpinner :size="15" />
@@ -131,15 +149,6 @@ watch(() => [route.params.namespace, route.params.name], load)
       <AppEmpty v-else-if="!store.currentDetail" icon="lock" description="SealedSecret not found" />
 
       <template v-else>
-        <AppPageHeader :title="store.currentDetail.name" title-id="page-title">
-          <template #eyebrow>
-            <AppTag tone="accent">{{ store.currentDetail.scope || 'strict' }}</AppTag>
-          </template>
-          <template #subtitle>
-            <p class="m-0 text-muted">{{ store.currentDetail.namespace }} · {{ countLabel(store.currentDetail.key_count, 'encrypted key') }}</p>
-          </template>
-        </AppPageHeader>
-
         <!-- Reported like a delivery, because it is the same result shape. -->
         <AppAlert v-if="syncOutcome" type="success" closable :title="syncTitle" class="mb-4" @close="syncOutcome = null">
           <span class="block">{{ syncSummary }}</span>
@@ -164,16 +173,23 @@ watch(() => [route.params.namespace, route.params.name], load)
             The manifest is in Git and there is no Secret for it in the cluster. Nothing on this page writes to the
             cluster — a GitOps controller managing this namespace is what would apply it.
           </p>
+          <!-- Git moved past the cluster, so the sync would overwrite a change this Secret
+               predates. The control is withheld rather than removed, and the sentence says what
+               pressing it would discard. -->
+          <p v-if="canSync && syncBaseCommit && gitMovedAhead" class="mt-2 mb-0">
+            Git holds a change this Secret predates: the mapped file was rewritten after the version in the
+            cluster. Syncing would overwrite that change with this Secret's content.
+          </p>
           <AppButton
-            v-else-if="canSync && syncBaseCommit"
-            variant="primary"
+            v-if="canSync && syncBaseCommit"
+            :variant="gitMovedAhead ? 'secondary' : 'primary'"
             size="small"
             icon="git-branch"
             class="mt-2"
             :loading="syncing"
             @click="onSync"
           >
-            Sync Live Secret to Git
+            {{ gitMovedAhead ? 'Sync anyway' : 'Sync Live Secret to Git' }}
           </AppButton>
           <p v-else class="mt-2 mb-0">{{ syncUnavailable }}</p>
         </AppAlert>
@@ -225,5 +241,5 @@ watch(() => [route.params.namespace, route.params.name], load)
         </div>
       </template>
     </template>
-  </div>
+  </section>
 </template>

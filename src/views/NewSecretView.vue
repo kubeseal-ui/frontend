@@ -51,17 +51,16 @@ onUnmounted(() => secrets.discardNewSecretDraft())
 
     <AppPageHeader eyebrow="New" title="Create a SealedSecret" title-id="page-title" />
 
-    <div v-if="!canSeal" class="grid gap-2 rounded-card-inner border border-danger bg-surface/60 p-4" role="alert">
-      <strong>Access denied.</strong>
-      <p class="mb-1 text-muted">
+    <AppAlert v-if="!canSeal" type="error" title="Access denied">
+      <p class="m-0">
         Creating a SealedSecret in {{ props.namespace }} requires the
         <code class="font-mono">secret:seal</code> capability, which your account does not have here.
       </p>
       <RouterLink
         :to="`/namespaces/${encodeURIComponent(props.namespace)}`"
-        class="font-semibold text-accent no-underline"
+        class="mt-2 inline-block font-semibold text-accent no-underline"
       >Back to {{ props.namespace }}</RouterLink>
-    </div>
+    </AppAlert>
 
     <div v-else class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div class="flex min-w-0 flex-col gap-6">
