@@ -24,9 +24,18 @@ const canDeliver = computed(() => mode.value === 'direct' ? auth.hasCapability(n
 const actionLabel = computed(() => mode.value === 'direct' ? 'Deliver directly' : 'Create proposal')
 const hasReview = computed(() => Boolean(store.currentDiff || store.newSecretDraft || store.dryRunResult))
 // The repository, branch, path, and mode always come from the server-side namespace policy.
+//
+// `target_path` follows the same rule as `base_commit`: the reviewed diff answers
+// first, and the detail is the fallback. The detail's `file_path` is the file the
+// server actually found the manifest in — two-tier discovery reads a Secret kept in
+// an application subdirectory out of the tree walk, not from the mapping's templated
+// path — so an edit delivered without it lands at the template and leaves a second
+// file claiming the same SealedSecret identity. Naming the reviewed path cannot
+// write outside the mapping's grant: the server resolves the destination itself and
+// refuses a name that is not where this Secret already lives.
 const target = computed(() => store.newSecretDraft
   ? { namespace: store.newSecretDraft.namespace, name: store.newSecretDraft.name, base_commit: store.newSecretDraft.base_commit, target_path: store.newSecretDraft.target_path }
-  : { namespace: namespace.value, name: props.detail?.name || '', base_commit: store.currentDiff?.base_commit || props.detail?.git.base_commit || '', target_path: store.currentDiff?.target_path })
+  : { namespace: namespace.value, name: props.detail?.name || '', base_commit: store.currentDiff?.base_commit || props.detail?.git.base_commit || '', target_path: store.currentDiff?.target_path || props.detail?.git.file_path })
 
 const reviewedYaml = computed(() => store.dryRunResult?.after || store.currentDiff?.after || store.newSecretDraft?.yaml || '')
 /**
@@ -60,10 +69,11 @@ async function applyPatch() {
   applying.value = true; error.value = ''; result.value = ''
   try {
     await store.applyReviewedMutation()
-    // The patch response carries the reviewed ciphertext that the dry run and
-    // delivery will use. applyReviewedMutation clears currentDetail/pending
-    // mutation but keeps the diff result available until delivery.
-    result.value = 'Encrypted patch applied and ready for dry run.'
+    // The batch is re-validated against the live Secret here, but nothing is
+    // written: delivery sends the ciphertext reviewed in the diff, and the
+    // detail deliberately stays on the page so the dry run and delivery
+    // controls below remain reachable.
+    result.value = 'Encrypted patch confirmed and ready for dry run.'
   }
   catch (e) { error.value = e instanceof Error ? e.message : 'Patch failed' }
   finally { applying.value = false }

@@ -27,12 +27,26 @@ describe('phase 3 secret workflow', () => {
     vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'before', after: 'after', mutations: [{ key: 'password', operation: 'replace' }, { key: 'api_key', operation: 'add' }], base_commit: 'abc', checksum: 'sum' } } as never)
     const patch = vi.spyOn(api, 'patch').mockResolvedValue({ data: { yaml: 'encrypted-updated', checksum: 'sum', diff_before: 'before', diff_after: 'after' } } as never)
     const store = useSecretsStore()
+    const detail = { name: 'api', namespace: 'payments', git: { file_path: 'clusters/payments/api.yaml', base_commit: 'abc' } } as never
+    store.currentDetail = detail
     await store.computeDiff('payments', 'api', mutations, 'abc')
     await store.applyReviewedMutation()
     // The keys travel in the body: a batch has no single key to name in a path.
     expect(patch).toHaveBeenCalledWith('/api/v1/secrets/payments/api/values', { mutations, base_commit: 'abc' }, expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
-    expect(store.currentDetail).toBeNull()
+    // Applying writes nothing, so the detail the page renders from is still
+    // valid — and clearing it would take the delivery panel off the page with
+    // it, leaving the operator unable to dry-run or deliver what they confirmed.
+    expect(store.currentDetail).toBe(detail)
     expect(store.pendingMutation).toBeNull()
+  })
+
+  it('carries the reviewed path from the diff, not the mapping template', async () => {
+    // The manifest lives in an application subdirectory, so the diff names the
+    // file the tree walk found rather than the path the mapping renders.
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { before: 'before', after: 'after', mutations: [{ key: 'password', operation: 'replace' }], base_commit: 'abc', checksum: 'sum', target_path: 'custom/apps/secrets/api.yaml' } } as never)
+    const store = useSecretsStore()
+    await store.computeDiff('payments', 'api', [{ key: 'password', operation: 'replace' as const, value: 'new' }], 'abc')
+    expect(store.currentDiff?.target_path).toBe('custom/apps/secrets/api.yaml')
   })
 
   it('applies exactly the batch that was reviewed, not the editor state at apply time', async () => {

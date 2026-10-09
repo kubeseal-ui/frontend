@@ -92,12 +92,25 @@ export const useSecretsStore = defineStore('secrets', {
      */
     async computeDiff(namespace: string, name: string, mutations: Mutation[], baseCommit: string) { const response = await api.post<EncryptedDiff>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/diff`, { mutations, base_commit: baseCommit }, { 'Idempotency-Key': idempotencyKey() }); this.currentDiff = response.data; this.pendingMutation = { namespace, name, mutations: mutations.map((mutation) => ({ ...mutation })) }; return response.data },
     /**
-     * Persists the batch that was just reviewed.
+     * Confirms the batch that was just reviewed by having the server reseal it
+     * against the live Secret.
+     *
+     * Nothing is persisted — not Kubernetes, not Git — so there is no state
+     * downstream of it that goes stale, and the detail the page is rendering
+     * from is deliberately left in place. Clearing it here would take the
+     * editor and the delivery panel off the page with it, since the detail view
+     * renders "not found" whenever `currentDetail` is null, leaving an operator
+     * who has just confirmed a patch with no way to dry-run or deliver it.
+     *
+     * What reaches the repository is the ciphertext reviewed in `currentDiff`,
+     * which the panel sends to delivery directly. This call exists so the batch
+     * is re-validated against the live Secret at the moment the operator
+     * commits to it, rather than only when it was staged.
      *
      * The keys travel in the body rather than a path segment, because a batch
      * has no single key to name in a URL.
      */
-    async applyReviewedMutation() { if (!this.currentDiff || !this.pendingMutation) throw new Error('No reviewed mutation'); const { namespace, name, mutations } = this.pendingMutation; const response = await api.patch<{ yaml: string; checksum: string; diff_before: string; diff_after: string }>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/values`, { mutations, base_commit: this.currentDiff.base_commit }, { 'Idempotency-Key': idempotencyKey() }); this.currentDetail = null; this.pendingMutation = null; return response.data },
+    async applyReviewedMutation() { if (!this.currentDiff || !this.pendingMutation) throw new Error('No reviewed mutation'); const { namespace, name, mutations } = this.pendingMutation; const response = await api.patch<{ yaml: string; checksum: string; diff_before: string; diff_after: string }>(`/api/v1/secrets/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/values`, { mutations, base_commit: this.currentDiff.base_commit }, { 'Idempotency-Key': idempotencyKey() }); this.pendingMutation = null; return response.data },
     /**
      * Encrypts a complete new Secret and hands the ciphertext to the shared
      * review/delivery state.
@@ -106,8 +119,14 @@ export const useSecretsStore = defineStore('secrets', {
      * against, so it is taken from the encrypt response. An explicit argument
      * still wins, which is how the detail page passes the head it already
      * holds; the create page passes nothing and uses the server's value.
+     *
+     * The path is stored for the same reason, and the server's answer wins
+     * there too: it is the path the vacancy check actually read. Dropping it
+     * would send delivery back to the mapping's rendered path, which for an
+     * operator who picked another allowed path is a file whose occupancy was
+     * never checked.
      */
-    async createNewSecretDraft(namespace: string, name: string, yaml: string, scope: string, baseCommit?: string, targetPath?: string) { const response = await api.post<{ yaml: string; base_commit?: string }>('/api/v1/secrets/encrypt', { namespace, name, yaml, scope, target_path: targetPath }); this.newSecretDraft = { namespace, name, scope, yaml: response.data.yaml, base_commit: baseCommit || response.data.base_commit || '' }; return this.newSecretDraft },
+    async createNewSecretDraft(namespace: string, name: string, yaml: string, scope: string, baseCommit?: string, targetPath?: string) { const response = await api.post<{ yaml: string; base_commit?: string; target_path?: string }>('/api/v1/secrets/encrypt', { namespace, name, yaml, scope, target_path: targetPath }); this.newSecretDraft = { namespace, name, scope, yaml: response.data.yaml, base_commit: baseCommit || response.data.base_commit || '', target_path: response.data.target_path || targetPath }; return this.newSecretDraft },
     discardNewSecretDraft() { this.newSecretDraft = null },
     /** Server-side Git dry-run for the reviewed ciphertext. The server resolves repository, branch, and path. */
     async dryRun(namespace: string, name: string, yaml: string, baseCommit: string, targetPath?: string) { const response = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace, name, yaml, base_commit: baseCommit, target_path: targetPath }, { 'Idempotency-Key': idempotencyKey() }); this.dryRunResult = response.data; return response.data },
