@@ -25,6 +25,9 @@ const store = useSecretsStore()
 const mode = ref<'create' | 'adopt'>('create')
 const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetDir = ref(''); const error = ref(''); const loading = ref(false)
 const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
+// A sealed draft is a change with no mutations: /secrets/encrypt produced its ciphertext
+// outright, so there is nothing to diff it against and the review stage never runs.
+const draft = computed(() => (store.change?.encrypted ? store.change : null))
 const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace-wide', value: 'namespace-wide' }, { label: 'Cluster-wide', value: 'cluster-wide' }]
 const sources = [{ label: 'Write a new Secret', value: 'create' }, { label: 'Adopt an existing Secret', value: 'adopt' }]
 const adopting = computed(() => mode.value === 'adopt')
@@ -123,17 +126,17 @@ function leave(field: 'name' | 'yaml', event: FocusEvent) {
 // Encrypting is what moves the flow on, so that is what folds this stage: the form keeps its
 // contents behind the toggle and the review below becomes what the page is about.
 const override = ref<boolean | null>(null)
-const open = computed(() => override.value ?? !store.newSecretDraft)
+const open = computed(() => override.value ?? !draft.value)
 const toggle = ref<{ $el?: HTMLElement } | null>(null)
 const nameInput = ref<{ $el?: HTMLElement } | null>(null)
 const yamlInput = ref<{ $el?: HTMLElement } | null>(null)
 const summary = computed(() => [
-  store.newSecretDraft ? `Encrypted draft for ${store.newSecretDraft.name}` : name.value,
+  draft.value ? `Encrypted draft for ${draft.value.name}` : name.value,
   scope.value,
   destination.value || defaultDestination.value,
 ].filter(Boolean).join(' · '))
 
-watch(() => store.newSecretDraft, async () => {
+watch(draft, async () => {
   override.value = null
   // The control that folded the stage goes with it, so focus has to be carried to the toggle
   // rather than left on `<body>`.
@@ -185,7 +188,7 @@ async function encrypt() {
 async function createDraft() {
   error.value = ''; loading.value = true
   try {
-    await store.createNewSecretDraft(props.namespace, name.value, yaml.value, scope.value, props.baseCommit, destination.value || undefined)
+    await store.encryptDraft(props.namespace, name.value, yaml.value, scope.value, props.baseCommit, destination.value || undefined)
     // The manifest box keeps what the operator wrote, including through the fold: the draft holds
     // ciphertext, so a reopened stage showing a fresh template leaves them no way back to the
     // plaintext they typed. Discard is what starts the next Secret from a clean template.
@@ -206,7 +209,7 @@ async function createDraft() {
 }
 
 function discard() {
-  store.discardNewSecretDraft()
+  store.discardChange()
   name.value = ''; targetDir.value = ''
   seedTemplate()
   shown.name = false; shown.yaml = false
@@ -223,18 +226,18 @@ onUnmounted(() => { yaml.value = '' })
   <AppCard v-if="canCreate" title="Create new SealedSecret" icon="plus">
     <!-- The folded stage keeps saying what it holds, and stays the way back into it: a draft
          never sits in a state the page offers no way out of. -->
-    <div v-if="!open || store.newSecretDraft" class="mb-3 flex flex-col gap-2">
+    <div v-if="!open || draft" class="mb-3 flex flex-col gap-2">
       <div class="flex flex-wrap items-center gap-2">
         <span v-if="!open" class="text-sm text-muted">{{ summary }}</span>
         <span class="ml-auto flex flex-wrap items-center gap-2">
-          <AppButton v-if="store.newSecretDraft" size="small" @click="discard">Discard encrypted draft</AppButton>
+          <AppButton v-if="draft" size="small" @click="discard">Discard encrypted draft</AppButton>
           <AppButton v-if="!open" ref="toggle" size="small" variant="ghost" @click="override = true">Edit</AppButton>
           <AppButton v-else size="small" variant="ghost" @click="override = false">Hide</AppButton>
         </span>
       </div>
 
-      <AppAlert v-if="store.newSecretDraft" type="success" title="Encrypted draft ready">
-        Ciphertext for {{ store.newSecretDraft.name }} is queued in the shared review and delivery panel below. The plaintext Secret is no longer held on this page.
+      <AppAlert v-if="draft" type="success" title="Encrypted draft ready">
+        Ciphertext for {{ draft.name }} is queued in the shared review and delivery panel below. The plaintext Secret is no longer held on this page.
       </AppAlert>
     </div>
 

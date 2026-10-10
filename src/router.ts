@@ -25,7 +25,7 @@ export const router = createRouter({
     {
       path: '/secrets/:namespace/:name',
       name: 'secret-detail',
-      component: () => import('./views/SecretDetailView.vue'),
+      component: () => import('./views/SecretSurface.vue'),
       props: true,
       meta: { requiresAuth: true },
     },

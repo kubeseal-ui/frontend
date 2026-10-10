@@ -44,7 +44,7 @@ function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): stri
 const cards = computed(() =>
   secrets.namespaces.map((namespace) => {
     const paths = secrets.namespaceGitPaths(namespace.name)
-    const repository = paths?.repository || namespace.git_repository || ''
+    const repository = paths?.repository || namespace.git_mapping || ''
     const branch = paths?.branch ?? ''
 
     return {

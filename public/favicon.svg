@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="kubeseal-ui">
+  <title>kubeseal-ui</title>
+  <!-- The tab strip belongs to the browser, not the app, so the mark carries its own two themes
+       instead of inheriting --app-accent. The values are that token's light and dark forms. -->
+  <style>
+    :root { --mark-bg: #2f5fd0; --mark-fg: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      :root { --mark-bg: #9db9ff; --mark-fg: #11151e; }
+    }
+  </style>
+  <rect width="64" height="64" rx="14" fill="var(--mark-bg)"/>
+  <!-- Sealed, not encrypted: the shackle closes above a body, and the keyhole is what is left
+       of the secret once the seal is on. Chunky on purpose — 16px is the size that matters. -->
+  <path d="M21 31v-6a11 11 0 0 1 22 0v6" fill="none" stroke="var(--mark-fg)" stroke-width="5.5" stroke-linecap="round"/>
+  <rect x="15" y="29" width="34" height="25" rx="7.5" fill="var(--mark-fg)"/>
+  <circle cx="32" cy="38.5" r="3.8" fill="var(--mark-bg)"/>
+  <rect x="30.3" y="39.5" width="3.4" height="7.5" rx="1.7" fill="var(--mark-bg)"/>
+</svg>

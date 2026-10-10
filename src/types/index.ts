@@ -20,10 +20,11 @@ export interface User {
 export interface Namespace {
   name: string
   capabilities: Capability[]
-  delivery?: { mode: 'direct' | 'proposal' }
   git_managed?: boolean
   delivery_mode?: 'direct' | 'proposal'
-  git_repository?: string
+  // The wire name is `git_mapping`, not `git_repository`: the Go field is GitRepository and
+  // its JSON tag is not.
+  git_mapping?: string
 }
 
 export interface GitState {
@@ -56,24 +57,14 @@ export interface SealedSecretDetail extends SealedSecretSummary {
   sealed_secret_yaml?: string
 }
 
-// Ciphertext only; the plaintext Secret never enters the store.
-export interface NewSecretDraft {
-  namespace: string
-  name: string
-  scope: string
-  yaml: string
-  base_commit: string
-  target_path?: string
-}
-
-/** Encrypted dry-run result returned by `POST /gitops/dry-run`. */
+/** Encrypted dry-run result returned by `POST /gitops/dry-run`. `path` is the resolved
+ *  destination — the file a delivery must then name. */
 export interface DryRunResult {
   before: string
   after: string
   path: string
   base_commit: string
   mode: 'direct' | 'proposal'
-  target_path?: string
 }
 
 /** Git paths configuration returned by `GET /gitops/paths`. */
@@ -119,6 +110,44 @@ export interface EncryptedDiff {
   base_commit: string
   checksum: string
   target_path?: string
+}
+
+/** The press the one button is about to make. Shared so the bar and the surface that owns the
+ *  presses cannot disagree about which step is which. */
+export type WorkflowStep = 'review' | 'apply-check' | 'check' | 'deliver'
+
+/** The pending change to one Secret — an edit staged as mutations, or a create carrying the
+ *  ciphertext `/secrets/encrypt` returned. One model for both, because the three presses that
+ *  follow are the same three either way. */
+export interface ChangeState {
+  namespace: string
+  /** Null until a create is named. */
+  name: string | null
+  mutations: Mutation[]
+  baseCommit: string
+  targetPath?: string
+  scope: string
+  /** Create only. An edit's ciphertext does not exist until the review is applied. */
+  encrypted?: string
+}
+
+/** What the operator reviewed, frozen when the review was computed: the apply has to send
+ *  exactly this batch, not whatever the editor holds by the time they press it. */
+export interface ReviewState {
+  before: string
+  after: string
+  mutations: MutationSummary[]
+  baseCommit: string
+  checksum: string
+  targetPath?: string
+}
+
+/** The ciphertext the dry run actually checked. `yaml` is the PATCH's own output, not the
+ *  review's predicted `after` — those are different documents, and delivery sends this one. */
+export interface CheckState {
+  yaml: string
+  checksum: string
+  result: DryRunResult
 }
 
 export interface DeliveryResult {

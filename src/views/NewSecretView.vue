@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppTag from '@/components/ui/AppTag.vue'
+import DiffBlocks from '@/components/DiffBlocks.vue'
+import PendingBar from '@/components/PendingBar.vue'
 import SecretNameEditor from '@/components/SecretNameEditor.vue'
-import DeliveryPanel from '@/components/DeliveryPanel.vue'
+import { describeError } from '@/api'
 import { renderNamespace, templateDirectory } from '@/utils/gitPath'
+import { requiredDeliveryCapability } from '@/utils/delivery'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
+import type { WorkflowStep } from '@/types'
 
 const props = defineProps<{ namespace: string }>()
 const auth = useAuthStore()
@@ -38,9 +42,31 @@ onMounted(() => {
   if (!secrets.gitPaths) secrets.fetchGitPaths()
 })
 
+// A create's first press is Encrypt, inside the name editor. What is left of the three is the
+// same two the edit path runs, so it is the same bar: check the ciphertext, then deliver it.
+const step = computed<WorkflowStep>(() => (secrets.check ? 'deliver' : 'check'))
+const busy = ref(false)
+const pressError = ref('')
+const canDeliver = computed(() => {
+  const required = requiredDeliveryCapability(deliveryMode.value)
+  return required ? auth.hasCapability(props.namespace, required) : false
+})
+const ready = computed(() => (step.value === 'deliver' ? canDeliver.value : true))
+
+async function press() {
+  if (!ready.value) return
+  busy.value = true; pressError.value = ''
+  try {
+    if (step.value === 'check') await secrets.checkDraft()
+    else await secrets.deliverChange()
+  } catch (e) {
+    pressError.value = describeError(e, 'The workflow could not be advanced')
+  } finally { busy.value = false }
+}
+
 // A half-finished encrypted draft belongs to this page and would follow the user to the
 // next one, where it has no meaning.
-onUnmounted(() => secrets.discardNewSecretDraft())
+onUnmounted(() => secrets.discardChange())
 </script>
 
 <template>
@@ -69,7 +95,24 @@ onUnmounted(() => secrets.discardNewSecretDraft())
     <div v-else class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div class="flex min-w-0 flex-col gap-6">
         <SecretNameEditor :namespace="props.namespace" />
-        <DeliveryPanel />
+
+        <section v-if="secrets.change?.encrypted" class="flex flex-col gap-3" aria-label="Encrypted draft">
+          <DiffBlocks
+            :after="secrets.check?.result.after || secrets.change.encrypted"
+            :before="secrets.check?.result.before"
+            before-label="Git before"
+            :after-label="secrets.check?.result.before ? 'Git after' : 'What will be written'"
+          />
+          <AppAlert v-if="pressError" type="error" closable title="Operation failed" @close="pressError = ''">{{ pressError }}</AppAlert>
+          <PendingBar
+            :step="step"
+            :mode="deliveryMode"
+            :count="0"
+            :ready="ready"
+            :busy="busy"
+            @press="press"
+          />
+        </section>
       </div>
 
       <div class="lg:sticky lg:top-24">
