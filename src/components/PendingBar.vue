@@ -14,6 +14,9 @@ const props = defineProps<{
   count: number
   ready: boolean
   busy: boolean
+  /** Set when there is no next press. The bar states why rather than offering a button that is
+   *  disabled (nothing staged) or that the server would refuse (the change already landed). */
+  idle?: string
 }>()
 
 defineEmits<{ press: [] }>()
@@ -33,14 +36,17 @@ const summary = computed(() => (props.count === 1 ? '1 change' : `${props.count}
 
 <template>
   <div class="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border bg-bg/90 pt-3 pb-2 backdrop-blur">
-    <span class="text-sm text-muted">{{ summary }}</span>
-    <AppButton
-      class="ml-auto"
-      variant="primary"
-      icon="lock"
-      :loading="busy"
-      :disabled="!ready"
-      @click="$emit('press')"
-    >{{ label }}</AppButton>
+    <span v-if="idle" class="text-sm text-muted">{{ idle }}</span>
+    <template v-else>
+      <span class="text-sm text-muted">{{ summary }}</span>
+      <AppButton
+        class="ml-auto"
+        variant="primary"
+        icon="lock"
+        :loading="busy"
+        :disabled="!ready"
+        @click="$emit('press')"
+      >{{ label }}</AppButton>
+    </template>
   </div>
 </template>

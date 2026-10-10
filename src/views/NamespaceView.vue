@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import AppCard from '@/components/ui/AppCard.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
@@ -16,17 +15,11 @@ import { driftPresentation } from '@/utils/drift'
 import { countLabel } from '@/utils/format'
 
 const props = defineProps<{ namespace: string }>()
-const router = useRouter()
 const secrets = useSecretsStore()
 const auth = useAuthStore()
-const loaded = ref(false)
 
 // A usability affordance only: the server refuses an unauthorized seal independently.
 const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
-
-function createSecret() {
-  router.push(`/namespaces/${encodeURIComponent(props.namespace)}/new`)
-}
 
 function drift(status: string) {
   return driftPresentation(status)
@@ -53,7 +46,7 @@ const driftCounts = computed(() => {
 })
 
 // Labels, glyphs and colours come from the shared vocabulary, so a chip cannot drift
-// away from the card it filters.
+// away from the row it filters.
 const filters = computed<DriftFilterChip[]>(() => [
   { value: 'all', label: 'All', icon: 'database', classes: drift('unknown').classes, count: driftCounts.value.total },
   { value: 'in-sync', label: drift('in-sync').label, icon: drift('in-sync').icon, classes: drift('in-sync').classes, count: driftCounts.value.inSync },
@@ -70,16 +63,9 @@ const visibleSecrets = computed(() => {
 const emptyFilterDescription = computed(() =>
   filter.value === 'in-sync' ? 'No SealedSecrets are in sync' : 'No SealedSecrets are out of sync')
 
-async function load() {
-  loaded.value = false
-  try {
-    await secrets.fetchSecrets(props.namespace)
-  } finally {
-    loaded.value = true
-  }
-}
-
-onMounted(load)
+// The rail loads the same listing, so this shares its fetch rather than asking twice.
+const load = () => secrets.ensureSecrets(props.namespace).catch(() => {})
+load()
 </script>
 
 <template>
@@ -89,17 +75,26 @@ onMounted(load)
       class="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent no-underline hover:underline"
     >
       <AppIcon name="chevron-left" :size="14" />
-      Namespaces
+      Secrets
     </RouterLink>
 
     <AppPageHeader eyebrow="Namespace" :title="props.namespace" title-id="namespace-title">
       <template #actions>
-        <AppButton v-if="canSeal" variant="primary" icon="plus" @click="createSecret">Create new Secret</AppButton>
+        <!-- A link, not a button: AppButton renders a bare <button>, and navigating is what
+             this does. The classes restate its primary variant. -->
+        <RouterLink
+          v-if="canSeal"
+          :to="`/namespaces/${encodeURIComponent(props.namespace)}/new`"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-chip border border-transparent bg-accent px-3.5 py-1.5 text-sm font-semibold text-bg no-underline transition hover:brightness-110"
+        >
+          <AppIcon name="plus" :size="16" />
+          Create new Secret
+        </RouterLink>
         <AppButton icon="refresh" @click="load">Refresh</AppButton>
       </template>
     </AppPageHeader>
 
-    <p v-if="!loaded || secrets.loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
+    <p v-if="!secrets.secretsLoaded || secrets.loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
       <AppSpinner :size="15" />
       Loading secrets…
     </p>
@@ -110,7 +105,7 @@ onMounted(load)
     </AppAlert>
 
     <AppEmpty
-      v-else-if="loaded && !secrets.loading && secrets.secrets.length === 0"
+      v-else-if="secrets.secretsLoaded && !secrets.loading && secrets.secrets.length === 0"
       icon="database"
       description="No SealedSecrets in this namespace"
     />
@@ -140,33 +135,25 @@ onMounted(load)
         :description="emptyFilterDescription"
       />
 
-      <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4" aria-label="SealedSecrets">
-        <li v-for="secret in visibleSecrets" :key="secret.name">
-          <AppCard class="group">
-            <RouterLink
-              :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
-              class="absolute inset-0 z-10 rounded-card-inner"
+      <!-- border-t rows rather than a card each: the redraw keeps one card-level surface per
+           screen, and on this screen it is the rail. -->
+      <ul v-else class="m-0 list-none border-t border-border p-0" aria-label="SealedSecrets">
+        <li v-for="secret in visibleSecrets" :key="secret.name" class="border-b border-border">
+          <RouterLink
+            :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 no-underline"
+          >
+            <AppIcon name="key" :size="16" class="shrink-0 text-accent" />
+            <h2 class="m-0 min-w-0 flex-1 truncate font-mono text-sm font-semibold text-ink">{{ secret.name }}</h2>
+            <span class="text-sm text-muted">{{ countLabel(secret.key_count, 'key') }} · {{ secret.scope || 'strict' }} scope</span>
+            <span
+              class="inline-flex items-center gap-1 whitespace-nowrap rounded-chip border px-2 py-0.5 text-xs font-semibold"
+              :class="drift(secret.git.drift).classes"
             >
-              <span class="sr-only">{{ secret.name }}</span>
-            </RouterLink>
-
-            <div class="flex h-full flex-col gap-1">
-              <h2 class="mb-0 flex min-h-[2.5em] items-start gap-2 text-[1.05rem] leading-tight">
-                <AppIcon name="key" :size="16" class="mt-1 text-accent" />
-                <span class="min-w-0 break-words">{{ secret.name }}</span>
-              </h2>
-              <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
-                <span class="text-sm text-muted">{{ countLabel(secret.key_count, 'key') }} · {{ secret.scope || 'strict' }} scope</span>
-                <span
-                  class="inline-flex items-center gap-1 whitespace-nowrap rounded-chip border px-2 py-0.5 text-xs font-semibold"
-                  :class="drift(secret.git.drift).classes"
-                >
-                  <AppIcon :name="drift(secret.git.drift).icon" :size="12" />
-                  {{ drift(secret.git.drift).label }}
-                </span>
-              </div>
-            </div>
-          </AppCard>
+              <AppIcon :name="drift(secret.git.drift).icon" :size="12" />
+              {{ drift(secret.git.drift).label }}
+            </span>
+          </RouterLink>
         </li>
       </ul>
     </template>

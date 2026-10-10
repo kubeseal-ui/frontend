@@ -11,7 +11,7 @@ import PendingBar from '@/components/PendingBar.vue'
 import SecretNameEditor from '@/components/SecretNameEditor.vue'
 import { describeError } from '@/api'
 import { renderNamespace, templateDirectory } from '@/utils/gitPath'
-import { requiredDeliveryCapability } from '@/utils/delivery'
+import { deliveryHeading, requiredDeliveryCapability, summarizeDelivery } from '@/utils/delivery'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { WorkflowStep } from '@/types'
@@ -52,6 +52,10 @@ const canDeliver = computed(() => {
   return required ? auth.hasCapability(props.namespace, required) : false
 })
 const ready = computed(() => (step.value === 'deliver' ? canDeliver.value : true))
+
+// The create path ends the way the edit path does: the delivery consumes the draft it was built
+// from, leaving no next press.
+const idle = computed(() => (secrets.delivery ? 'Delivered. Encrypt another manifest to run the workflow again.' : ''))
 
 async function press() {
   if (!ready.value) return
@@ -96,13 +100,26 @@ onUnmounted(() => secrets.discardChange())
       <div class="flex min-w-0 flex-col gap-6">
         <SecretNameEditor :namespace="props.namespace" />
 
-        <section v-if="secrets.change?.encrypted" class="flex flex-col gap-3" aria-label="Encrypted draft">
+        <section v-if="secrets.change?.encrypted || secrets.delivery" class="flex flex-col gap-3" aria-label="Encrypted draft">
           <DiffBlocks
-            :after="secrets.check?.result.after || secrets.change.encrypted"
+            :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
             :before="secrets.check?.result.before"
             before-label="Git before"
             :after-label="secrets.check?.result.before ? 'Git after' : 'What will be written'"
           />
+          <!-- The edit path reports a delivery; a create that delivered and said nothing left a
+               spent draft on screen with no record of where it went. -->
+          <AppAlert v-if="secrets.delivery" type="success" :title="deliveryHeading(secrets.delivery)">
+            <span class="block">{{ summarizeDelivery(secrets.delivery) }}</span>
+            <a
+              v-if="secrets.delivery.proposal_url"
+              :href="secrets.delivery.proposal_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-1 block break-all text-accent no-underline hover:underline"
+            >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
+            <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block">ArgoCD synchronization is not verified by this workflow.</span>
+          </AppAlert>
           <AppAlert v-if="pressError" type="error" closable title="Operation failed" @close="pressError = ''">{{ pressError }}</AppAlert>
           <PendingBar
             :step="step"
@@ -110,6 +127,7 @@ onUnmounted(() => secrets.discardChange())
             :count="0"
             :ready="ready"
             :busy="busy"
+            :idle="idle"
             @press="press"
           />
         </section>

@@ -76,6 +76,16 @@ const ready = computed(() => {
   return true
 })
 
+// A press is offered only when there is a next one. A landed delivery is the terminal case: the
+// store drops the change it consumed, and pressing again would meet a base-commit conflict.
+const idle = computed(() => {
+  if (store.delivery) return 'Delivered. Change another key to run the workflow again.'
+  if (step.value === 'review' && batch.value.length === 0) {
+    return 'Nothing staged. Change, remove, or add a key to begin.'
+  }
+  return ''
+})
+
 async function press() {
   if (!ready.value) return
   pressError.value = ''
@@ -304,6 +314,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             :count="batch.length || (store.change?.mutations.length ?? 0)"
             :ready="ready"
             :busy="busy"
+            :idle="idle"
             @press="press"
           />
         </div>

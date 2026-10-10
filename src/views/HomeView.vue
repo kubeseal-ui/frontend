@@ -3,7 +3,6 @@ import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import AppCard from '@/components/ui/AppCard.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
@@ -17,7 +16,7 @@ const secrets = useSecretsStore()
 const auth = useAuthStore()
 
 // `metadata:read` is deliberately absent: it is the grant that puts a namespace on this
-// page at all, so it would print the same chip on every card.
+// page at all, so it would print the same chip on every row.
 const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
   { capability: 'secret:seal', label: 'Seal' },
   { capability: 'secret:decrypt', label: 'Reveal' },
@@ -41,7 +40,9 @@ function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): stri
   return secrets.gitPathsLoaded ? 'No Git mapping' : 'Git status unavailable'
 }
 
-const cards = computed(() =>
+// What the rail does not carry: the rail is a namespace tree for navigation, so the grants
+// and the delivery destination have nowhere else to be read.
+const rows = computed(() =>
   secrets.namespaces.map((namespace) => {
     const paths = secrets.namespaceGitPaths(namespace.name)
     const repository = paths?.repository || namespace.git_mapping || ''
@@ -91,51 +92,35 @@ onMounted(async () => {
       description="No authorized namespaces. Your account has authenticated, but no namespace grants it a capability yet — ask an administrator to map one."
     />
 
-    <!-- auto-fill, not auto-fit: auto-fit collapses empty tracks, so three cards
-         would render wide and ten narrow. -->
-    <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-      <li v-for="card in cards" :key="card.namespace.name">
-        <AppCard class="group">
-          <RouterLink
-            :to="`/namespaces/${encodeURIComponent(card.namespace.name)}`"
-            class="absolute inset-0 z-10 rounded-card-inner"
-          >
-            <span class="sr-only">{{ card.namespace.name }}</span>
-          </RouterLink>
+    <!-- Rows, not a card each: the rail holds the screen's card-level surface, and a second
+         grid beside it would state the same names twice at the same weight. -->
+    <ul v-else class="m-0 list-none border-t border-border p-0" aria-label="Namespaces">
+      <li v-for="row in rows" :key="row.namespace.name" class="border-b border-border">
+        <RouterLink
+          :to="`/namespaces/${encodeURIComponent(row.namespace.name)}`"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 no-underline"
+        >
+          <AppIcon name="namespace" :size="16" class="shrink-0 text-accent" />
+          <h2 class="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-ink">{{ row.namespace.name }}</h2>
 
-          <div class="flex h-full flex-col gap-2">
-            <h2 class="mb-0 flex min-h-[2.5em] items-start gap-2 text-[1.05rem] leading-tight">
-              <AppIcon name="namespace" :size="16" class="mt-1 text-accent" />
-              <span class="min-w-0 break-words">{{ card.namespace.name }}</span>
-            </h2>
+          <span class="flex flex-wrap gap-1">
+            <span
+              v-for="grant in row.grants"
+              :key="grant"
+              class="rounded-chip border border-border px-2 py-0.5 text-xs font-semibold text-muted"
+            >{{ grant }}</span>
+            <span
+              v-if="row.grants.length === 0"
+              class="rounded-chip border border-border px-2 py-0.5 text-xs font-semibold text-muted"
+            >Read only</span>
+          </span>
 
-            <div class="flex flex-wrap gap-1">
-              <span
-                v-for="grant in card.grants"
-                :key="grant"
-                class="rounded-chip border border-border px-2 py-0.5 text-xs font-semibold text-muted"
-              >{{ grant }}</span>
-              <span
-                v-if="card.grants.length === 0"
-                class="rounded-chip border border-border px-2 py-0.5 text-xs font-semibold text-muted"
-              >Read only</span>
-            </div>
-
-            <div class="mt-auto flex flex-col gap-1">
-              <p v-if="card.repository" class="m-0 truncate font-mono text-xs text-muted" :title="card.repository">
-                {{ card.repository }}
-              </p>
-              <p class="m-0 flex items-center justify-between gap-2 text-sm text-muted">
-                <span>{{ card.summary }}</span>
-                <AppIcon
-                  name="arrow-right"
-                  :size="16"
-                  class="text-accent opacity-0 transition-opacity group-hover:opacity-100"
-                />
-              </p>
-            </div>
-          </div>
-        </AppCard>
+          <span v-if="row.repository" class="truncate font-mono text-xs text-muted" :title="row.repository">
+            {{ row.repository }}
+          </span>
+          <span class="text-sm text-muted">{{ row.summary }}</span>
+          <AppIcon name="arrow-right" :size="14" class="shrink-0 text-accent" />
+        </RouterLink>
       </li>
     </ul>
   </section>

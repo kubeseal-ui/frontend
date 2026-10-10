@@ -24,6 +24,10 @@ const secretPath = (namespace: string, name: string) =>
 export const useSecretsStore = defineStore('secrets', {
   state: () => ({
     namespaces: [] as Namespace[], secrets: [] as SealedSecretSummary[], currentDetail: null as SealedSecretDetail | null,
+    // Which namespace `secrets` describes. The rail and the namespace page render the same set,
+    // so they share one fetch rather than issuing the same request twice.
+    secretsNamespace: '' as string,
+    secretsLoaded: false,
     // The pending change and everything the three presses produce from it. One change model
     // covers an edit and a create; `review` is null for a create, which has nothing to diff.
     change: null as ChangeState | null,
@@ -35,6 +39,11 @@ export const useSecretsStore = defineStore('secrets', {
     // Not derivable from `gitPaths` being null, which fetchGitPaths also stores on
     // failure: a card would otherwise state "no Git mapping" for a listing that failed.
     gitPathsLoaded: false,
+    // The rail's search index: one cross-namespace listing. Names, key names, scope and drift
+    // only — nothing decrypted — so it survives clearSensitiveState() and a route change.
+    index: [] as SealedSecretSummary[],
+    indexLoaded: false,
+    indexError: null as Error | null,
   }),
   getters: {
     // Prefer this over scanning `gitPaths`: a mapping stored against `*` is what the
@@ -46,7 +55,29 @@ export const useSecretsStore = defineStore('secrets', {
   },
   actions: {
     async fetchNamespaces() { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<Namespace>>('/api/v1/namespaces'); this.namespaces = response.data.namespaces || []; return this.namespaces } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load namespaces'); throw error } finally { this.loading = false } },
-    async fetchSecrets(namespace: string) { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<SealedSecretSummary>>(`/api/v1/secrets?namespace=${encodeURIComponent(namespace)}`); this.secrets = response.data.secrets || []; return this.secrets } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secrets'); throw error } finally { this.loading = false } },
+    async fetchSecrets(namespace: string) { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<SealedSecretSummary>>(`/api/v1/secrets?namespace=${encodeURIComponent(namespace)}`); this.secrets = response.data.secrets || []; this.secretsNamespace = namespace; this.secretsLoaded = true; return this.secrets } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secrets'); throw error } finally { this.loading = false } },
+
+    /** Cached by namespace: an empty listing is a loaded one, which is why this needs the flag. */
+    async ensureSecrets(namespace: string) {
+      if (this.secretsLoaded && this.secretsNamespace === namespace) return this.secrets
+      return this.fetchSecrets(namespace)
+    },
+
+    /** The rail's index. An unscoped listing is not an error case for `loading`/`error`: the rail
+     *  is chrome around the route, and a search index that failed must not blank the page. */
+    async fetchIndex() {
+      this.indexError = null
+      try {
+        const response = await api.get<ListResponse<SealedSecretSummary>>('/api/v1/secrets')
+        this.index = response.data.secrets || []
+        this.indexLoaded = true
+        return this.index
+      } catch (error) {
+        this.indexError = error instanceof Error ? error : new Error('Failed to load secrets')
+        this.indexLoaded = false
+        throw error
+      }
+    },
     async fetchDetail(namespace: string, name: string) { this.loading = true; this.error = null; try { const response = await api.get<SealedSecretDetail>(secretPath(namespace, name)); this.currentDetail = response.data; return response.data } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secret'); throw error } finally { this.loading = false } },
     async reveal(namespace: string, name: string, key: string, baseCommit: string) { const response = await api.post<{ key: string; value: string }>(`${secretPath(namespace, name)}/reveal`, { key, base_commit: baseCommit }); return response.data },
 
@@ -106,6 +137,10 @@ export const useSecretsStore = defineStore('secrets', {
       if (!change?.name || !check) throw new Error('Nothing checked to deliver')
       const response = await api.post<DeliveryResult>('/api/v1/gitops/deliver', { namespace: change.namespace, name: change.name, yaml: check.yaml, base_commit: check.result.base_commit, target_path: check.result.path }, { 'Idempotency-Key': idempotencyKey() })
       this.delivery = response.data
+      // The workflow is spent: re-offering this batch would stage a change already in Git, and the
+      // review's `after` is a different encryption of the same values. `check` stays — it is the
+      // bytes that were written.
+      this.change = null; this.review = null
       return response.data
     },
 

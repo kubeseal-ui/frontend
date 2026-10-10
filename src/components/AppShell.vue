@@ -35,6 +35,13 @@ onMounted(() => {
 
 onUnmounted(() => observer?.disconnect())
 
+// The drawer is off-canvas below lg and a static column at lg, so Escape only matters narrow.
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') ui.closeRail()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
 async function logout() {
   await auth.logout()
 }
@@ -87,10 +94,36 @@ async function logout() {
       </RouterLink>
 
       <div class="header-cluster flex items-center gap-2 rounded-chip border border-border-strong/50 bg-surface/70 py-1 pl-3 pr-1.5">
-        <span v-if="displayName" class="flex items-center gap-1.5 text-sm text-muted">
+        <span v-if="displayName" class="hidden items-center gap-1.5 text-sm text-muted sm:flex">
           <AppIcon name="shield" :size="14" />
           {{ displayName }}
         </span>
+
+        <!-- The rail is a static column from lg up, so these two exist only for the drawer. They
+             carry aria-expanded rather than aria-pressed: they disclose a region, and the theme
+             control's pressed-state is not something they should be counted among. -->
+        <div class="flex items-center gap-1 lg:hidden">
+          <button
+            type="button"
+            aria-label="Search Secrets"
+            :aria-expanded="ui.railOpen"
+            aria-controls="secret-rail"
+            class="inline-flex cursor-pointer items-center justify-center rounded-chip border-0 p-1.5 text-muted hover:text-ink"
+            @click="ui.openRail(true)"
+          >
+            <AppIcon name="search" :size="14" />
+          </button>
+          <button
+            type="button"
+            :aria-label="ui.railOpen ? 'Close the Secret list' : 'Browse Secrets'"
+            :aria-expanded="ui.railOpen"
+            aria-controls="secret-rail"
+            class="inline-flex cursor-pointer items-center justify-center rounded-chip border-0 p-1.5 text-muted hover:text-ink"
+            @click="ui.railOpen ? ui.closeRail() : ui.openRail()"
+          >
+            <AppIcon :name="ui.railOpen ? 'x' : 'menu'" :size="14" />
+          </button>
+        </div>
 
         <!-- A segmented control of pressed buttons, not a radio group: each button is
              its glyph alone, so aria-label is its name. The filled track is load-bearing
@@ -121,8 +154,22 @@ async function logout() {
       </div>
     </header>
 
-    <main id="main-content" class="mx-auto w-[min(1100px,calc(100%_-_2rem))] pt-10 pb-16">
-      <slot />
-    </main>
+    <div class="mx-auto flex w-[min(1400px,calc(100%_-_2rem))] items-start gap-6 pt-10 pb-16">
+      <!-- One element, not two: rendering the rail at both breakpoints would mount it twice and
+           fetch its listings twice. It slides off-canvas by visibility, which also keeps it out of
+           the tab order and the accessibility tree while it is closed. -->
+      <div v-if="ui.railOpen" class="fixed inset-0 z-10 bg-ink/30 lg:hidden" @click="ui.closeRail()"></div>
+      <aside
+        id="secret-rail"
+        class="fixed inset-y-0 left-0 z-20 flex w-[80vw] max-w-[280px] flex-col overflow-y-auto border-r border-border bg-bg p-3 lg:sticky lg:top-24 lg:z-auto lg:max-h-[calc(100vh-8rem)] lg:w-[190px] lg:shrink-0 lg:border-0 lg:bg-transparent lg:p-0"
+        :class="ui.railOpen ? 'visible' : 'invisible lg:visible'"
+      >
+        <slot name="rail" />
+      </aside>
+
+      <main id="main-content" class="min-w-0 flex-1">
+        <slot />
+      </main>
+    </div>
   </div>
 </template>

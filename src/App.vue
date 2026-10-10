@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppShell from '@/components/AppShell.vue'
+import NamespaceRail from '@/components/NamespaceRail.vue'
 import { useColorScheme } from '@/composables/useColorScheme'
 import { useGlassSpecular } from '@/composables/useGlassSpecular'
 
@@ -14,6 +15,9 @@ useGlassSpecular()
 
 <template>
   <AppShell>
+    <template #rail>
+      <NamespaceRail />
+    </template>
     <RouterView />
   </AppShell>
 </template>

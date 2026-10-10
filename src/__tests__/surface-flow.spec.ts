@@ -38,7 +38,7 @@ const PATCHED = { yaml: 'cipher-patched', checksum: 'sum-patch' }
 // The dry run resolves a destination the mapping template never named. A delivery that echoed
 // the template instead of this would write to the wrong file.
 const CHECKED = { before: 'git-before', after: 'git-after', path: 'custom/apps/secrets/api.yaml', base_commit: 'abc123', mode: 'direct' as const }
-const DELIVERED = { mode: 'direct' as const, commit_sha: 'sha-1', branch: 'main', file_path: 'custom/apps/secrets/api.yaml', argocd_sync_verified: false }
+const DELIVERED = { mode: 'direct' as const, commit_sha: 'sha-1', branch: 'main', file_path: 'custom/apps/secrets/api.yaml', argocd_sync_verified: false as const }
 
 function git(overrides: Partial<GitState> = {}): GitState {
   return {
@@ -284,6 +284,70 @@ describe('the surface', () => {
     useSecretsStore(pinia).currentDetail = detail({ git: git({ drift: 'diverged', in_sync_with_live: false }) })
     await flushPromises()
     expect(press().attributes('disabled')).toBeDefined()
+  })
+
+  it('stops offering the press once the change has landed, and says why', async () => {
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+    expect(wrapper.findAll('button').map((button) => button.text())).toContain('Review change')
+
+    useSecretsStore(pinia).delivery = DELIVERED
+    await flushPromises()
+
+    // A landed delivery is terminal: the store dropped the change it consumed, so a press here
+    // would re-post the same base commit into a conflict. The bar states that instead of
+    // offering a button the server would refuse.
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Review change')
+    expect(wrapper.text()).toContain('Delivered. Change another key to run the workflow again.')
+    // The report still names where it went.
+    expect(wrapper.text()).toContain('Delivered directly')
+  })
+
+  it('says there is nothing staged rather than offering a dead button', async () => {
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Review change')
+    expect(wrapper.text()).toContain('Nothing staged. Change, remove, or add a key to begin.')
+  })
+})
+
+describe('once the change has landed', () => {
+  it('spends the change and the review it delivered, and keeps the bytes it wrote', async () => {
+    posts(DIFF, CHECKED, DELIVERED)
+    vi.spyOn(api, 'patch').mockResolvedValue({ data: PATCHED } as never)
+    const store = stageEdit()
+    await store.reviewChange()
+    await store.applyAndCheck()
+    await store.deliverChange()
+
+    // The batch is in Git and the review is a different encryption of the same values, so
+    // re-offering either would stage a change that has already landed.
+    expect(store.change).toBeNull()
+    expect(store.review).toBeNull()
+    // The check stays: it is the ciphertext that was written, and the report reads its path.
+    expect(store.check?.result.path).toBe('custom/apps/secrets/api.yaml')
+    await expect(store.deliverChange()).rejects.toThrow('Nothing checked to deliver')
+  })
+
+  it('reports the delivery on the create path, which has no Secret page to land on', async () => {
+    grant(['metadata:read', 'secret:seal', 'gitops:push'])
+    vi.spyOn(api, 'get').mockImplementation((async (path: string) => ({
+      data: path.includes('/gitops/paths') ? { namespaces: [] } : {},
+    })) as never)
+
+    const wrapper = mount(NewSecretView, { props: { namespace: 'payments' }, global: { plugins: [pinia, router] } })
+    await flushPromises()
+
+    // A create delivers only ciphertext it has already checked, so the reachable state holds both.
+    const store = useSecretsStore(pinia)
+    store.check = { yaml: 'cipher-sealed', checksum: 'sum-check', result: CHECKED }
+    store.delivery = DELIVERED
+    await flushPromises()
+
+    // A create that delivered and said nothing left a spent draft on screen with no record of
+    // where it went.
+    expect(wrapper.text()).toContain('Delivered directly')
   })
 })
 

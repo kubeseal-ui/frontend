@@ -1,5 +1,7 @@
 // The drift rollup and the filter it doubles as. The counts come from the listing the
-// grid already renders, so these checks also pin that the summary costs no second request.
+// page already renders, so these checks also pin that the summary costs no second request.
+// The rows are the rail's list rendered as a page, so they are flat rather than cards; the
+// rollup, the filter and the counts are unchanged.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
