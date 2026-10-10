@@ -165,7 +165,7 @@ onMounted(async () => {
         <AppInput
           v-model="filter"
           type="search"
-          aria-label="Filter namespaces"
+          ariaLabel="Filter namespaces"
           placeholder="Filter namespaces"
           class="max-w-xs"
         />

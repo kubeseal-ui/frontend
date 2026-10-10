@@ -376,7 +376,7 @@ describe('once the change has landed', () => {
 
     // A create delivers only ciphertext it has already checked, so the reachable state holds both.
     const store = useSecretsStore(pinia)
-    store.check = { yaml: 'cipher-sealed', checksum: 'sum-check', result: CHECKED }
+    store.check = { yaml: 'cipher-sealed', checksum: 'sum-check', result: CHECKED, idempotencyKey: 'check-key' }
     store.delivery = DELIVERED
     await flushPromises()
 
