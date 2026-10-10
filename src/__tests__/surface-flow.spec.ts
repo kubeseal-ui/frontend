@@ -162,9 +162,10 @@ describe('the create path', () => {
     const store = useSecretsStore(pinia)
 
     await store.encryptDraft('payments', 'new', 'apiVersion: v1\nkind: Secret\n', 'strict')
+    // No idempotency key: encrypt persists nothing, so there is no effect for a repeat to duplicate.
     expect(post).toHaveBeenNthCalledWith(1, '/api/v1/secrets/encrypt', {
       namespace: 'payments', name: 'new', yaml: 'apiVersion: v1\nkind: Secret\n', scope: 'strict', target_path: undefined,
-    }, IDEMPOTENT)
+    })
     // Nothing to diff: the manifest had no SealedSecret before this press.
     expect(store.review).toBeNull()
     // The server's base commit wins; the caller had none to offer.
@@ -245,15 +246,17 @@ describe('the surface', () => {
     const refetches = () => get.mock.calls.filter(([path]) => path === '/api/v1/secrets/payments/api').length
     const reads = refetches()
 
-    const yamlButton = wrapper.findAll('button').find((candidate) => candidate.text() === 'YAML')!
-    await yamlButton.trigger('click')
+    // Re-queried after the press rather than held across it: the mode drives both the classes and
+    // the pressed state, so the read follows the live node instead of one captured before it.
+    const modeButton = (label: string) => wrapper.findAll('button').find((candidate) => candidate.text() === label)!
+    await modeButton('YAML').trigger('click')
     await flushPromises()
 
     // The mode is a query parameter, so a reload lands where the operator was...
     expect(router.currentRoute.value.query.mode).toBe('yaml')
     // ...and both buttons announce which one is pressed rather than showing it in colour alone.
-    expect(yamlButton.attributes('aria-pressed')).toBe('true')
-    expect(wrapper.findAll('button').find((candidate) => candidate.text() === 'Key rows')!.attributes('aria-pressed')).toBe('false')
+    expect(modeButton('YAML').attributes('aria-pressed')).toBe('true')
+    expect(modeButton('Key rows').attributes('aria-pressed')).toBe('false')
     expect(wrapper.text()).toContain('Copy YAML')
     expect(refetches()).toBe(reads)
   })

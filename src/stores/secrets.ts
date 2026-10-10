@@ -76,8 +76,8 @@ export const useSecretsStore = defineStore('secrets', {
       const { change, review } = this
       if (!change?.name || !review) throw new Error('No reviewed change to apply')
       const applied = await api.patch<{ yaml: string; checksum: string }>(`${secretPath(change.namespace, change.name)}/values`, { mutations: change.mutations, base_commit: review.baseCommit }, { 'Idempotency-Key': idempotencyKey() })
-      const result = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace: change.namespace, name: change.name, yaml: applied.data.yaml, base_commit: review.baseCommit, target_path: review.targetPath }, { 'Idempotency-Key': idempotencyKey() })
-      this.check = { yaml: applied.data.yaml, checksum: applied.data.checksum, result }
+      const dryRun = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace: change.namespace, name: change.name, yaml: applied.data.yaml, base_commit: review.baseCommit, target_path: review.targetPath }, { 'Idempotency-Key': idempotencyKey() })
+      this.check = { yaml: applied.data.yaml, checksum: applied.data.checksum, result: dryRun.data }
       return this.check
     },
 
@@ -94,8 +94,8 @@ export const useSecretsStore = defineStore('secrets', {
     async checkDraft() {
       const change = this.change
       if (!change?.name || !change.encrypted) throw new Error('No encrypted draft to check')
-      const result = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace: change.namespace, name: change.name, yaml: change.encrypted, base_commit: change.baseCommit, target_path: change.targetPath }, { 'Idempotency-Key': idempotencyKey() })
-      this.check = { yaml: change.encrypted, checksum: '', result }
+      const dryRun = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace: change.namespace, name: change.name, yaml: change.encrypted, base_commit: change.baseCommit, target_path: change.targetPath }, { 'Idempotency-Key': idempotencyKey() })
+      this.check = { yaml: change.encrypted, checksum: '', result: dryRun.data }
       return this.check
     },
 

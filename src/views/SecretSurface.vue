@@ -157,7 +157,9 @@ async function load() {
 }
 
 onMounted(load)
-watch(() => [route.params.namespace, route.params.name], load)
+// Two sources, not a getter returning an array: a fresh array never compares equal, so that form
+// reloads on every route change — including the `?mode=` flip, which is meant to be a mode switch.
+watch([() => route.params.namespace, () => route.params.name], load)
 </script>
 
 <template>

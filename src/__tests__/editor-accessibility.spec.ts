@@ -186,12 +186,16 @@ describe('when a row is allowed to say it is wrong', () => {
     await button(wrapper, 'Change password')!.trigger('click')
     await button(wrapper, 'Change api_key')!.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).not.toContain('This change needs a value.')
+
+    // Opening the second row moves focus out of the first, and being left is what lets a row speak —
+    // so only the row just opened is still quiet, and the press is what makes the pair agree.
+    const problems = () => wrapper.findAll('p').filter((node) => node.text() === 'This change needs a value.')
+    expect(problems()).toHaveLength(1)
 
     ;(wrapper.vm as unknown as { showProblems: () => void }).showProblems()
     await flushPromises()
 
-    expect(wrapper.findAll('p').filter((node) => node.text() === 'This change needs a value.')).toHaveLength(2)
+    expect(problems()).toHaveLength(2)
   })
 
   it('names what the batch is missing, in the words the press would be refused with', async () => {
