@@ -28,7 +28,7 @@
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/test-utils": "^2.5.0",
     "@vue/tsconfig": "^0.9.1",
-    "autoprefixer": "^10.5.4",
+    "autoprefixer": "^10.6.1",
     "eslint": "^9.39.5",
     "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-vue": "^9.33.0",
