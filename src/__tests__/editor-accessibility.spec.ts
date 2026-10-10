@@ -10,7 +10,7 @@ import DocumentEditor from '@/components/DocumentEditor.vue'
 import KeyRows from '@/components/KeyRows.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
-import type { Capability, GitState, SealedSecretDetail } from '@/types'
+import type { Capability, GitState, Mutation, SealedSecretDetail } from '@/types'
 
 const ALL: Capability[] = ['metadata:read', 'secret:seal', 'secret:decrypt']
 
@@ -50,8 +50,9 @@ const revealButtons = (wrapper: ReturnType<typeof mountRows>) =>
   wrapper.findAll('button').filter((candidate) => candidate.text() === 'Reveal one key')
 
 // The last batch the editor mirrored up to the surface, which is what the first press would send.
-const batch = (wrapper: ReturnType<typeof mountRows>) =>
-  (wrapper.emitted()['update:batch']?.at(-1)?.[0] ?? []) as { key: string; operation: string; value: string }[]
+// `emitted()` does not know what an event carries, so the payload shape is asserted where it is read.
+const batch = (wrapper: ReturnType<typeof mountRows>): Mutation[] =>
+  ((wrapper.emitted() as Record<string, Mutation[][]>)['update:batch'] ?? []).at(-1)?.[0] ?? []
 
 beforeEach(() => {
   setActivePinia(pinia)
