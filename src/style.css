@@ -1,0 +1,314 @@
+@import "tailwindcss";
+
+/* Light palette. Must stay the first palette block: theme-contrast.spec.ts slices the
+   light tokens from the first root selector to the first closing brace, and
+   glass-fallbacks.spec.ts compares this block's position against the Tailwind theme
+   block — both by plain index-of over the raw text, so neither literal may appear ahead
+   of it, not even inside a comment.
+
+   These are the runtime tokens; the inline bridge below derives Tailwind's utility names
+   from them, so a value changed here reaches every `bg-*`/`text-*`/`border-*` class.
+   Non-colour values (radii, blur radii, durations, easings) stay literals in the rules
+   below, because the contrast spec captures colour values only and refuses any var() it
+   did not capture. The --glass-* entries are rgb() rather than hex because they carry
+   alpha; the spec accepts both forms, so they are held to the same both-themes parity.
+   Adding a token here means adding it to both dark blocks. */
+:root, :root[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #eef1f7;
+  --app-surface: #ffffff;
+  --app-surface-raised: #f6f8fc;
+  --app-ink: #1c1c1e;
+  --app-muted: #5b6472;
+  --app-border: #d7dce6;
+  --app-border-strong: #b6bfd0;
+  --app-accent: #2f5fd0;
+  --app-danger: #c0221a;
+  --app-success: #0b6b3a;
+  --app-warning: #8a5300;
+  --app-info: #1f5fbf;
+  --app-focus: #1d4ed8;
+  --glass-specular: rgb(255 255 255 / 0.5);
+  --glass-specular-b: rgb(255 255 255 / 0.12);
+  --glass-edge: rgb(255 255 255 / 0.6);
+}
+
+/* Dark palette, media form. theme-contrast.spec.ts matches this as exactly one
+   prefers-color-scheme rule wrapping one root rule, so the shape is fixed: nothing may
+   precede the selector inside the media rule, and the palette stays free of nested rules.
+   The rim is dimmed hard rather than kept at light-mode strength: a white rim that reads
+   as a lit edge on a bright surface reads as a glow on a dark one. */
+/* --app-surface-raised is the well cut into a surface — the field utility, the code,
+   alert, and diff blocks, the neutral tag, the key chip all sit on it. It must stay a
+   step toward the page from the surface it nests in, in both themes; in dark it was
+   lighter, so every input read as a raised bubble. The fill never locates an element on
+   its own — those consumers all set a border too — so stating it as a value is safe. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --app-bg: #0d1017;
+    --app-surface: #161a24;
+    --app-surface-raised: #11151e;
+    --app-ink: #f2f5fb;
+    --app-muted: #a8b2c6;
+    --app-border: #2c3446;
+    --app-border-strong: #414c63;
+    --app-accent: #9db9ff;
+    --app-danger: #ff9e95;
+    --app-success: #79dfae;
+    --app-warning: #f0b95f;
+    --app-info: #86b4ff;
+    --app-focus: #8fb0ff;
+    --glass-specular: rgb(255 255 255 / 0.14);
+    --glass-specular-b: rgb(255 255 255 / 0.04);
+    --glass-edge: rgb(255 255 255 / 0.16);
+  }
+}
+
+/* Dark palette, explicit-choice form. A stored preference cannot be expressed from
+   inside a media rule, so the same values are declared twice; glass-fallbacks.spec.ts
+   pins the copies identical so they cannot drift. This selector out-specifies the media
+   rule, so an explicit light choice also wins on a dark host. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #0d1017;
+  --app-surface: #161a24;
+  --app-surface-raised: #11151e;
+  --app-ink: #f2f5fb;
+  --app-muted: #a8b2c6;
+  --app-border: #2c3446;
+  --app-border-strong: #414c63;
+  --app-accent: #9db9ff;
+  --app-danger: #ff9e95;
+  --app-success: #79dfae;
+  --app-warning: #f0b95f;
+  --app-info: #86b4ff;
+  --app-focus: #8fb0ff;
+  --glass-specular: rgb(255 255 255 / 0.14);
+  --glass-specular-b: rgb(255 255 255 / 0.04);
+  --glass-edge: rgb(255 255 255 / 0.16);
+}
+
+/* Bridge the runtime tokens into Tailwind's colour namespace, so `bg-surface`, `text-ink`,
+   `border-border`, and friends exist as real utilities. `inline` makes the generated
+   utilities emit `var(--app-surface)` rather than routing through a second `--color-*`
+   variable, so there is one copy of every value and a theme swap needs no rebuild.
+
+   The light palette deliberately does NOT live in a @theme block: Tailwind emits its
+   output inside `@layer theme, base, components, utilities`, and unlayered CSS outranks
+   every layer before specificity is consulted, so a layered light palette would lose to
+   the unlayered dark media rule above on a dark-preferring host and an explicit
+   data-theme="light" there would silently stop working. */
+@theme inline {
+  --color-bg: var(--app-bg);
+  --color-surface: var(--app-surface);
+  --color-surface-raised: var(--app-surface-raised);
+  --color-ink: var(--app-ink);
+  --color-muted: var(--app-muted);
+  --color-border: var(--app-border);
+  --color-border-strong: var(--app-border-strong);
+  --color-accent: var(--app-accent);
+  --color-danger: var(--app-danger);
+  --color-success: var(--app-success);
+  --color-warning: var(--app-warning);
+  --color-info: var(--app-info);
+  --color-focus: var(--app-focus);
+}
+
+/* Geometry. Not themed, so it lives outside the palette blocks and the parity check does
+   not ask the dark blocks to repeat it. The radius scale is concentric — a nested surface
+   uses --radius-card-inner, the outer radius less the inset it sits at — and stating the
+   relation as calc() stops it drifting when either number is edited. */
+@theme {
+  --radius-card: 24px;
+  --radius-chip: 999px;
+  --glass-inset: 8px;
+  --radius-card-inner: calc(var(--radius-card) - var(--glass-inset));
+}
+
+/* Derived material tokens and interaction state.
+
+   Declaring the fill and shadow once, in terms of the palette tokens, is what lets one
+   declaration serve both themes: the values resolve against whatever --app-surface and
+   --glass-specular are at use time. --glass-x/y are overwritten by useGlassSpecular on the
+   surface under the pointer, so the highlight is a position within a surface. */
+:root {
+  --glass-x: 50%;
+  --glass-y: 0%;
+  --glass-fill: color-mix(in srgb, var(--app-surface) 60%, transparent);
+  --glass-shadow:
+    inset 0 1px 0 0 var(--glass-specular),
+    inset 0 -1px 0 0 var(--glass-specular-b),
+    0 10px 30px -12px rgb(0 0 0 / 0.28);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient colour behind the glass: fixed, non-interactive, purely decorative. It stays
+   because the glass has to refract something — remove it and the blur shows nothing. It
+   is removed outright by the opaque fallbacks below, so nothing depends on it.
+
+   Both gradient centres sit above the top edge (-40%/-30%), because a radial gradient
+   reads as a blob whenever its centre is on screen. The box overscans by -4% rather than
+   0: the drift animation translates it by up to 2% of its own size, and at inset 0 that
+   would slide an edge into the viewport and cut the wash mid-fade.
+
+   Chroma stays well below the accent token's saturation so surfaces read neutral the way
+   a system material does; colour belongs on controls. The drift is slow — a moving
+   backdrop behind several backdrop-filtered layers is real GPU work — and is disabled
+   under both reduced-motion and reduced-transparency. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -4%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 130% at 22% -40%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 78%),
+    radial-gradient(110% 120% at 86% -30%, color-mix(in srgb, var(--app-info) 11%, transparent), transparent 80%);
+  animation: ambient-drift 90s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(2%, 2%, 0) scale(1.06); }
+}
+
+button, a { transition: color 200ms cubic-bezier(.32,.72,0,1), background-color 200ms cubic-bezier(.32,.72,0,1), border-color 200ms cubic-bezier(.32,.72,0,1), transform 200ms cubic-bezier(.32,.72,0,1), box-shadow 200ms cubic-bezier(.32,.72,0,1); }
+:focus-visible { outline: 3px solid var(--app-focus); outline-offset: 2px; }
+
+/*
+ * The material. Three tiers:
+ *
+ *   tier 0  no backdrop-filter, or prefers-reduced-transparency: reduce
+ *           -> an opaque surface with the ambient field removed; declared at the
+ *              end of this file so it outranks everything above it
+ *   tier 1  the default: a blurred, saturated fill under a lit rim
+ *   tier 2  engines that accept url() inside backdrop-filter also get edge
+ *           refraction, through the SVG filter AppShell renders
+ *
+ * The blur and saturation are Tailwind utilities applied inside @utility, so the material
+ * speaks the same vocabulary as the templates that use it.
+ */
+@utility glass {
+  @apply relative overflow-hidden backdrop-blur-lg backdrop-saturate-150;
+  background-color: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+
+/*
+ * Form controls: one utility rather than the same declarations in every input, select,
+ * and textarea. Written longhand rather than with @apply so the placeholder and focus
+ * colours can name palette tokens directly — the contrast spec resolves every var() in
+ * this file, so they must stay tokens rather than literals.
+ */
+@utility field {
+  @apply w-full rounded-xl border border-border-strong bg-surface-raised px-3 py-2 text-sm text-ink;
+
+  &::placeholder { color: var(--app-muted); }
+  &:focus-visible { border-color: var(--app-accent); }
+  &:disabled { cursor: not-allowed; opacity: 0.6; }
+}
+
+/* The specular highlight, moved to the pointer by useGlassSpecular. Held at zero opacity
+   until the surface is hovered, so a page of cards is not a field of competing
+   highlights. The negative z-index paints it over the surface's own fill but under its
+   content — a highlight over the text would wash out what the material exists to keep
+   legible. Safe because backdrop-filter gives the element a stacking context; where the
+   material is not drawn the rule below removes it outright. */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Capped in absolute terms as well as relative ones: a pure percentage scales with the
+     surface, which on the full-width header turns 28% x 40% into a ~500px-wide ellipse a
+     few pixels tall that smears across the chrome instead of reading as a lit point. */
+  background: radial-gradient(min(28%, 150px) min(40%, 150px) at var(--glass-x) var(--glass-y), var(--glass-specular), transparent 70%);
+  opacity: 0;
+  transition: opacity 400ms cubic-bezier(.32, .72, 0, 1);
+}
+.glass:hover::before,
+.glass:focus-within::before { opacity: 1; }
+
+/* The header keeps the rim and the blur but never the pointer highlight: it is chrome,
+   and it is the one surface whose proportions guarantee the gradient above distorts. */
+header.glass::before { display: none; }
+
+/*
+ * Tier 2: edge refraction. The filter bends the backdrop near the shape's boundary, which
+ * is what makes a surface read as a lens with thickness; the interior stays diffuse.
+ *
+ * Gated rather than unconditional because the failure is not symmetric: Safari does not
+ * accept url() inside backdrop-filter, and an ungated reference there would invalidate
+ * the whole property and take the tier-1 blur down with it. Gated, the worst case is an
+ * engine that accepts the syntax and cannot render the filter, which costs the blur on
+ * that surface and leaves the fill, border, and rim intact.
+ */
+@supports (backdrop-filter: url(#liquid-lens)) {
+  .glass {
+    /* The lens adds edge refraction, it does not change the diffusion: an engine taking
+       this branch must not see the material get sharper or flatter. */
+    -webkit-backdrop-filter: blur(16px) saturate(150%) url(#liquid-lens);
+    backdrop-filter: blur(16px) saturate(150%) url(#liquid-lens);
+  }
+}
+
+/* Continuous (squircle) curvature where an engine can express it. Apple's corner treatment
+   is not a circular arc; this is the closest CSS gets, and its absence costs nothing. */
+@supports (corner-shape: squircle) {
+  .glass { corner-shape: squircle; }
+}
+
+/*
+ * Opaque fallbacks. ADR-004 requires legibility to survive the absence of glass, and the
+ * two triggers below fail independently — an engine can lack backdrop-filter while the
+ * user has no transparency preference, and a modern engine can honour the preference
+ * while having full blur support — so both are handled and both produce the same result.
+ *
+ * The material has a single selector, so each block states `.glass` once; there is no
+ * more-specific rule that could survive the fallback and keep the rim and lift on a
+ * surface that is no longer glass.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body::before { display: none; }
+  .glass {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .glass::before { display: none; }
+  .header-cluster { background: var(--app-surface); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body::before { display: none; }
+  .glass {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .glass::before { display: none; }
+  .header-cluster { background: var(--app-surface); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  body::before { display: none; }
+}

@@ -1,0 +1,17 @@
+<script setup lang="ts">
+import AppIcon from './AppIcon.vue'
+
+// The label is not decorative: several of these stack in the delivery panel, and without
+// one a reader cannot tell before from after.
+defineProps<{ code: string; label?: string }>()
+</script>
+
+<template>
+  <div class="flex min-w-0 flex-col gap-1">
+    <span v-if="label" class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+      <AppIcon name="lock" :size="13" />
+      {{ label }}
+    </span>
+    <pre class="m-0 max-h-72 overflow-auto rounded-card-inner border border-border bg-surface-raised/70 p-3 text-xs leading-relaxed"><code class="font-mono whitespace-pre">{{ code }}</code></pre>
+  </div>
+</template>

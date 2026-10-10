@@ -1,0 +1,128 @@
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
+import { type IconName } from '@/components/ui/icons'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore, type ThemePreference } from '@/stores/ui'
+import { LENS_MAP } from '@/theme/lens-map'
+
+const auth = useAuthStore()
+const ui = useUiStore()
+
+const displayName = computed(() => auth.user?.name || auth.user?.username || '')
+
+const themes: { value: ThemePreference; label: string; icon: IconName }[] = [
+  { value: 'light', label: 'Light', icon: 'sun' },
+  { value: 'dark', label: 'Dark', icon: 'moon' },
+  { value: 'system', label: 'System', icon: 'monitor' },
+]
+
+// Contracts the header once the page scrolls past the sentinel above it. Optional
+// everywhere: without IntersectionObserver it keeps its resting height.
+const contracted = ref(false)
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  if (typeof IntersectionObserver !== 'function' || !sentinel.value) return
+  observer = new IntersectionObserver((entries) => {
+    contracted.value = !entries[0]?.isIntersecting
+  })
+  observer.observe(sentinel.value)
+})
+
+onUnmounted(() => observer?.disconnect())
+
+async function logout() {
+  await auth.logout()
+}
+</script>
+
+<template>
+  <div class="min-h-screen">
+    <div ref="sentinel" aria-hidden="true" class="h-px"></div>
+
+    <!--
+      The lens filter. Its two halves live in different files — src/theme/lens-map.ts
+      holds the displacement map, style.css references this filter by id inside a
+      @supports query — and glass-fallbacks.spec.ts pins them to each other, because a
+      rename on either side would silently disable the lens.
+    -->
+    <svg aria-hidden="true" focusable="false" class="pointer-events-none absolute h-0 w-0 overflow-hidden">
+      <defs>
+        <filter id="liquid-lens" x="-20%" y="-20%" width="140%" height="140%">
+          <feImage :href="LENS_MAP" :xlink:href="LENS_MAP" result="lensMap" preserveAspectRatio="none" />
+          <!-- Softening the map turns flat bands into a ramp; a hard-edged map
+               displaces the backdrop in visible steps. -->
+          <feGaussianBlur in="lensMap" stdDeviation="6" result="lensRamp" />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="lensRamp"
+            scale="14"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </defs>
+    </svg>
+
+    <a
+      class="skip-link absolute -left-[9999px] top-0 z-30 rounded-br-xl border border-border-strong bg-surface px-4 py-2.5 font-semibold text-ink no-underline focus:left-0"
+      href="#main-content"
+    >Skip to main content</a>
+
+    <!-- The only persistent glass surface: stacking glass on glass leaves the second
+         layer nothing legible to refract. -->
+    <header
+      class="glass sticky top-0 z-10 flex items-center justify-between gap-4 rounded-none px-[clamp(1rem,4vw,4rem)] py-[0.7rem] data-[contracted=true]:py-[0.45rem]"
+      :data-contracted="String(contracted)"
+    >
+      <RouterLink to="/" class="flex items-center gap-2 text-[1.1rem] font-bold tracking-tight text-ink no-underline">
+        <span class="flex size-7 items-center justify-center rounded-lg border border-border-strong/60 bg-surface/60 text-accent">
+          <AppIcon name="lock" :size="16" />
+        </span>
+        kubeseal-ui
+      </RouterLink>
+
+      <div class="header-cluster flex items-center gap-2 rounded-chip border border-border-strong/50 bg-surface/70 py-1 pl-3 pr-1.5">
+        <span v-if="displayName" class="flex items-center gap-1.5 text-sm text-muted">
+          <AppIcon name="shield" :size="14" />
+          {{ displayName }}
+        </span>
+
+        <!-- A segmented control of pressed buttons, not a radio group: each button is
+             its glyph alone, so aria-label is its name. The filled track is load-bearing
+             — the selected chip is bg-surface against the cluster's bg-surface/70, about
+             1/255 apart — and each state is one class list, because two utilities on the
+             same property are resolved by stylesheet order, not attribute order. -->
+        <div class="flex items-center gap-[2px] rounded-chip bg-bg/70 p-[3px]" role="group" aria-label="Colour theme">
+          <button
+            v-for="theme in themes"
+            :key="theme.value"
+            type="button"
+            :aria-label="theme.label"
+            :title="theme.label"
+            class="inline-flex cursor-pointer items-center justify-center rounded-chip border-0 p-1.5"
+            :class="
+              ui.themePreference === theme.value
+                ? 'bg-surface text-ink shadow-sm'
+                : 'bg-transparent text-muted hover:text-ink'
+            "
+            :aria-pressed="ui.themePreference === theme.value"
+            @click="ui.setThemePreference(theme.value)"
+          >
+            <AppIcon :name="theme.icon" :size="14" />
+          </button>
+        </div>
+
+        <AppButton v-if="auth.isAuthenticated" variant="secondary" icon="sign-out" @click="logout">Sign out</AppButton>
+      </div>
+    </header>
+
+    <main id="main-content" class="mx-auto w-[min(1100px,calc(100%_-_2rem))] pt-10 pb-16">
+      <slot />
+    </main>
+  </div>
+</template>
