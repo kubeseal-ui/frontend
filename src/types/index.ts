@@ -148,6 +148,10 @@ export interface CheckState {
   yaml: string
   checksum: string
   result: DryRunResult
+  /** Minted with the check and reused by every delivery press of it. A delivery whose response was
+   *  lost retries with the same key, so the server replays the commit it already pushed instead of
+   *  refusing the retry against the base that push moved. */
+  idempotencyKey: string
 }
 
 export interface DeliveryResult {

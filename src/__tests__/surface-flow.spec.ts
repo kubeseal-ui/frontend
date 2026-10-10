@@ -140,6 +140,34 @@ describe('the edit path', () => {
     expect(store.delivery).toEqual(DELIVERED)
   })
 
+  // A delivery whose response never arrived retries under the key it already used. The push landed,
+  // so the server replays the commit it recorded; minting a fresh key claims a new delivery and gets
+  // it refused against the base that same push moved.
+  it('retries a delivery under the key it already used', async () => {
+    const post = posts(DIFF, CHECKED)
+    vi.spyOn(api, 'patch').mockResolvedValue({ data: PATCHED } as never)
+    const store = stageEdit()
+    await store.reviewChange()
+    await store.applyAndCheck()
+
+    const keys: unknown[] = []
+    let loseTheResponse = true
+    post.mockImplementation((async (path: string, _body: unknown, headers?: HeadersInit) => {
+      if (path === '/api/v1/gitops/deliver') {
+        keys.push((headers as Record<string, string>)['Idempotency-Key'])
+        if (loseTheResponse) { loseTheResponse = false; throw new Error('network') }
+      }
+      return { data: DELIVERED }
+    }) as never)
+
+    await expect(store.deliverChange()).rejects.toThrow('network')
+    await store.deliverChange()
+
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+  })
+
   it('pushes a drifted Secret to Git with an idempotency key and re-reads it after', async () => {
     const post = posts({ ...DELIVERED, mode: 'direct' })
     const get = vi.spyOn(api, 'get').mockResolvedValue({ data: detail() } as never)

@@ -82,11 +82,13 @@ onMounted(() => {
 
       <ul v-else class="m-0 list-none p-0">
         <li v-for="namespace in secrets.namespaces" :key="namespace.name">
+          <!-- The fill, not just the accent text: the row you are in has to be findable in a
+               column of twenty, and accent text alone sits at the same weight as the others. -->
           <RouterLink
             :to="`/namespaces/${encodeURIComponent(namespace.name)}`"
             :aria-current="namespace.name === active ? 'page' : undefined"
-            class="flex items-center gap-1.5 px-2 py-2 text-sm no-underline lg:py-1"
-            :class="namespace.name === active ? 'font-semibold text-accent' : 'text-muted hover:text-ink'"
+            class="flex items-center gap-1.5 rounded-chip px-2 py-2 text-sm no-underline lg:py-1"
+            :class="namespace.name === active ? 'bg-surface-raised font-semibold text-accent' : 'text-muted hover:text-ink'"
           >
             <AppIcon :name="namespace.name === active ? 'chevron-down' : 'namespace'" :size="12" class="shrink-0" />
             <span class="truncate">{{ namespace.name }}</span>

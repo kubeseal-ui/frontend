@@ -126,10 +126,11 @@ async function logout() {
         </div>
 
         <!-- A segmented control of pressed buttons, not a radio group: each button is
-             its glyph alone, so aria-label is its name. The filled track is load-bearing
-             — the selected chip is bg-surface against the cluster's bg-surface/70, about
-             1/255 apart — and each state is one class list, because two utilities on the
-             same property are resolved by stylesheet order, not attribute order. -->
+             its glyph alone, so aria-label is its name. The selected chip takes the accent,
+             a surface fill and a rim, because the track's fill against the cluster's own is
+             under a percent apart — a selection resting on that fill alone would not be one.
+             Each state is one class list, because two utilities on the same property are
+             resolved by stylesheet order, not attribute order. -->
         <div class="flex items-center gap-[2px] rounded-chip bg-bg/70 p-[3px]" role="group" aria-label="Colour theme">
           <button
             v-for="theme in themes"
@@ -140,7 +141,7 @@ async function logout() {
             class="inline-flex cursor-pointer items-center justify-center rounded-chip border-0 p-1.5"
             :class="
               ui.themePreference === theme.value
-                ? 'bg-surface text-ink shadow-sm'
+                ? 'bg-surface text-accent ring-1 ring-border-strong'
                 : 'bg-transparent text-muted hover:text-ink'
             "
             :aria-pressed="ui.themePreference === theme.value"

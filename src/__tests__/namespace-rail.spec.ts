@@ -187,7 +187,7 @@ describe('search in the rail', () => {
     await wrapper.find('#secret-search').setValue('api')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Indexed 1/2 namespaces')
+    expect(wrapper.text()).toContain('Secrets found in 1 of your 2 namespaces')
   })
 
   it('keeps the rail usable when the index cannot be built', async () => {

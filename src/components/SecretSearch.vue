@@ -4,6 +4,7 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 import { describeError } from '@/api'
 import { useSecretsStore } from '@/stores/secrets'
 import { useUiStore } from '@/stores/ui'
+import { countLabel } from '@/utils/format'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
@@ -45,7 +46,8 @@ watch(
 watch(() => props.modelValue, (query) => { if (query.trim()) ensureIndex() }, { immediate: true })
 
 // The index is as wide as the caller's access: namespaces without metadata:read are dropped
-// server-side, so this counts what was returned rather than what exists.
+// server-side, so this counts what was returned rather than what exists — an authorized
+// namespace holding no Secrets is the gap the line below reports.
 const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => secret.namespace)).size)
 </script>
 
@@ -83,8 +85,10 @@ const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => s
       The search index could not be loaded. {{ describeError(secrets.indexError, 'No detail was reported.') }}
     </p>
     <p v-else-if="secrets.indexLoading" class="mt-1 mb-0 text-xs text-muted">Building the search index…</p>
+    <!-- "Secrets found in 1 of your 2 namespaces" rather than "Indexed 1/2": the same two
+         numbers, said as what they mean to the reader, who searches Secrets and not listings. -->
     <p v-else-if="secrets.indexLoaded && secrets.namespaces.length" class="mt-1 mb-0 text-xs text-muted">
-      Indexed {{ namespacesIndexed }}/{{ secrets.namespaces.length }} namespaces
+      Secrets found in {{ namespacesIndexed }} of your {{ countLabel(secrets.namespaces.length, 'namespace') }}
     </p>
   </div>
 </template>

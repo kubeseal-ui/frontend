@@ -6,6 +6,10 @@ export type { SealedSecretDetail, SealedSecretSummary } from '@/types'
 // Ciphertext only: the plaintext Secret never enters the store.
 export type { ChangeState, ReviewState, CheckState, DryRunResult, DeliveryResult, GitPathsConfig, Mutation }
 
+// A fresh key per press, except for delivery: the seal, diff, patch and dry-run presses have no
+// effect for a repeat to duplicate, and the endpoints that guard them refuse a reused key rather
+// than replay it. The delivery press has an effect, so its key is minted once per check and reused
+// — see CheckState.idempotencyKey.
 function idempotencyKey() { return crypto.randomUUID() }
 
 // The server resolves a namespace through its own mapping and then a `*` wildcard; this
@@ -124,7 +128,7 @@ export const useSecretsStore = defineStore('secrets', {
       if (!change?.name || !review) throw new Error('No reviewed change to apply')
       const applied = await api.patch<{ yaml: string; checksum: string }>(`${secretPath(change.namespace, change.name)}/values`, { mutations: change.mutations, base_commit: review.baseCommit }, { 'Idempotency-Key': idempotencyKey() })
       const dryRun = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace: change.namespace, name: change.name, yaml: applied.data.yaml, base_commit: review.baseCommit, target_path: review.targetPath }, { 'Idempotency-Key': idempotencyKey() })
-      this.check = { yaml: applied.data.yaml, checksum: applied.data.checksum, result: dryRun.data }
+      this.check = { yaml: applied.data.yaml, checksum: applied.data.checksum, result: dryRun.data, idempotencyKey: idempotencyKey() }
       return this.check
     },
 
@@ -142,7 +146,7 @@ export const useSecretsStore = defineStore('secrets', {
       const change = this.change
       if (!change?.name || !change.encrypted) throw new Error('No encrypted draft to check')
       const dryRun = await api.post<DryRunResult>('/api/v1/gitops/dry-run', { namespace: change.namespace, name: change.name, yaml: change.encrypted, base_commit: change.baseCommit, target_path: change.targetPath }, { 'Idempotency-Key': idempotencyKey() })
-      this.check = { yaml: change.encrypted, checksum: '', result: dryRun.data }
+      this.check = { yaml: change.encrypted, checksum: '', result: dryRun.data, idempotencyKey: idempotencyKey() }
       return this.check
     },
 
@@ -151,7 +155,7 @@ export const useSecretsStore = defineStore('secrets', {
     async deliverChange() {
       const { change, check } = this
       if (!change?.name || !check) throw new Error('Nothing checked to deliver')
-      const response = await api.post<DeliveryResult>('/api/v1/gitops/deliver', { namespace: change.namespace, name: change.name, yaml: check.yaml, base_commit: check.result.base_commit, target_path: check.result.path }, { 'Idempotency-Key': idempotencyKey() })
+      const response = await api.post<DeliveryResult>('/api/v1/gitops/deliver', { namespace: change.namespace, name: change.name, yaml: check.yaml, base_commit: check.result.base_commit, target_path: check.result.path }, { 'Idempotency-Key': check.idempotencyKey })
       this.delivery = response.data
       // The workflow is spent: re-offering this batch would stage a change already in Git, and the
       // review's `after` is a different encryption of the same values. `check` stays — it is the
