@@ -52,7 +52,7 @@ const revealButtons = (wrapper: ReturnType<typeof mountRows>) =>
 // The last batch the editor mirrored up to the surface, which is what the first press would send.
 // `emitted()` does not know what an event carries, so the payload shape is asserted where it is read.
 const batch = (wrapper: ReturnType<typeof mountRows>): Mutation[] =>
-  ((wrapper.emitted() as Record<string, Mutation[][]>)['update:batch'] ?? []).at(-1)?.[0] ?? []
+  ((wrapper.emitted() as Record<string, Mutation[][][]>)['update:batch'] ?? []).at(-1)?.[0] ?? []
 
 beforeEach(() => {
   setActivePinia(pinia)
