@@ -45,7 +45,7 @@ function setMode(next: 'rows' | 'yaml') {
 
 const scoped = (capability: 'secret:seal' | 'secret:decrypt' | 'gitops:push' | 'gitops:propose') =>
   auth.hasCapability(namespace(), capability)
-const canPatch = computed(() => scoped('secret:seal') && scoped('secret:decrypt'))
+const canPatch = computed(() => Boolean(detail.value?.git.in_sync_with_live) && scoped('secret:seal') && scoped('secret:decrypt'))
 const baseCommit = computed(() => detail.value?.git.base_commit || '')
 const deliveryMode = computed(() => detail.value?.git.delivery_mode || store.namespaceDeliveryMode(namespace()))
 const canDeliver = computed(() => {
@@ -67,8 +67,9 @@ const step = computed<WorkflowStep>(() => {
   return 'deliver'
 })
 
-// Withheld only when this press has nothing to send. A press the server would refuse is
-// answered by the refusal, not by a dead button explaining itself.
+// Withheld when the batch is empty, and by capability and drift — the page's own gate, stated above
+// the content it disables. A press the server would refuse for any other reason is answered by the
+// refusal rather than by a dead button explaining itself.
 const ready = computed(() => {
   if (step.value === 'review') return batch.value.length > 0 && canPatch.value && baseCommit.value !== ''
   if (step.value === 'deliver') return canDeliver.value
@@ -211,7 +212,7 @@ watch(() => [route.params.namespace, route.params.name], load)
           </AppAlert>
           <AppAlert v-if="syncError" type="error" closable class="mb-4" @close="syncError = ''">{{ syncError }}</AppAlert>
 
-          <!-- Drift gates editing, so it is stated before the content it disables. -->
+          <!-- Drift gates revealing and editing, so it is stated before the content it disables. -->
           <AppAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync" class="mb-4">
             <p class="m-0">Status: {{ driftLabel }}. Reveal, editing, and delivery are disabled.</p>
             <!-- Git-only is the one drift nothing here can act on: this page never writes to

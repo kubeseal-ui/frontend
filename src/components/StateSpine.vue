@@ -8,7 +8,7 @@ import { driftPresentation } from '@/utils/drift'
 import type { SealedSecretDetail } from '@/types'
 
 // The spine holds the state of the change, not a second copy of the editor: where it is going,
-// what this namespace lets you do here, and which of the three presses have already happened.
+// what can be done here, and which of the three presses have already happened.
 const props = defineProps<{ namespace: string; detail?: SealedSecretDetail }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
@@ -20,15 +20,18 @@ const paths = computed(() => store.namespaceGitPaths(props.namespace))
 const base = computed(() => store.review?.baseCommit || store.change?.baseCommit || props.detail?.git.base_commit || '')
 const target = computed(() => store.check?.result.path || store.review?.targetPath || props.detail?.git.file_path || '')
 
-const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
-const canReveal = computed(() => auth.hasCapability(props.namespace, 'secret:decrypt'))
+const driftState = computed(() => props.detail?.git.drift || (props.detail?.git.in_sync_with_live ? 'in-sync' : 'unknown'))
+// Drift withholds revealing, sealing and delivery on this page whatever the namespace grants, so
+// these answer what can be done here; the sentence below names the reason. With no detail there
+// is no drift to read, so no claim is made.
+const inSync = computed(() => !props.detail || driftState.value === 'in-sync')
+const canSeal = computed(() => inSync.value && auth.hasCapability(props.namespace, 'secret:seal'))
+const canReveal = computed(() => inSync.value && auth.hasCapability(props.namespace, 'secret:decrypt'))
 const deliverCapability = computed(() => requiredDeliveryCapability(mode.value))
 const canDeliver = computed(() =>
-  deliverCapability.value ? auth.hasCapability(props.namespace, deliverCapability.value) : false)
+  inSync.value && (deliverCapability.value ? auth.hasCapability(props.namespace, deliverCapability.value) : false))
 
-const drift = computed(() => props.detail
-  ? driftPresentation(props.detail.git.drift || (props.detail.git.in_sync_with_live ? 'in-sync' : 'unknown'))
-  : null)
+const drift = computed(() => (props.detail ? driftPresentation(driftState.value) : null))
 
 // A stage is done when the store holds what it produced. Nothing here is a gate on the presses —
 // the bar below owns that — so these read as history rather than as instructions.

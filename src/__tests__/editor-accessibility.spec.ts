@@ -1,625 +1,354 @@
-// Keyboard reachability, accessible names, masked-by-default values, capability gating, the
-// staged-changes panel, the dry-run gate, and the shared review/delivery state.
+// The editor's keyboard and announcement behaviour: where focus lands when a control opens a
+// row, when a row is allowed to say it is wrong, and what an operator without reveal access or
+// without a clean Git source can still do.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { flushPromises, mount } from '@vue/test-utils'
+import { setActivePinia } from 'pinia'
+import { pinia } from '@/pinia'
 import { api } from '@/api'
+import DocumentEditor from '@/components/DocumentEditor.vue'
+import KeyRows from '@/components/KeyRows.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
-import SecretKeyEditor from '@/components/SecretKeyEditor.vue'
-import SecretNameEditor from '@/components/SecretNameEditor.vue'
-import DeliveryPanel from '@/components/DeliveryPanel.vue'
-import type { Capability, MutationOperation, SealedSecretDetail } from '@/types'
+import type { Capability, GitState, SealedSecretDetail } from '@/types'
 
-function makeDetail(overrides: Partial<SealedSecretDetail> = {}): SealedSecretDetail {
+const ALL: Capability[] = ['metadata:read', 'secret:seal', 'secret:decrypt']
+
+function git(overrides: Partial<GitState> = {}): GitState {
   return {
-    name: 'api',
-    namespace: 'payments',
-    keys: ['password', 'username'],
-    key_count: 2,
-    scope: 'strict',
-    created_at: '2026-09-01T00:00:00Z',
-    git: {
-      managed: true,
-      in_sync_with_live: true,
-      drift: 'in-sync',
-      base_commit: 'abc123',
-      file_path: 'clusters/prod/payments/api.yaml',
-      delivery_mode: 'direct',
-    },
+    managed: true, in_sync_with_live: true, drift: 'in-sync',
+    base_commit: 'abc123', file_path: 'clusters/payments/api.yaml', branch: 'main', delivery_mode: 'direct',
     ...overrides,
   }
 }
 
-function grant(pinia: Pinia, namespace: string, capabilities: Capability[]) {
-  useAuthStore(pinia).setSession({ email: 'u@example.com', name: 'User', username: 'u', namespaces: { [namespace]: capabilities } })
+function detail(overrides: Partial<SealedSecretDetail> = {}): SealedSecretDetail {
+  return {
+    name: 'api', namespace: 'payments', key_count: 2, keys: ['password', 'api_key'], scope: 'strict',
+    created_at: '2026-09-01T00:00:00Z',
+    sealed_secret_yaml: 'apiVersion: bitnami.com/v1alpha1\nkind: SealedSecret\n',
+    git: git(),
+    ...overrides,
+  }
 }
 
-function reviewedDiff(mutations: { key: string; operation: MutationOperation }[] = [{ key: 'password', operation: 'replace' }]) {
-  return { before: 'encrypted-before', after: 'encrypted-after', mutations, base_commit: 'abc123', checksum: 'sum' }
+function grant(grants: Capability[]) {
+  useAuthStore(pinia).setSession({ email: 'operator@example.com', name: 'Operator', username: 'operator', namespaces: { payments: grants } })
 }
 
-let pinia: Pinia
+function mountRows(grants: Capability[] = ALL, overrides: Partial<SealedSecretDetail> = {}) {
+  grant(grants)
+  return mount(KeyRows, { props: { detail: detail(overrides) }, attachTo: document.body, global: { plugins: [pinia] } })
+}
+
+const button = (wrapper: ReturnType<typeof mountRows>, label: string) =>
+  wrapper.findAll('button').find((candidate) => candidate.attributes('aria-label') === label || candidate.text() === label)
+
+// Every reveal control reads the same, so they are matched by order: the row is what tells them
+// apart, and which row a press discloses is the thing under test.
+const revealButtons = (wrapper: ReturnType<typeof mountRows>) =>
+  wrapper.findAll('button').filter((candidate) => candidate.text() === 'Reveal one key')
+
+// The last batch the editor mirrored up to the surface, which is what the first press would send.
+const batch = (wrapper: ReturnType<typeof mountRows>) =>
+  (wrapper.emitted()['update:batch']?.at(-1)?.[0] ?? []) as { key: string; operation: string; value: string }[]
+
 beforeEach(() => {
-  pinia = createPinia()
   setActivePinia(pinia)
   vi.restoreAllMocks()
+  useSecretsStore(pinia).$reset()
+  useAuthStore(pinia).clearSession()
   document.body.innerHTML = ''
 })
 
-function mountEditor(detail: SealedSecretDetail) {
-  return mount(SecretKeyEditor, { props: { detail }, attachTo: document.body, global: { plugins: [pinia] } })
-}
+describe('revealing', () => {
+  it('decrypts one key at a time, each as its own audited request', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { key: 'password', value: 'hunter2' } } as never)
+    const wrapper = mountRows()
 
-function mountPanel(detail: SealedSecretDetail) {
-  return mount(DeliveryPanel, { props: { detail }, global: { plugins: [pinia] } })
-}
+    await revealButtons(wrapper)[0]!.trigger('click')
+    await flushPromises()
 
-function findButton(wrapper: ReturnType<typeof mountEditor> | ReturnType<typeof mountPanel>, label: string) {
-  return wrapper.findAll('button').find((button) => button.text() === label)
-}
-
-/** A rail row's header, by its title. Only a row the flow has reached carries `aria-expanded`. */
-function railRow(wrapper: VueWrapper, title: string) {
-  return wrapper.findAll('button')
-    .filter((button) => button.attributes('aria-expanded') !== undefined)
-    .find((button) => button.text().startsWith(title))
-}
-
-/**
- * The inventory's keys. The tray's rows name their key as well, so a plain
- * `findAll('code')` counts a staged key as though it had joined the list — which is the
- * one thing these assertions exist to rule out. The tray is a `ul` of `li` rows; the
- * inventory is not.
- */
-function inventoryKeys(wrapper: ReturnType<typeof mountEditor>) {
-  return wrapper.findAll('code')
-    .filter((node) => !node.element.closest('li'))
-    .map((node) => node.text())
-}
-
-describe('secret key editor accessibility', () => {
-  it('conceals every value until one key is revealed', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const reveal = vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
-    const wrapper = mountEditor(makeDetail())
-
-    expect(wrapper.findAll('input[type="password"]')).toHaveLength(0)
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/payments/api/reveal', { key: 'password', base_commit: 'abc123' })
+    // The row says what it is holding, and the row beside it is untouched.
+    expect(wrapper.text()).toContain('revealed')
     expect(wrapper.text()).toContain('concealed')
+    expect((wrapper.find('input[aria-label="Revealed value for password"]').element as HTMLInputElement).value).toBe('hunter2')
+    // No bulk control: the second key is a second press and a second disclosure.
+    expect(revealButtons(wrapper)).toHaveLength(1)
+  })
 
-    await findButton(wrapper, 'Reveal one key')!.trigger('click')
+  it('drops the plaintext when the key is concealed again', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { key: 'password', value: 'hunter2' } } as never)
+    const wrapper = mountRows()
+
+    await revealButtons(wrapper)[0]!.trigger('click')
+    await flushPromises()
+    await button(wrapper, 'Conceal password')!.trigger('click')
     await flushPromises()
 
-    expect(reveal).toHaveBeenCalledWith('payments', 'api', 'password', 'abc123')
-    const masked = wrapper.findAll('input[type="password"]')
-    expect(masked.length).toBeGreaterThan(0)
-    expect((masked[0].element as HTMLInputElement).value).toBe('plain-secret')
-    expect((masked[0].element as HTMLInputElement).type).toBe('password')
-    expect(wrapper.text()).not.toContain('plain-secret')
-  })
-
-  it('renders no reveal or edit control without secret:decrypt', () => {
-    grant(pinia, 'payments', ['metadata:read'])
-    const wrapper = mountEditor(makeDetail())
-
-    expect(findButton(wrapper, 'Reveal one key')).toBeFalsy()
-    expect(wrapper.findAll('input')).toHaveLength(0)
-    expect(wrapper.text()).toContain('Values concealed')
-  })
-
-  it('explains drift and keeps the review control disabled', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const wrapper = mountEditor(makeDetail({ git: { ...makeDetail().git, in_sync_with_live: false, drift: 'diverged' } }))
-
-    expect(wrapper.text()).toContain('Editing disabled')
-    await findButton(wrapper, 'Change')!.trigger('click')
-
-    const review = wrapper.findAll('button').find((button) => button.text().includes('Review encrypted diff'))
-    expect(review?.attributes('disabled')).toBeDefined()
-  })
-
-  it('stages nothing when a key is revealed to look at it', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
-    const wrapper = mountEditor(makeDetail())
-
-    await findButton(wrapper, 'Reveal one key')!.trigger('click')
-    await flushPromises()
-
-    // A look is not a change: the revealed value is on screen, nothing is staged, and a
-    // key read on the way past cannot hold the review closed.
-    expect(wrapper.find('input[aria-label="Revealed value for password"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Nothing staged.')
-    expect(findButton(wrapper, 'Review encrypted diff')).toBeFalsy()
-
-    // Conceal drops the value again and leaves the row as it was.
-    await findButton(wrapper, 'Conceal')!.trigger('click')
     expect(wrapper.find('input[aria-label="Revealed value for password"]').exists()).toBe(false)
-    expect(findButton(wrapper, 'Reveal one key')).toBeTruthy()
+    expect(wrapper.text()).not.toContain('hunter2')
+    expect(wrapper.text()).not.toContain('revealed')
+    expect(revealButtons(wrapper)).toHaveLength(2)
   })
 
-  it('reviews the selected operation from keyboard-operable controls', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const store = useSecretsStore(pinia)
-    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
-    const wrapper = mountEditor(makeDetail())
-    await findButton(wrapper, 'Change')!.trigger('click')
+  it('hides the controls entirely, and says why, without reveal access', async () => {
+    const wrapper = mountRows(['metadata:read', 'secret:seal'])
+    expect(wrapper.text()).toContain('this namespace does not grant reveal access')
+    expect(revealButtons(wrapper)).toHaveLength(0)
+    expect(button(wrapper, 'Change password')).toBeUndefined()
+    // Names are still readable — that is what metadata:read buys.
+    expect(wrapper.text()).toContain('password')
+    expect(wrapper.text()).toContain('concealed')
+  })
+})
 
+describe('staging a change', () => {
+  it('puts focus in the field the control just opened', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
+
+    // Change is gone the moment it is pressed, so without this the keyboard user is dumped on
+    // the body and has to tab back through the inventory to reach the field they asked for.
+    const active = document.activeElement as HTMLInputElement
+    expect(active?.type).toBe('password')
+    expect(active?.getAttribute('aria-label')).toBe('Replacement value for password')
+  })
+
+  it('stages a replacement value, and discarding the row drops it', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
-    const remove = wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'delete')
-    expect(remove).toBeDefined()
-    await remove!.setValue()
-    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
-    await flushPromises()
+    expect(batch(wrapper)).toEqual([{ key: 'password', operation: 'replace', value: 'rotated' }])
 
-    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [{ key: 'password', operation: 'delete', value: '' }], 'abc123')
-    expect(wrapper.text()).toContain('Encrypted diff is ready for review.')
+    await button(wrapper, 'Discard the staged change to password')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('#staged-password').exists()).toBe(false)
+    expect(batch(wrapper)).toEqual([])
   })
 
-  it('stages a removal from the row that names the key', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const store = useSecretsStore(pinia)
-    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff([{ key: 'password', operation: 'delete' }]))
-    const wrapper = mountEditor(makeDetail())
-
-    // Removing a key is stated by the row that names it rather than hidden behind Change: a
-    // delete opens no value field, so one must not be what choosing a removal lands the cursor in.
-    await findButton(wrapper, 'Remove')!.trigger('click')
+  it('stages a delete and moves focus to the option it chose', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Remove password')!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('input[aria-label="Replacement value for password"]').exists()).toBe(false)
+    const active = document.activeElement as HTMLInputElement
+    expect(active?.name).toBe('operation-password')
+    expect(active?.value).toBe('delete')
+    // A delete opens no value field, so nothing sits between choosing it and reviewing it.
     expect(wrapper.text()).toContain('Deletes the key; no value is needed.')
-    expect(document.activeElement).toBe(wrapper.find('input[name="operation-password"][value="delete"]').element)
-
-    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
-    await flushPromises()
-    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [{ key: 'password', operation: 'delete', value: '' }], 'abc123')
+    expect(batch(wrapper)).toEqual([{ key: 'password', operation: 'delete', value: '' }])
   })
 
-  it('submits every staged change as one batch', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const store = useSecretsStore(pinia)
-    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
-    const wrapper = mountEditor(makeDetail())
-
-    // A replacement, staged without ever revealing the key it replaces.
-    await findButton(wrapper, 'Change')!.trigger('click')
+  it('reports each entry change as one batch, so they travel as one commit', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
-
-    // A deletion staged without a reveal; the radios are addressed by the per-row
-    // group name.
-    await findButton(wrapper, 'Change')!.trigger('click')
-    await wrapper.find('input[name="operation-username"][value="delete"]').setValue()
-
-    // A brand new key.
-    await findButton(wrapper, 'Add key')!.trigger('click')
-    await wrapper.find('input[aria-label="New key name 1"]').setValue('api_key')
-    await wrapper.find('input[aria-label="New key value 1"]').setValue('brand-new')
-
-    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
+    await button(wrapper, 'Remove api_key')!.trigger('click')
     await flushPromises()
 
-    // One batch, one round trip: three keys changed, one diff computed.
-    expect(computeDiff).toHaveBeenCalledTimes(1)
-    expect(computeDiff).toHaveBeenCalledWith('payments', 'api', [
+    expect(batch(wrapper)).toEqual([
       { key: 'password', operation: 'replace', value: 'rotated' },
-      { key: 'username', operation: 'delete', value: '' },
-      { key: 'api_key', operation: 'add', value: 'brand-new' },
-    ], 'abc123')
+      { key: 'api_key', operation: 'delete', value: '' },
+    ])
   })
+})
 
-  it('answers an incomplete batch when review is pressed', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const store = useSecretsStore(pinia)
-    const computeDiff = vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
-    const wrapper = mountEditor(makeDetail())
+describe('when a row is allowed to say it is wrong', () => {
+  it('stays quiet until the row is left', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
 
-    // Offered as soon as there is a batch. An incomplete one is answered by pressing the
-    // control, not by a control greyed out with a sentence beside it explaining why.
-    await findButton(wrapper, 'Change')!.trigger('click')
-    const review = findButton(wrapper, 'Review encrypted diff')!
-    expect(review.attributes('disabled')).toBeUndefined()
+    // A field that turns red the moment it appears reads as a fault rather than a prompt.
     expect(wrapper.text()).not.toContain('This change needs a value.')
 
-    // Pressing it asks the row what it is missing and puts the cursor in the field to fix,
-    // so the answer arrives where the operator already is. Nothing reaches the server.
-    await review.trigger('click')
-    await flushPromises()
-    expect(computeDiff).not.toHaveBeenCalled()
+    await wrapper.find('#staged-password').trigger('focusout', { relatedTarget: null })
     expect(wrapper.text()).toContain('This change needs a value.')
-    const replacement = wrapper.find('input[aria-label="Replacement value for password"]')
-    expect(document.activeElement).toBe(replacement.element)
-
-    // Filled, the row stops asking.
-    await replacement.setValue('rotated')
-    expect(wrapper.text()).not.toContain('This change needs a value.')
-
-    // A new key colliding with an existing one is answered the same way, by the row that
-    // holds it: the sentence names the key, so it never has to be matched to a row by eye.
-    await findButton(wrapper, 'Add key')!.trigger('click')
-    await wrapper.find('input[aria-label="New key name 1"]').setValue('username')
-    await wrapper.find('input[aria-label="New key value 1"]').setValue('clash')
-    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
-    await flushPromises()
-    expect(computeDiff).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('This Secret already has a key named username.')
-
-    // Renamed to something free, the same press submits the whole batch.
-    await wrapper.find('input[aria-label="New key name 1"]').setValue('api_key')
-    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
-    await flushPromises()
-    expect(computeDiff).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('#staged-password input[aria-label="Replacement value for password"]').attributes('aria-describedby')).toBe('staged-problem-password')
   })
 
-  it('stages a new key in the tray, and the row answers once it is left', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const wrapper = mountEditor(makeDetail())
+  it('says nothing when a delete needs no value', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Remove password')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('#staged-password').trigger('focusout', { relatedTarget: null })
+    expect(wrapper.text()).not.toContain('This change needs a value.')
+  })
 
-    // The tray is on screen with nothing staged, so its absence never has to be read
-    // as an empty stage.
-    expect(wrapper.text()).toContain('Nothing staged.')
+  it('marks every open row at once when a press asks what is missing', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await button(wrapper, 'Change api_key')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('This change needs a value.')
 
-    await findButton(wrapper, 'Add key')!.trigger('click')
+    ;(wrapper.vm as unknown as { showProblems: () => void }).showProblems()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('1 staged change')
-    // The inventory still lists exactly the Secret's keys: the new key is a tray row,
-    // so staging it cannot rearrange the keys above it.
-    expect(inventoryKeys(wrapper)).toEqual(['password', 'username'])
+    expect(wrapper.findAll('p').filter((node) => node.text() === 'This change needs a value.')).toHaveLength(2)
+  })
 
-    // The row takes focus and asks for nothing yet: a field that turns red the moment it
-    // appears reads as a fault rather than a prompt.
-    const name = wrapper.find('input[aria-label="New key name 1"]')
-    const value = wrapper.find('input[aria-label="New key value 1"]')
-    expect(document.activeElement).toBe(name.element)
-    expect(name.attributes('aria-invalid')).toBeUndefined()
-    expect(wrapper.text()).not.toContain('This new key needs a name.')
+  it('names what the batch is missing, in the words the press would be refused with', async () => {
+    const wrapper = mountRows()
+    const vm = wrapper.vm as unknown as { batchProblem: string }
 
-    // Leaving the row is what makes it answer, under the field it is about.
-    await wrapper.find('li').trigger('focusout')
-    expect(name.attributes('aria-invalid')).toBe('true')
-    expect(wrapper.text()).toContain('This new key needs a name.')
+    expect(vm.batchProblem).toBe('')
 
-    await name.setValue('password')
+    await button(wrapper, 'Add key')!.trigger('click')
+    await flushPromises()
+    expect(vm.batchProblem).toBe('Every key being added needs a name.')
+
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('password')
+    expect(vm.batchProblem).toBe('Every key being changed needs a value.')
+  })
+})
+
+describe('adding a key', () => {
+  it('puts focus on the name field of the row it just added', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Add key')!.trigger('click')
+    await flushPromises()
+
+    const active = document.activeElement as HTMLInputElement
+    expect(active?.getAttribute('aria-label')).toBe('New key name 1')
+  })
+
+  it('refuses a name the Secret already uses, once the row has been left', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Add key')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('password')
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('rotated')
+
+    expect(wrapper.text()).not.toContain('This Secret already has a key named password.')
+    await wrapper.findAll('li').at(-1)!.trigger('focusout', { relatedTarget: null })
     expect(wrapper.text()).toContain('This Secret already has a key named password.')
 
-    await name.setValue('api_key')
-    expect(name.attributes('aria-invalid')).toBeUndefined()
-    expect(wrapper.text()).toContain('This new key needs a value.')
-
-    await value.setValue('brand-new')
-    expect(wrapper.text()).not.toContain('This new key needs a value.')
-    expect(findButton(wrapper, 'Review encrypted diff')!.attributes('disabled')).toBeUndefined()
+    // A batch that is otherwise complete is refused for the collision alone: an add over a key
+    // that is present is what the API refuses, so it is not offered.
+    const vm = wrapper.vm as unknown as { batchProblem: string }
+    expect(vm.batchProblem).toBe('Every new key needs a name the Secret does not already use: password.')
   })
 
-  it('discards one staged change without touching the keys around it', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const wrapper = mountEditor(makeDetail())
-
-    await findButton(wrapper, 'Change')!.trigger('click')
-    expect(wrapper.text()).toContain('1 staged change')
-    // The inventory still lists exactly the Secret's keys: staging is a row in the panel,
-    // not a key that joins the list.
-    expect(inventoryKeys(wrapper)).toEqual(['password', 'username'])
-
-    // Discarding returns the row to plain inventory: concealed again, with the controls a
-    // key that is not being touched carries.
-    await findButton(wrapper, 'Discard')!.trigger('click')
-    expect(wrapper.text()).toContain('Nothing staged.')
-    expect(findButton(wrapper, 'Reveal one key')).toBeTruthy()
-  })
-
-  it('names every control, keeps disabled actions out of the tab order, and focuses what is enabled', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    vi.spyOn(useSecretsStore(pinia), 'reveal').mockResolvedValue({ key: 'password', value: 'plain-secret' })
-    const wrapper = mountEditor(makeDetail())
-    await findButton(wrapper, 'Reveal one key')!.trigger('click')
+  it('carries a new key as an add alongside the rest of the batch', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Add key')!.trigger('click')
     await flushPromises()
-    await findButton(wrapper, 'Change')!.trigger('click')
-    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('database_url')
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('postgres://localhost')
 
+    expect(batch(wrapper)).toEqual([{ key: 'database_url', operation: 'add', value: 'postgres://localhost' }])
+  })
+})
+
+describe('when the Git source is not in sync', () => {
+  it('withholds every control that would read or write a value', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: {} } as never)
+    const wrapper = mountRows(ALL, { git: git({ in_sync_with_live: false, drift: 'unknown' }) })
+    expect(wrapper.text()).toContain('Git and live state differ')
+
+    // Reveal is withheld with the rest. The server answers a drifted reveal with 409, so offering
+    // it would be a guaranteed failure and a decrypt's worth of audit trail for nothing.
+    expect(revealButtons(wrapper)).toHaveLength(0)
+    expect(button(wrapper, 'Change password')).toBeUndefined()
+    expect(button(wrapper, 'Remove password')).toBeUndefined()
+    expect(button(wrapper, 'Add key')).toBeUndefined()
+    expect(post).not.toHaveBeenCalled()
+
+    // The names are still readable — that is what metadata:read buys, drift or not.
+    expect(wrapper.text()).toContain('password')
+  })
+})
+
+describe('every control', () => {
+  // ADR-004's guarantee, walked over the controls the editor actually renders rather than a list
+  // someone has to remember to extend. A staged row and an added row between them reach every kind
+  // of control the editor has: a radio option, a masked field, its reveal toggle, and plain buttons.
+  async function openEverything() {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await button(wrapper, 'Add key')!.trigger('click')
+    await flushPromises()
+    return wrapper
+  }
+
+  it('carries an accessible name', async () => {
+    const wrapper = await openEverything()
     const controls = wrapper.findAll('button, input, textarea')
-    expect(controls.length).toBeGreaterThan(2)
-    for (const control of controls) {
-      const element = control.element as HTMLInputElement
-      const name = element.getAttribute('aria-label') || element.closest('label')?.textContent?.trim() || element.textContent?.trim()
-      expect(name, `${element.outerHTML} needs an accessible name`).toBeTruthy()
-      expect(Number(element.getAttribute('tabindex') ?? 0)).toBeLessThanOrEqual(0)
-    }
+    expect(controls.length).toBeGreaterThan(8)
 
-    const enabled = controls.filter((control) => !(control.element as HTMLInputElement).disabled)
-    expect(enabled.length).toBeGreaterThan(0)
-    for (const control of enabled) {
-      const element = control.element as HTMLInputElement
-      element.focus()
-      expect(document.activeElement).toBe(element)
-    }
+    const unnamed = controls.filter((control) => {
+      if (control.attributes('aria-label')?.trim()) return false
+      const element = control.element as HTMLElement
+      if (element.textContent?.trim()) return false
+      // A field wrapped in its own `<label>` is named by it, which is how the radio options are named.
+      return !element.closest('label')
+    })
+    expect(unnamed.map((control) => control.html())).toEqual([])
   })
 
-  it('folds the editor once a review exists, and Edit brings it back', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const store = useSecretsStore(pinia)
-    const wrapper = mountEditor(makeDetail())
-
-    // Nothing reviewed yet: the form is the page, so there is no fold and no toggle.
-    expect(findButton(wrapper, 'Edit')).toBeFalsy()
-
-    store.currentDiff = reviewedDiff()
-    await flushPromises()
-
-    // Folded to a line saying what was reviewed, with the way back in. Folding discards
-    // nothing: the inventory and the tray are behind the toggle, not gone.
-    expect(wrapper.text()).toContain('1 change reviewed')
-    expect(wrapper.text()).toContain('Reveal one key')
-    expect(wrapper.text()).toContain('Staged changes')
-
-    await findButton(wrapper, 'Edit')!.trigger('click')
-    expect(findButton(wrapper, 'Hide')).toBeTruthy()
-    expect(findButton(wrapper, 'Edit')).toBeFalsy()
+  it('stays at or below the default tab order', async () => {
+    const wrapper = await openEverything()
+    const raised = wrapper.findAll('[tabindex]').filter((node) => Number(node.attributes('tabindex')) > 0)
+    expect(raised.map((node) => node.html())).toEqual([])
   })
 
-  it('drops the staged set once a delivery has consumed it', async () => {
-    grant(pinia, 'payments', ['metadata:read', 'secret:seal', 'secret:decrypt'])
-    const store = useSecretsStore(pinia)
-    vi.spyOn(store, 'computeDiff').mockResolvedValue(reviewedDiff())
-    const wrapper = mountEditor(makeDetail())
+  it('takes focus unless it is disabled', async () => {
+    const wrapper = await openEverything()
+    const reachable = wrapper.findAll('button, input, textarea').filter((control) => control.attributes('disabled') === undefined)
+    expect(reachable.length).toBeGreaterThan(8)
 
-    await findButton(wrapper, 'Change')!.trigger('click')
-    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
-    await findButton(wrapper, 'Review encrypted diff')!.trigger('click')
-    await flushPromises()
-
-    // The reviewed state the panel delivers from, then the push it reports and the diff it
-    // consumed to make it.
-    store.currentDiff = reviewedDiff()
-    await flushPromises()
-    expect(wrapper.text()).toContain('1 change reviewed')
-
-    store.deliveryResult = { mode: 'direct', commit_sha: '2a0a5dd', argocd_sync_verified: false }
-    store.currentDiff = null
-    await flushPromises()
-
-    // Those rows were the plaintext the delivered ciphertext was built from, so they leave
-    // with it rather than standing as a change that has already landed.
-    expect(wrapper.text()).toContain('Nothing staged.')
-    expect(wrapper.text()).not.toContain('1 staged change')
-    expect(wrapper.text()).not.toContain('Encrypted diff is ready for review')
-    expect(findButton(wrapper, 'Review encrypted diff')).toBeFalsy()
+    for (const control of reachable) {
+      ;(control.element as HTMLElement).focus()
+      expect(document.activeElement).toBe(control.element)
+    }
   })
 })
 
-describe('delivery panel policy controls', () => {
-  it('gates delivery on a server-side dry run', async () => {
-    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
-    const store = useSecretsStore(pinia)
-    store.currentDiff = reviewedDiff()
-    store.pendingMutation = { namespace: 'payments', name: 'api', mutations: [{ key: 'password', operation: 'replace', value: 'rotated' }] }
-    // The mapping the panel reads the branch from, as the detail page would have loaded it.
-    store.gitPaths = { namespaces: [{ namespace: 'payments', path_template: 'clusters/prod/{name}.yaml', allowed_paths: ['custom/apps'], repository: 'org/repo', branch: 'main', mode: 'proposal' }] }
-    vi.spyOn(store, 'applyReviewedMutation').mockImplementation(async () => {
-      // Mirrors the real action: the pending mutation clears, the reviewed ciphertext
-      // and the detail stay.
-      store.pendingMutation = null
-      return { yaml: 'encrypted-after', checksum: 'sum', diff_before: 'encrypted-before', diff_after: 'encrypted-after' }
-    })
-    vi.spyOn(store, 'dryRun').mockImplementation(async () => {
-      store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
-      return store.dryRunResult
-    })
-    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: '9c1f4a7b2e3d5a6f8091b2c3d4e5f6a7b8c9d0e1', proposal_url: 'https://git.example/pr/7', argocd_sync_verified: false })
-    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
+describe('the document view', () => {
+  // Only the clipboard is replaced: monkey-patching the whole `navigator` would take `userAgent`
+  // and the rest with it, and feature detection reads those during a mount.
+  function stubClipboard(writeText: (text: string) => Promise<void>) {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  }
 
-    // Stage 'apply': the dry-run gate warns and apply is the only primary action.
-    expect(wrapper.text()).toContain('Run dry run before delivery')
-    expect(findButton(wrapper, 'Apply reviewed patch')).toBeTruthy()
-    expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
-    expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
+  it('renders the ciphertext read-only and copies it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubClipboard(writeText)
+    const wrapper = mount(DocumentEditor, { props: { detail: detail() }, global: { plugins: [pinia] } })
 
-    await findButton(wrapper, 'Apply reviewed patch')!.trigger('click')
+    expect(wrapper.text()).toContain('Read-only.')
+    expect(wrapper.find('pre').text()).toContain('kind: SealedSecret')
+    expect(wrapper.find('pre input, pre textarea').exists()).toBe(false)
+
+    await wrapper.find('button').trigger('click')
     await flushPromises()
 
-    // Stage 'dry-run': the dry-run control replaces the apply control, and the row that now
-    // holds it stops claiming it is still waiting on the review above.
-    expect(wrapper.text()).toContain('Reviewed patch applied.')
-    expect(wrapper.text()).toContain('Nothing is written to Git yet')
-    expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
-    expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
-    expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
-    expect(railRow(wrapper, 'Check against the branch')!.text()).not.toContain('Waiting on the review above')
-
-    await findButton(wrapper, 'Run dry run')!.trigger('click')
-    await flushPromises()
-
-    // Stage 'deliver': delivery is gated on the dry-run result.
-    expect(wrapper.text()).toContain('Dry run complete.')
-    expect(wrapper.text()).toContain('wrote nothing')
-    // The base commit is shown as Git prints it, not as the server sent it.
-    expect(wrapper.text()).toContain('Path: clusters/prod/payments/api.yaml')
-    expect(wrapper.text()).toContain('base commit abc123')
-    expect(findButton(wrapper, 'Run dry run')).toBeFalsy()
-    expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
-
-    // The open row is the one carrying the delivery button, so it is the one that has to name
-    // the file it writes — the row that resolved the path folded two stages ago — and it is the
-    // one row that must not still be telling the operator to run the dry run it just ran.
-    const deliverRow = railRow(wrapper, 'Deliver')!
-    expect(deliverRow.text()).toContain('Path: clusters/prod/payments/api.yaml')
-    expect(deliverRow.text()).toContain('branch main')
-    expect(deliverRow.text()).not.toContain('Run dry run before delivery')
-
-    await findButton(wrapper, 'Create proposal')!.trigger('click')
-    await flushPromises()
-
-    expect(deliver).toHaveBeenCalledTimes(1)
-    // The diff carries no target_path, so the file name comes from the detail's
-    // discovered file_path.
-    expect(deliver).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
-    expect(wrapper.text()).toContain('https://git.example/pr/7')
-    expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
-
-    // The outcome names what was written; the commit is the seven characters Git
-    // prints rather than the whole hash.
-    expect(wrapper.text()).toContain('Proposal opened')
-    expect(wrapper.text()).toContain('Pushed 9c1f4a7 to main at clusters/prod/payments/api.yaml and opened a merge proposal.')
-    const proposal = wrapper.find('a[href="https://git.example/pr/7"]')
-    expect(proposal.exists()).toBe(true)
-    expect(proposal.attributes('rel')).toBe('noopener noreferrer')
-
-    // The delivery consumed the review: without the delivered state the panel would
-    // offer the same push again against ciphertext it has already sent.
-    expect(findButton(wrapper, 'Create proposal')).toBeFalsy()
-    expect(wrapper.text()).not.toContain('Delivery unavailable')
+    expect(writeText).toHaveBeenCalledWith(detail().sealed_secret_yaml)
+    expect(wrapper.text()).toContain('The manifest is on the clipboard.')
   })
 
-  it('runs the dry run straight off the reviewed diff when nothing is pending', async () => {
-    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
-    const store = useSecretsStore(pinia)
-    store.currentDiff = reviewedDiff()
-    const dryRun = vi.spyOn(store, 'dryRun').mockImplementation(async () => {
-      store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
-      return store.dryRunResult
-    })
-    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
+  it('does not claim the copy succeeded when the clipboard refuses', async () => {
+    stubClipboard(vi.fn().mockRejectedValue(new Error('denied')))
+    const wrapper = mount(DocumentEditor, { props: { detail: detail() }, global: { plugins: [pinia] } })
 
-    // No pending mutation: the apply step is skipped.
-    expect(findButton(wrapper, 'Apply reviewed patch')).toBeFalsy()
-    expect(findButton(wrapper, 'Run dry run')).toBeTruthy()
-
-    await findButton(wrapper, 'Run dry run')!.trigger('click')
+    await wrapper.find('button').trigger('click')
     await flushPromises()
 
-    expect(dryRun).toHaveBeenCalledWith('payments', 'api', 'encrypted-after', 'abc123', 'clusters/prod/payments/api.yaml')
-    expect(findButton(wrapper, 'Create proposal')).toBeTruthy()
+    expect(wrapper.text()).toContain('Copy YAML')
+    expect(wrapper.text()).not.toContain('The manifest is on the clipboard.')
   })
 
-  it('opens the row the flow stands on and folds the ones it has left', async () => {
-    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
-    const store = useSecretsStore(pinia)
-    store.currentDiff = reviewedDiff()
-    vi.spyOn(store, 'dryRun').mockImplementation(async () => {
-      store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'clusters/prod/payments/api.yaml', base_commit: 'abc123', mode: 'proposal' }
-      return store.dryRunResult
-    })
-    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
-
-    // The rows that can be toggled, in order. A row the flow has not reached carries no
-    // `aria-expanded` at all, because there is nothing for it to open.
-    const rows = () => wrapper.findAll('button').filter((button) => button.attributes('aria-expanded') !== undefined)
-
-    // Standing on Check: Review folded, Check open, Deliver not yet reachable.
-    expect(rows().map((row) => row.attributes('aria-expanded'))).toEqual(['false', 'true'])
-
-    await findButton(wrapper, 'Run dry run')!.trigger('click')
-    await flushPromises()
-
-    // Deliver open, and the folded Check row still names the path and base commit the
-    // delivery is made against.
-    expect(rows().map((row) => row.attributes('aria-expanded'))).toEqual(['false', 'false', 'true'])
-    expect(rows()[1].text()).toContain('clusters/prod/payments/api.yaml')
-    expect(rows()[1].text()).toContain('base commit abc123')
-
-    // A folded row is a toggle, not a dead end.
-    await rows()[0].trigger('click')
-    expect(rows()[0].attributes('aria-expanded')).toBe('true')
-    expect(rows()[0].text()).toContain('Includes: replace password')
-  })
-
-  it('names the commit, branch, and file for a direct push', async () => {
-    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:push'])
-    const store = useSecretsStore(pinia)
-    store.dryRunResult = { before: 'git-before', after: 'encrypted-after', path: 'kube/immich/tet-cred.yml', base_commit: 'abc1234def', mode: 'direct' }
-    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({
-      mode: 'direct',
-      commit_sha: '2a0a5dd0ac92dd290240811b4d3ef0ee8afa1be1',
-      branch: 'main',
-      file_path: 'kube/immich/tet-cred.yml',
-      argocd_sync_verified: false,
-    })
-    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'direct' } }))
-
-    await findButton(wrapper, 'Deliver directly')!.trigger('click')
-    await flushPromises()
-
-    expect(deliver).toHaveBeenCalledTimes(1)
-    // A direct push has no proposal URL, so every field the server sent is reported
-    // rather than a bare hash.
-    expect(wrapper.text()).toContain('Delivered directly')
-    expect(wrapper.text()).toContain('Committed 2a0a5dd to main at kube/immich/tet-cred.yml.')
-    expect(wrapper.text()).toMatch(/ArgoCD .*not verified/)
-    // Nothing offers a second push of what has just landed.
-    expect(findButton(wrapper, 'Deliver directly')).toBeFalsy()
-    expect(wrapper.text()).not.toContain('Delivery unavailable')
-  })
-
-  it('withholds delivery when the namespace capability is missing', () => {
-    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt'])
-    useSecretsStore(pinia).currentDiff = reviewedDiff()
-    const wrapper = mountPanel(makeDetail())
-
-    expect(wrapper.text()).toContain('Delivery unavailable')
-    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Deliver directly')
-  })
-
-  it('exposes no control for repository, branch, path, or mode', () => {
-    grant(pinia, 'payments', ['secret:seal', 'secret:decrypt', 'gitops:propose'])
-    useSecretsStore(pinia).currentDiff = reviewedDiff()
-    const wrapper = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
-
-    expect(wrapper.findAll('input, select, textarea')).toHaveLength(0)
-    const labelled = wrapper.findAll('[aria-label]').map((node) => node.attributes('aria-label'))
-    expect(labelled.filter((label) => /repository|branch|path|delivery mode/i.test(label ?? ''))).toHaveLength(0)
-  })
-})
-
-describe('new secret draft review', () => {
-  it('hands the ciphertext to the shared review state, runs a dry run, and delivers', async () => {
-    grant(pinia, 'payments', ['secret:seal', 'gitops:propose'])
-    const store = useSecretsStore(pinia)
-    vi.spyOn(api, 'post').mockResolvedValue({ data: { yaml: 'encrypted-new-secret' } } as never)
-
-    const form = mount(SecretNameEditor, { props: { namespace: 'payments', baseCommit: 'abc123' }, global: { plugins: [pinia] } })
-    await form.find('input[aria-label="New secret name"]').setValue('new-cred')
-    await form.find('textarea').setValue('kind: Secret\nstringData:\n  password: plaintext-marker')
-    await form.findAll('button').find((button) => button.text() === 'Encrypt for review')!.trigger('click')
-    await flushPromises()
-
-    expect(store.newSecretDraft).toMatchObject({ namespace: 'payments', name: 'new-cred', yaml: 'encrypted-new-secret', base_commit: 'abc123' })
-    // The box keeps the manifest the operator wrote: the draft holds ciphertext, so this is
-    // the only copy they could correct and re-encrypt from. The store never sees it.
-    const kept = (form.find('textarea').element as HTMLTextAreaElement).value
-    expect(kept).toContain('kind: Secret')
-    expect(kept).toContain('password: plaintext-marker')
-    expect(JSON.stringify(store.$state)).not.toContain('plaintext-marker')
-
-    vi.spyOn(store, 'dryRun').mockImplementation(async () => {
-      store.dryRunResult = { before: 'git-before', after: 'encrypted-new-secret', path: 'clusters/prod/payments/new-cred.yaml', base_commit: 'abc123', mode: 'proposal' }
-      return store.dryRunResult
-    })
-    const deliver = vi.spyOn(store, 'deliver').mockResolvedValue({ mode: 'proposal', commit_sha: 'cafe', proposal_url: 'https://git.example/pr/9', argocd_sync_verified: false })
-    const panel = mountPanel(makeDetail({ git: { ...makeDetail().git, delivery_mode: 'proposal' } }))
-    expect(panel.html()).toContain('encrypted-new-secret')
-
-    // New-secret drafts skip the apply step: there is no keyed patch.
-    expect(findButton(panel, 'Apply reviewed patch')).toBeFalsy()
-    expect(findButton(panel, 'Run dry run')).toBeTruthy()
-
-    await findButton(panel, 'Run dry run')!.trigger('click')
-    await flushPromises()
-
-    expect(findButton(panel, 'Create proposal')).toBeTruthy()
-
-    await findButton(panel, 'Create proposal')!.trigger('click')
-    await flushPromises()
-
-    expect(deliver).toHaveBeenCalledWith('payments', 'new-cred', 'encrypted-new-secret', 'abc123', undefined)
-    expect(store.newSecretDraft).toBeNull()
-  })
-
-  it('renders nothing for users without secret:seal', () => {
-    grant(pinia, 'payments', ['metadata:read'])
-    const form = mount(SecretNameEditor, { props: { namespace: 'payments', baseCommit: 'abc123' }, global: { plugins: [pinia] } })
-
-    expect(form.findAll('textarea')).toHaveLength(0)
-    expect(form.text()).not.toContain('Create new SealedSecret')
+  it('says so when the server returned no manifest', () => {
+    const wrapper = mount(DocumentEditor, { props: { detail: detail({ sealed_secret_yaml: '', yaml: '' }) }, global: { plugins: [pinia] } })
+    expect(wrapper.text()).toContain('The server did not return a manifest for this Secret.')
+    // Nothing to copy, so nothing offers to copy it.
+    expect(wrapper.find('button').exists()).toBe(false)
   })
 })

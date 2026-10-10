@@ -31,7 +31,11 @@ const rows = ref<Record<string, HTMLLIElement | null>>({})
 
 const namespace = computed(() => props.detail.namespace)
 const canReveal = computed(() => auth.hasCapability(namespace.value, 'secret:decrypt'))
-const canPatch = computed(() => auth.hasCapability(namespace.value, 'secret:seal') && canReveal.value && props.detail.git.in_sync_with_live)
+// The server refuses reveal and patch with a 409 while Git and the cluster differ, so the
+// controls that would earn one are withheld rather than offered. Concealing is not gated: it
+// drops plaintext this page already holds and sends nothing.
+const canRevealValue = computed(() => canReveal.value && props.detail.git.in_sync_with_live)
+const canPatch = computed(() => auth.hasCapability(namespace.value, 'secret:seal') && canRevealValue.value)
 // The commit every reveal and review is made against. Absent means the server did not report
 // one, which the controls that need it refuse rather than send.
 const baseCommit = computed(() => props.detail.git.base_commit || '')
@@ -64,7 +68,7 @@ const hasRevealed = (key: string) => revealed[key] !== undefined
 const openKeys = computed(() => (props.detail.keys || []).filter((key) => editing[key]))
 
 async function reveal(key: string) {
-  if (!canReveal.value || !baseCommit.value) return
+  if (!canRevealValue.value || !baseCommit.value) return
   error.value = ''; activeKey.value = key
   try {
     revealed[key] = (await store.reveal(namespace.value, props.detail.name, key, baseCommit.value)).value
@@ -191,7 +195,7 @@ defineExpose({ batchProblem, showProblems, clear })
 
 <template>
   <div class="flex flex-col">
-    <AppAlert v-if="!props.detail.git.in_sync_with_live" type="warning" title="Editing disabled" class="mb-3">
+    <AppAlert v-if="!props.detail.git.in_sync_with_live" type="warning" title="Revealing and editing disabled" class="mb-3">
       Git and live state differ. Resolve drift before revealing or editing values.
     </AppAlert>
     <AppAlert v-if="!canReveal" type="info" title="Values concealed" class="mb-3">
@@ -215,20 +219,21 @@ defineExpose({ batchProblem, showProblems, clear })
 
           <div class="ml-auto flex flex-wrap items-center gap-2">
             <AppSecretInput v-if="hasRevealed(key)" v-model="revealed[key]" readonly :ariaLabel="`Revealed value for ${key}`" />
-            <AppButton v-if="canReveal && !hasRevealed(key)" icon="eye" :disabled="!!activeKey" @click="reveal(key)">Reveal one key</AppButton>
+            <AppButton v-if="canRevealValue && !hasRevealed(key)" icon="eye" :disabled="!!activeKey" @click="reveal(key)">Reveal one key</AppButton>
             <AppButton v-if="hasRevealed(key)" icon="eye-off" :aria-label="`Conceal ${key}`" @click="conceal(key)">Conceal</AppButton>
             <!-- One control both ways: it opens the row's staged change and closes it again,
                  discarding what was staged. A button that disappeared on press would leave the
-                 expansion unannounced, so this one stays and carries the state. -->
+                 expansion unannounced, so this one stays and carries the state. It stays openable
+                 while `canPatch` is false only to close a row drift appeared under. -->
             <AppButton
-              v-if="canReveal"
+              v-if="canPatch || editing[key]"
               :icon="editing[key] ? 'trash' : 'pencil'"
               :aria-label="editing[key] ? `Discard the staged change to ${key}` : `Change ${key}`"
               :aria-expanded="editing[key]"
               :aria-controls="`staged-${key}`"
               @click="editing[key] ? clear(key) : startEdit(key)"
             >{{ editing[key] ? 'Discard' : 'Change' }}</AppButton>
-            <AppButton v-if="canReveal && !editing[key]" variant="ghost" icon="trash" :aria-label="`Remove ${key}`" @click="removeKey(key)">Remove</AppButton>
+            <AppButton v-if="canPatch && !editing[key]" variant="ghost" icon="trash" :aria-label="`Remove ${key}`" @click="removeKey(key)">Remove</AppButton>
           </div>
         </div>
 

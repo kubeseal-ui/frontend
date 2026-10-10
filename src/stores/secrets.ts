@@ -51,10 +51,15 @@ export const useSecretsStore = defineStore('secrets', {
     async reveal(namespace: string, name: string, key: string, baseCommit: string) { const response = await api.post<{ key: string; value: string }>(`${secretPath(namespace, name)}/reveal`, { key, base_commit: baseCommit }); return response.data },
 
     /** Replaces the pending change and drops anything derived from the previous one. */
-    stageChange(change: ChangeState) { this.change = change; this.review = null; this.check = null; this.delivery = null },
+    stageChange(change: ChangeState) {
+      // The entries are copied, not just the array, so an editor that goes on typing into a row
+      // it already staged cannot change what a press sends.
+      this.change = { ...change, mutations: change.mutations.map((mutation) => ({ ...mutation })) }
+      this.review = null; this.check = null; this.delivery = null
+    },
 
     // An edit's first press. Nothing is persisted: the operator reviews the ciphertext, then
-    // applies it. The batch is copied so a later edit to the rows cannot alter what is sent.
+    // applies it.
     async reviewChange() {
       const change = this.change
       if (!change?.name) throw new Error('No change to review')
