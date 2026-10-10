@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import { describeError } from '@/api'
 import { useSecretsStore } from '@/stores/secrets'
@@ -12,7 +12,7 @@ const secrets = useSecretsStore()
 const ui = useUiStore()
 const box = ref<HTMLInputElement | null>(null)
 
-// A whole cross-namespace listing, so it is built on first use rather than on every page load.
+// The refresh button's deliberate repeat: the one caller that asks again for a listing we hold.
 async function loadIndex() {
   try {
     await secrets.fetchIndex()
@@ -21,19 +21,28 @@ async function loadIndex() {
   }
 }
 
+// A whole cross-namespace listing, so it is built on first use rather than on every page load.
+function ensureIndex() {
+  // A query arrives one keystroke at a time and every one of them wants the same request, so an
+  // index already held — or already in flight — is not asked for again.
+  if (secrets.indexLoaded || secrets.indexLoading) return
+  return loadIndex()
+}
+
 // The header's search control opens the drawer, and focusing the box is what it asked for.
 watch(
   () => ui.searchRequests,
   async () => {
-    if (!secrets.indexLoaded) await loadIndex()
+    await ensureIndex()
     await nextTick()
     box.value?.focus()
   },
 )
 
-onMounted(() => {
-  if (props.modelValue) loadIndex()
-})
+// Typing is asking for the index. A query can reach the box before it is ever focused — restored
+// or set programmatically — and answering that from an index nobody requested reads "No Secret or
+// key matches." off a listing that was never made.
+watch(() => props.modelValue, (query) => { if (query.trim()) ensureIndex() }, { immediate: true })
 
 // The index is as wide as the caller's access: namespaces without metadata:read are dropped
 // server-side, so this counts what was returned rather than what exists.
@@ -54,7 +63,7 @@ const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => s
         autocomplete="off"
         spellcheck="false"
         class="field min-w-0 flex-1"
-        @focus="secrets.indexLoaded || loadIndex()"
+        @focus="ensureIndex"
         @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       />
       <button
@@ -67,8 +76,11 @@ const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => s
         <AppIcon name="refresh" :size="12" />
       </button>
     </div>
+    <!-- The label names the failure and the server's detail follows it. The store only ever holds
+         an Error, so a fallback alone would never render and the operator would read a bare
+         message like "gateway" with nothing saying what failed. -->
     <p v-if="secrets.indexError" class="mt-1 mb-0 text-xs text-danger">
-      {{ describeError(secrets.indexError, 'The search index could not be loaded') }}
+      The search index could not be loaded. {{ describeError(secrets.indexError, 'No detail was reported.') }}
     </p>
     <p v-else-if="secrets.indexLoading" class="mt-1 mb-0 text-xs text-muted">Building the search index…</p>
     <p v-else-if="secrets.indexLoaded && secrets.namespaces.length" class="mt-1 mb-0 text-xs text-muted">

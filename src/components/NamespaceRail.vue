@@ -18,11 +18,14 @@ const hits = computed(() => searchSecrets(secrets.index, query.value))
 const active = computed(() => String(route.params.namespace ?? ''))
 const currentName = computed(() => String(route.params.name ?? ''))
 
-// Announced as the query is typed. "Searching…" while the index is in flight, because an
-// empty result set is not yet an answer.
-const resultLabel = computed(() =>
-  secrets.indexLoading ? 'Searching…' : `${hits.value.length} ${hits.value.length === 1 ? 'match' : 'matches'}`,
-)
+// Announced as the query is typed. "Searching…" while the index is in flight, and nothing at all
+// for an index that is not held: the count of a listing that failed or was never asked for is not
+// zero, it is unknown, and the box below is where the failure is stated.
+const resultLabel = computed(() => {
+  if (secrets.indexLoading) return 'Searching…'
+  if (!secrets.indexLoaded) return ''
+  return `${hits.value.length} ${hits.value.length === 1 ? 'match' : 'matches'}`
+})
 
 const drift = (secret: SealedSecretSummary) => driftPresentation(secret.git?.drift || 'unknown')
 
@@ -70,7 +73,7 @@ onMounted(() => {
             </RouterLink>
           </li>
         </ul>
-        <p v-else-if="!secrets.indexLoading" class="m-0 px-2 py-1 text-xs text-muted">No Secret or key matches.</p>
+        <p v-else-if="secrets.indexLoaded" class="m-0 px-2 py-1 text-xs text-muted">No Secret or key matches.</p>
       </template>
 
       <p v-else-if="secrets.namespaces.length === 0" class="m-0 px-2 py-1 text-xs text-muted">

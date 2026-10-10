@@ -289,6 +289,13 @@ describe('the surface', () => {
   it('stops offering the press once the change has landed, and says why', async () => {
     const { wrapper } = await mountSurface(detail())
     await flushPromises()
+
+    // A change is staged first, because an empty one has no press to lose: the bar already states
+    // that instead of offering a button, which the test below pins on its own.
+    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Change')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await flushPromises()
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('Review change')
 
     useSecretsStore(pinia).delivery = DELIVERED
