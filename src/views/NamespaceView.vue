@@ -75,7 +75,7 @@ load()
       class="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent no-underline hover:underline"
     >
       <AppIcon name="chevron-left" :size="14" />
-      Secrets
+      Namespaces
     </RouterLink>
 
     <AppPageHeader eyebrow="Namespace" :title="props.namespace" title-id="namespace-title">
@@ -94,7 +94,9 @@ load()
       </template>
     </AppPageHeader>
 
-    <p v-if="!secrets.secretsLoaded || secrets.loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
+    <!-- Gated on the request, not on `secretsLoaded`: that flag is only ever set by a fetch
+         that succeeded, so `!secretsLoaded` keeps claiming to load after one that failed. -->
+    <p v-if="secrets.loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
       <AppSpinner :size="15" />
       Loading secrets…
     </p>
@@ -141,7 +143,7 @@ load()
         <li v-for="secret in visibleSecrets" :key="secret.name" class="border-b border-border">
           <RouterLink
             :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
-            class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 no-underline"
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 no-underline transition hover:bg-surface-raised focus-visible:bg-surface-raised"
           >
             <AppIcon name="key" :size="16" class="shrink-0 text-accent" />
             <h2 class="m-0 min-w-0 flex-1 truncate font-mono text-sm font-semibold text-ink">{{ secret.name }}</h2>

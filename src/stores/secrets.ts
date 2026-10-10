@@ -28,6 +28,9 @@ export const useSecretsStore = defineStore('secrets', {
     // so they share one fetch rather than issuing the same request twice.
     secretsNamespace: '' as string,
     secretsLoaded: false,
+    // The namespace whose listing is in flight. Separate from `loading`, which the namespaces
+    // call also sets — reading that as "secrets are coming" would be wrong.
+    secretsPending: '' as string,
     // The pending change and everything the three presses produce from it. One change model
     // covers an edit and a create; `review` is null for a create, which has nothing to diff.
     change: null as ChangeState | null,
@@ -43,6 +46,9 @@ export const useSecretsStore = defineStore('secrets', {
     // only — nothing decrypted — so it survives clearSensitiveState() and a route change.
     index: [] as SealedSecretSummary[],
     indexLoaded: false,
+    // Read by the rail as well as the box: while the index is in flight a query has no
+    // matches *yet*, and "No Secret or key matches." would be an answer it cannot give.
+    indexLoading: false,
     indexError: null as Error | null,
   }),
   getters: {
@@ -55,11 +61,18 @@ export const useSecretsStore = defineStore('secrets', {
   },
   actions: {
     async fetchNamespaces() { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<Namespace>>('/api/v1/namespaces'); this.namespaces = response.data.namespaces || []; return this.namespaces } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load namespaces'); throw error } finally { this.loading = false } },
-    async fetchSecrets(namespace: string) { this.loading = true; this.error = null; try { const response = await api.get<ListResponse<SealedSecretSummary>>(`/api/v1/secrets?namespace=${encodeURIComponent(namespace)}`); this.secrets = response.data.secrets || []; this.secretsNamespace = namespace; this.secretsLoaded = true; return this.secrets } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secrets'); throw error } finally { this.loading = false } },
+    async fetchSecrets(namespace: string) {
+      this.loading = true; this.error = null; this.secretsPending = namespace
+      try { const response = await api.get<ListResponse<SealedSecretSummary>>(`/api/v1/secrets?namespace=${encodeURIComponent(namespace)}`); this.secrets = response.data.secrets || []; this.secretsNamespace = namespace; this.secretsLoaded = true; return this.secrets } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secrets'); throw error } finally { this.loading = false; this.secretsPending = '' }
+    },
 
-    /** Cached by namespace: an empty listing is a loaded one, which is why this needs the flag. */
+    /** Cached by namespace: an empty listing is a loaded one, which is why this needs the flag.
+     *  A caller that arrives while the same namespace is already in flight joins it instead of
+     *  issuing a second request — `secretsLoaded` only records a *finished* fetch, so the rail
+     *  and the page, which mount in the same tick, would otherwise both start one. */
     async ensureSecrets(namespace: string) {
-      if (this.secretsLoaded && this.secretsNamespace === namespace) return this.secrets
+      if (this.secretsNamespace === namespace && this.secretsLoaded) return this.secrets
+      if (this.secretsPending === namespace) return this.secrets
       return this.fetchSecrets(namespace)
     },
 
@@ -67,6 +80,7 @@ export const useSecretsStore = defineStore('secrets', {
      *  is chrome around the route, and a search index that failed must not blank the page. */
     async fetchIndex() {
       this.indexError = null
+      this.indexLoading = true
       try {
         const response = await api.get<ListResponse<SealedSecretSummary>>('/api/v1/secrets')
         this.index = response.data.secrets || []
@@ -76,6 +90,8 @@ export const useSecretsStore = defineStore('secrets', {
         this.indexError = error instanceof Error ? error : new Error('Failed to load secrets')
         this.indexLoaded = false
         throw error
+      } finally {
+        this.indexLoading = false
       }
     },
     async fetchDetail(namespace: string, name: string) { this.loading = true; this.error = null; try { const response = await api.get<SealedSecretDetail>(secretPath(namespace, name)); this.currentDetail = response.data; return response.data } catch (error) { this.error = error instanceof Error ? error : new Error('Failed to load secret'); throw error } finally { this.loading = false } },

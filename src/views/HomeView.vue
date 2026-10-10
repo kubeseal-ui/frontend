@@ -98,7 +98,7 @@ onMounted(async () => {
       <li v-for="row in rows" :key="row.namespace.name" class="border-b border-border">
         <RouterLink
           :to="`/namespaces/${encodeURIComponent(row.namespace.name)}`"
-          class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 no-underline"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-3 no-underline transition hover:bg-surface-raised focus-visible:bg-surface-raised"
         >
           <AppIcon name="namespace" :size="16" class="shrink-0 text-accent" />
           <h2 class="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-ink">{{ row.namespace.name }}</h2>

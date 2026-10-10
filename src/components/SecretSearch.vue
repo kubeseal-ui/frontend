@@ -11,17 +11,13 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 const secrets = useSecretsStore()
 const ui = useUiStore()
 const box = ref<HTMLInputElement | null>(null)
-const loading = ref(false)
 
 // A whole cross-namespace listing, so it is built on first use rather than on every page load.
 async function loadIndex() {
-  loading.value = true
   try {
     await secrets.fetchIndex()
   } catch {
     // Rendered below; the rail must not take the route down with it.
-  } finally {
-    loading.value = false
   }
 }
 
@@ -54,7 +50,7 @@ const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => s
         ref="box"
         :value="modelValue"
         type="search"
-        placeholder="Search keys"
+        placeholder="Search Secrets and keys"
         autocomplete="off"
         spellcheck="false"
         class="field min-w-0 flex-1"
@@ -63,8 +59,8 @@ const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => s
       />
       <button
         type="button"
-        :aria-label="loading ? 'Refreshing the search index' : 'Refresh the search index'"
-        :disabled="loading"
+        :aria-label="secrets.indexLoading ? 'Refreshing the search index' : 'Refresh the search index'"
+        :disabled="secrets.indexLoading"
         class="cursor-pointer rounded-chip border border-border p-1 text-muted hover:text-ink disabled:opacity-60"
         @click="loadIndex"
       >
@@ -74,6 +70,7 @@ const namespacesIndexed = computed(() => new Set(secrets.index.map((secret) => s
     <p v-if="secrets.indexError" class="mt-1 mb-0 text-xs text-danger">
       {{ describeError(secrets.indexError, 'The search index could not be loaded') }}
     </p>
+    <p v-else-if="secrets.indexLoading" class="mt-1 mb-0 text-xs text-muted">Building the search index…</p>
     <p v-else-if="secrets.indexLoaded && secrets.namespaces.length" class="mt-1 mb-0 text-xs text-muted">
       Indexed {{ namespacesIndexed }}/{{ secrets.namespaces.length }} namespaces
     </p>
