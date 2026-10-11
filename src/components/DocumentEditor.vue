@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import type { SealedSecretDetail } from '@/types'
 
 // The document's second mode. It renders the ciphertext the cluster holds rather than an editor
@@ -32,9 +33,9 @@ async function copy() {
       <button
         v-if="yaml"
         type="button"
-        class="cursor-pointer rounded-chip border border-border-strong bg-surface/70 px-2.5 py-1 text-xs font-medium text-ink"
+        class="inline-flex cursor-pointer items-center gap-[5px] rounded-chip border border-border-strong bg-surface/70 px-2.5 py-1 text-xs font-medium text-ink"
         @click="copy"
-      >{{ copied ? 'Copied' : 'Copy YAML' }}</button>
+      ><AppIcon :name="copied ? 'check' : 'copy'" :size="13" />{{ copied ? 'Copied' : 'Copy YAML' }}</button>
       <span role="status" class="text-xs text-muted">{{ copied ? 'The manifest is on the clipboard.' : '' }}</span>
     </div>
   </div>

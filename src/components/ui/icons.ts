@@ -13,6 +13,10 @@ export const ICONS = {
   'chevron-down': ['M6.5 9.5 12 15l5.5-5.5'],
   // The mapped Git file: the Sync control's glyph, because it writes the cluster's copy to it.
   file: ['M13.5 3.2H7a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.7l-5.5-5.5Z', 'M13.4 3.4v5.3h5.3'],
+  copy: [
+    'M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z',
+    'M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2',
+  ],
   plus: ['M12 5v14', 'M5 12h14'],
   check: ['M5 12.5l4.5 4.5L19 7'],
   alert: ['M12 3.5 2.5 20h19L12 3.5Z', 'M12 10v4.5', 'M12 17v.5'],

@@ -205,6 +205,7 @@ onMounted(async () => {
           "
           @click="toggle('empty')"
         >
+          <AppIcon name="database" :size="14" />
           Empty <span class="font-mono">{{ emptyCount }}</span>
         </button>
       </div>
