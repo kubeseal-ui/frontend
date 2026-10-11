@@ -204,7 +204,7 @@ watch(() => props.namespace, load)
           <li v-for="secret in visibleSecrets" :key="secret.name" class="contents">
             <RouterLink
               :to="`/secrets/${encodeURIComponent(props.namespace)}/${encodeURIComponent(secret.name)}`"
-              class="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-[3px] border-b border-l-2 px-[14px] pt-3 pb-[13px] pl-[15px] no-underline transition-colors duration-[110ms] hover:bg-surface focus-visible:bg-surface [&:hover_.name]:text-accent"
+              class="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-[3px] border-b border-b-border border-l-2 px-[14px] pt-3 pb-[13px] pl-[15px] no-underline transition-colors duration-[110ms] hover:bg-surface focus-visible:bg-surface [&:hover_.name]:text-accent"
               :class="drift(secret.git.drift).gutter"
             >
               <span class="flex min-w-0 items-center gap-2.5">

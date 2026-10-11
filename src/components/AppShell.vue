@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import AppButton from '@/components/ui/AppButton.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import { type IconName } from '@/components/ui/icons'
 import SearchResults from '@/components/SearchResults.vue'
 import SecretSearch from '@/components/SecretSearch.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore, type ThemePreference } from '@/stores/ui'
+import { avatarUrl } from '@/utils/avatar'
 
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -23,6 +23,41 @@ const displayName = computed(() => auth.user?.name || auth.user?.username || '')
 const initials = computed(() =>
   displayName.value.trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase(),
 )
+const email = computed(() => auth.user?.email ?? '')
+
+// The account photo, empty unless the deployment names an endpoint — see utils/avatar.ts. A failed
+// load resets with the address it belongs to, so one account's miss cannot blank the next one's.
+const photo = computed(() => avatarUrl(email.value))
+const photoFailed = ref(false)
+watch(photo, () => {
+  photoFailed.value = false
+})
+
+// The account control is a native disclosure: the toggle, the keyboard operation and the
+// announcement are the element's own. What it does not have is a way out — Escape closes it and
+// hands focus back to the summary it came from, and a click anywhere else closes it, which is also
+// what every navigation in this app is.
+const account = ref<HTMLDetailsElement | null>(null)
+const summary = ref<HTMLElement | null>(null)
+
+function onPointerDown(event: PointerEvent) {
+  if (account.value && !account.value.contains(event.target as Node)) account.value.open = false
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !account.value?.open) return
+  account.value.open = false
+  summary.value?.focus()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onPointerDown)
+  document.addEventListener('keydown', onKeydown)
+})
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onPointerDown)
+  document.removeEventListener('keydown', onKeydown)
+})
 
 const themes: { value: ThemePreference; label: string; icon: IconName }[] = [
   { value: 'light', label: 'Light', icon: 'sun' },
@@ -81,14 +116,49 @@ async function logout() {
           </button>
         </div>
 
-        <!-- The avatar is decorative — the name beside it is the fact — and the cluster goes at
-             the width where the name would start truncating. -->
-        <span v-if="displayName" class="hidden items-center gap-2 text-[13px] text-muted md:flex">
-          <span aria-hidden="true" class="flex size-[26px] items-center justify-center rounded-full border border-border-strong bg-surface-raised text-[10px] font-bold text-ink">{{ initials }}</span>
-          {{ displayName }}
-        </span>
+        <!-- The account is one control: the photo, the name, and the way out are the same subject,
+             and a Sign out button standing beside them read as unrelated to the account it ends.
+             The name drops visually below md but stays in the accessibility tree, because an
+             avatar-only control would otherwise have no name at all. -->
+        <details v-if="auth.user" ref="account" class="relative shrink-0">
+          <summary
+            ref="summary"
+            class="flex cursor-pointer list-none items-center gap-2 rounded-control px-1.5 py-1 text-[13px] text-muted hover:bg-surface-raised hover:text-ink [&::-webkit-details-marker]:hidden"
+          >
+            <!-- The initials are the standing mark and the photo only ever covers them, so a
+                 missing image, an address the service has no record of, and avatars switched off
+                 are all the same rendering. -->
+            <span class="relative flex size-[26px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-strong bg-surface-raised text-[10px] font-bold text-ink">
+              <span aria-hidden="true">{{ initials }}</span>
+              <img
+                v-if="photo && !photoFailed"
+                :src="photo"
+                alt=""
+                referrerpolicy="no-referrer"
+                class="absolute inset-0 size-full object-cover"
+                @error="photoFailed = true"
+              />
+            </span>
+            <span class="sr-only md:not-sr-only">{{ displayName || 'Account' }}</span>
+            <AppIcon name="chevron-down" :size="12" class="text-faint" />
+          </summary>
 
-        <AppButton v-if="auth.isAuthenticated" variant="secondary" size="small" icon="sign-out" @click="logout">Sign out</AppButton>
+          <!-- A surface with a full border and no shadow: the app has no elevation layer to
+               borrow, and a panel that floats above the header would be the only one. -->
+          <div class="absolute right-0 top-[calc(100%+6px)] z-10 min-w-[200px] rounded-control border border-border-strong bg-surface p-1.5">
+            <p v-if="email" class="m-0 truncate border-b border-border px-2 pb-[7px] font-mono text-[11.5px] text-muted">
+              {{ email }}
+            </p>
+            <button
+              type="button"
+              class="mt-[5px] flex w-full cursor-pointer items-center gap-2 rounded-mini border-0 bg-transparent px-2 py-1.5 text-left text-[13px] text-ink hover:bg-surface-raised"
+              @click="logout"
+            >
+              <AppIcon name="sign-out" :size="14" class="text-muted" />
+              Sign out
+            </button>
+          </div>
+        </details>
       </div>
     </header>
 
