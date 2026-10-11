@@ -7,15 +7,8 @@ export const ICONS = {
     'M6 10h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z',
     'M8 10V7a4 4 0 0 1 8 0v3',
   ],
-  'git-branch': [
-    'M6 3v12',
-    'M21 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
-    'M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
-    'M18 9a9 9 0 0 1-9 9',
-  ],
   refresh: ['M21 12a9 9 0 1 1-2.6-6.4', 'M21 4v5h-5'],
   'sign-out': ['M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3', 'M10 17l5-5-5-5', 'M15 12H3'],
-  'arrow-right': ['M4 12h15', 'm13 6 6 6-6 6'],
   'chevron-left': ['M14.5 5 7.5 12l7 7'],
   'chevron-down': ['M6.5 9.5 12 15l5.5-5.5'],
   // The mapped Git file: the Sync control's glyph, because it writes the cluster's copy to it.
