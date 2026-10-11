@@ -160,14 +160,20 @@ const syncBaseCommit = computed(() => detail.value?.git.base_commit || '')
 // The live Secret still holds the version the Git file had before its last change, so the file
 // has moved on and a sync would overwrite whatever replaced it.
 const gitMovedAhead = computed(() => Boolean(detail.value?.git.git_moved_ahead))
+// Identity drift is the one divergence a sync cannot resolve: the mapped file is another Secret's
+// manifest, so the server refuses the sync as PATH_OCCUPIED. Withhold the control rather than offer a
+// button that only ever returns a conflict.
+const identityDrift = computed(() => detail.value?.git.drift_reason === 'identity')
 const canSync = computed(() => {
+  if (identityDrift.value) return false
   const required = requiredDeliveryCapability(detail.value?.git.delivery_mode || '')
   return required ? auth.hasCapability(namespace(), required) : false
 })
 
-// Three situations, three answers: no Git policy, no branch head, no capability.
+// Four situations, four answers: identity drift, no Git policy, no branch head, no capability.
 const syncUnavailable = computed(() => {
   const mode = detail.value?.git.delivery_mode
+  if (identityDrift.value) return 'The mapped file in Git holds a different Secret, so syncing this one would overwrite it. Point the namespace mapping at the right path, or move the other manifest, before syncing.'
   if (!mode) return 'This namespace has no Git delivery policy, so there is nowhere in Git for this Secret to be synced to.'
   if (!syncBaseCommit.value) return 'The Git source could not be read, so there is no branch head to sync against. Reload the page and try again.'
   return `Syncing writes to Git, which needs the ${requiredDeliveryCapability(mode)} capability in this namespace.`
