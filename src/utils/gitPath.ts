@@ -26,8 +26,13 @@ export function templateDirectory(template: string, namespace: string): string {
   return parts.join('/')
 }
 
-// The file name a rendered path ends in — what a chosen directory has to be joined with, since a
-// bare directory is not a destination the server will accept.
-export function renderedFileName(rendered: string): string {
-  return rendered.split('/').pop() || ''
+// The template's tail from the segment carrying `{name}` onward, rendered. A template may put the
+// identity in a directory (`apps/{name}/cred.yml`), where the last segment alone names no Secret —
+// joining a chosen directory to it would land every Secret on one file.
+export function renderedIdentityTail(template: string, namespace: string, name: string): string {
+  if (!template || !name) return ''
+  const segments = template.split('/')
+  const from = segments.findIndex((segment) => segment.includes('{name}'))
+  const tail = (from === -1 ? segments.slice(-1) : segments.slice(from)).join('/')
+  return renderNamespace(tail, namespace).replaceAll('{name}', name)
 }

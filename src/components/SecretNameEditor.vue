@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { ApiError, describeError } from '@/api'
 import { refocusAfterCollapse } from '@/utils/refocus'
-import { renderNamespace, renderPathTemplate, renderedFileName, templateDirectory } from '@/utils/gitPath'
+import { renderNamespace, renderPathTemplate, renderedIdentityTail, templateDirectory } from '@/utils/gitPath'
 import type { NamespaceGitPaths } from '@/types'
 
 // One form for both ways a Secret gets managed: writing it here, and adopting a live one
@@ -22,7 +22,7 @@ const emit = defineEmits<{ 'update:name': [value: string] }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
 const mode = ref<'create' | 'adopt'>('create')
-const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetDir = ref(''); const error = ref(''); const loading = ref(false)
+const name = ref(''); const yaml = ref(''); const scope = ref('strict'); const targetDir = ref(''); const subdirectory = ref(''); const error = ref(''); const loading = ref(false)
 const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
 // A sealed draft is a change with no mutations: /secrets/encrypt produced its ciphertext
 // outright, so there is nothing to diff it against and the review stage never runs.
@@ -55,12 +55,24 @@ const pathTemplate = computed(() => currentNsPaths.value?.path_template || '')
 // the template renders one and the server refuses a nameless path.
 const defaultDestination = computed(() => renderPathTemplate(pathTemplate.value, props.namespace, name.value))
 
+// Typed freely under a chosen directory, so what it holds is tidied here: the server writes the
+// path it is given, so what the picker names has to be what is sent. A blank, doubled or `.`
+// segment is the operator's spelling, not a destination.
+const normalizedSubdirectory = computed(() =>
+  subdirectory.value.split('/').map((segment) => segment.trim()).filter((segment) => segment && segment !== '.').join('/'),
+)
+// `..` is the one segment no tidying can resolve: honouring it would name a path outside the
+// directory just chosen, which is the only thing that choice decides.
+const stepsOutside = computed(() => normalizedSubdirectory.value.split('/').includes('..'))
+
 // The select picks a directory, but the server writes the path it is given: submitting the bare
 // directory is `400 INVALID_TARGET_PATH`, since an allowed entry is a prefix the destination must
-// sit under. So the chosen directory is joined with the file name here, where the name is known.
+// sit under. So the chosen directory is joined, here, with the template's identity-bearing tail —
+// the file name alone would drop the identity of a template like `apps/{name}/cred.yml`.
 const destination = computed(() => {
-  const fileName = renderedFileName(defaultDestination.value)
-  return targetDir.value && fileName ? `${targetDir.value}/${fileName}` : ''
+  const tail = renderedIdentityTail(pathTemplate.value, props.namespace, name.value)
+  if (!targetDir.value || !tail) return ''
+  return [targetDir.value, normalizedSubdirectory.value, tail].filter(Boolean).join('/')
 })
 // The first option is the mapping's own template, named as the directory it lands in: it is a
 // different thing from any allowed directory, since only it carries the namespace default.
@@ -69,6 +81,18 @@ const pathOptions = computed(() => [
   { label: defaultDirectory.value ? `${defaultDirectory.value}/ — the namespace default` : 'The namespace default', value: '' },
   ...directories.value.filter((directory) => directory !== `${defaultDirectory.value}/`).map((directory) => ({ label: directory, value: directory })),
 ])
+
+// The depth field exists only under a chosen directory, so returning to the mapping's own template
+// drops what it held rather than keeping a depth nothing is measured from.
+watch(targetDir, (next) => { if (!next) subdirectory.value = '' })
+
+// The path is the one thing this choice decides, so the select states it. Until the name that
+// completes it is typed there is no file to name, and the template is not it.
+const destinationHint = computed(() => {
+  if (destination.value) return `the file will be ${destination.value}`
+  if (targetDir.value) return 'the file this lands on is named once the Secret has a name.'
+  return defaultDestination.value ? `the file will be ${defaultDestination.value}` : `Rendered per Secret from ${pathTemplate.value}`
+})
 
 // The one value is empty on purpose: a template that reads like real data is one someone
 // eventually delivers.
@@ -112,11 +136,16 @@ const renderedName = ref('')
 // once that field has been left or encrypt has been pressed — a message that arrives
 // before anything has been touched reads as a fault rather than a prompt.
 const holdsOnlyTemplate = computed(() => yaml.value === pristineTemplate.value)
-const shown = reactive({ name: false, yaml: false, manifest: false })
+const shown = reactive({ name: false, yaml: false, manifest: false, subdirectory: false })
 
 function nameProblem() {
   if (!shown.name) return ''
   return name.value.trim() === '' ? 'This Secret needs a name.' : ''
+}
+
+function subdirectoryProblem() {
+  if (!shown.subdirectory) return ''
+  return stepsOutside.value ? 'A subdirectory cannot step outside the directory you chose.' : ''
 }
 
 // An empty box and an untouched template are the same answer: nothing to seal either way.
@@ -135,7 +164,7 @@ function yamlProblem() {
 
 // Leaving a field is what turns its problem on. Each box is its own unit here, so moving
 // to the next one counts as leaving — only movement inside the box does not.
-function leave(field: 'name' | 'yaml', event: FocusEvent) {
+function leave(field: 'name' | 'yaml' | 'subdirectory', event: FocusEvent) {
   const next = event.relatedTarget as Node | null
   if (next && (event.currentTarget as HTMLElement).contains(next)) return
   shown[field] = true
@@ -149,6 +178,7 @@ const open = computed(() => override.value ?? !draft.value)
 const toggle = ref<{ $el?: HTMLElement } | null>(null)
 const nameInput = ref<{ $el?: HTMLElement } | null>(null)
 const yamlInput = ref<{ $el?: HTMLElement } | null>(null)
+const subdirectoryInput = ref<{ $el?: HTMLElement } | null>(null)
 const summary = computed(() => [
   draft.value ? `Encrypted draft for ${draft.value.name}` : name.value,
   scope.value,
@@ -199,12 +229,12 @@ onMounted(() => {
 // control greyed out with the reason in a sentence beside it answers nothing.
 async function encrypt() {
   if (!canCreate.value) return
-  shown.name = true; shown.yaml = true; shown.manifest = true
+  shown.name = true; shown.yaml = true; shown.manifest = true; shown.subdirectory = true
   await nextTick()
-  if (nameProblem() || yamlProblem()) {
-    ;(nameProblem() ? nameInput.value?.$el : yamlInput.value?.$el)?.focus()
-    return
-  }
+  // The first field that needs answering is the one focus lands on, so the name is asked before
+  // the path it lands in and the path before the manifest that goes in it.
+  const focus = nameProblem() ? nameInput : subdirectoryProblem() ? subdirectoryInput : yamlProblem() ? yamlInput : null
+  if (focus) { focus.value?.$el?.focus(); return }
   await createDraft()
 }
 
@@ -216,7 +246,7 @@ async function createDraft() {
     // ciphertext, so a reopened stage showing a fresh template leaves them no way back to the
     // plaintext they typed. Discard is what starts the next Secret from a clean template.
     // The validation marks go, though — the press they answered has been acted on.
-    shown.name = false; shown.yaml = false; shown.manifest = false
+    shown.name = false; shown.yaml = false; shown.manifest = false; shown.subdirectory = false
   } catch (e) {
     // Both refusals are about which manifest this is, so they are restated in the
     // operator's terms; describeError carries the server's request id either way.
@@ -233,9 +263,9 @@ async function createDraft() {
 
 function discard() {
   store.discardChange()
-  name.value = ''; targetDir.value = ''
+  name.value = ''; targetDir.value = ''; subdirectory.value = ''
   seedTemplate()
-  shown.name = false; shown.yaml = false; shown.manifest = false
+  shown.name = false; shown.yaml = false; shown.manifest = false; shown.subdirectory = false
   // Discarding takes the button that was pressed with it, so focus is carried to the field
   // the emptied form starts at rather than dropped on `<body>`.
   return refocusAfterCollapse(() => nameInput.value?.$el)
@@ -285,9 +315,10 @@ onUnmounted(() => { yaml.value = '' })
           spellcheck="false"
           class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
         />
-        <!-- The file the name produces, before the file exists. It is the path the row will
-             carry, not a summary of one. -->
-        <span class="font-mono text-[11.5px] text-faint">{{ defaultDestination || `${pathTemplate || 'the namespace default'}` }}</span>
+        <!-- The file the name produces, before the file exists. It is the path the row will carry,
+             not a summary of one — so a chosen directory moves it, rather than standing beside a
+             default the Secret no longer lands on. -->
+        <span class="font-mono text-[11.5px] text-faint">{{ destination || defaultDestination || pathTemplate || 'the namespace default' }}</span>
         <span v-if="nameProblem()" id="name-problem" class="text-[12.5px] text-danger">{{ nameProblem() }}</span>
       </label>
 
@@ -303,8 +334,28 @@ onUnmounted(() => { yaml.value = '' })
         v-model="targetDir"
         label="Target directory"
         :options="pathOptions"
-        :hint="defaultDestination ? `the file will be ${destination || defaultDestination}` : `Rendered per Secret from ${pathTemplate}`"
+        :hint="destinationHint"
       />
+
+      <!-- Only under a chosen directory: a depth beneath that choice, which the mapping's own
+           template does not have. Empty is a depth of none, so the file lands where the path shown
+           above says it does. -->
+      <label v-if="targetDir" class="flex flex-col gap-[7px]" @focusout="leave('subdirectory', $event)">
+        <span class="text-[13px] font-semibold text-ink">Further subdirectory</span>
+        <input
+          ref="subdirectoryInput"
+          v-model="subdirectory"
+          type="text"
+          aria-label="Further subdirectory under the chosen directory"
+          :aria-invalid="subdirectoryProblem() ? 'true' : undefined"
+          :aria-describedby="subdirectoryProblem() ? 'subdirectory-problem' : undefined"
+          placeholder="e.g. prod"
+          autocomplete="off"
+          spellcheck="false"
+          class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
+        />
+        <span v-if="subdirectoryProblem()" id="subdirectory-problem" class="text-[12.5px] text-danger">{{ subdirectoryProblem() }}</span>
+      </label>
 
       <label class="flex flex-col gap-[7px]" @focusout="leave('yaml', $event)">
         <span class="text-[13px] font-semibold text-ink">Secret manifest</span>

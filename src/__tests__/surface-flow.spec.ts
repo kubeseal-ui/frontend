@@ -4,7 +4,7 @@
 // two views are mounted for the things that exist only in markup — the destination that gets
 // named, the mode switch, and the sync that is withheld when Git moved ahead.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
 import { pinia } from '@/pinia'
 import { router } from '@/router'
@@ -72,6 +72,32 @@ function posts(...bodies: unknown[]) {
 function stageEdit(store = useSecretsStore(pinia), mutations = editorBatch()) {
   store.stageChange({ namespace: 'payments', name: 'api', mutations, baseCommit: 'abc123', targetPath: 'clusters/payments/api.yaml', scope: 'strict' })
   return store
+}
+
+// The create form over one mapping. The directory picker exists only where the mapping grants one,
+// so each test states the grant it is about rather than sharing a fixture that hides it.
+async function mountCreate(mapping: { path_template: string; allowed_paths: string[] }) {
+  grant(['metadata:read', 'secret:seal'])
+  vi.spyOn(api, 'get').mockImplementation((async (path: string) => ({
+    data: path.includes('/gitops/paths')
+      ? { namespaces: [{ namespace: 'payments', repository: 'r', branch: 'main', mode: 'direct', ...mapping }] }
+      : {},
+  })) as never)
+  const wrapper = mount(NewSecretView, { props: { namespace: 'payments' }, global: { plugins: [pinia, router] } })
+  await flushPromises()
+  return wrapper
+}
+
+// The box opens holding the template's single empty key, which the server refuses to seal, so a
+// test that reaches the press has to put a manifest in it.
+async function writeManifest(wrapper: VueWrapper, name: string) {
+  await wrapper.find('textarea').setValue(`apiVersion: v1\nkind: Secret\nmetadata:\n  name: ${name}\nstringData:\n  key: "value"\n`)
+  await flushPromises()
+}
+
+async function pressEncrypt(wrapper: VueWrapper) {
+  await wrapper.findAll('button').find((candidate) => candidate.text() === 'Encrypt for review')!.trigger('click')
+  await flushPromises()
 }
 
 beforeEach(() => {
@@ -234,6 +260,62 @@ describe('the create path', () => {
     // The mapping's directory, rendered per namespace, marked as where a Secret lands by default.
     expect(wrapper.text()).toContain('clusters/payments')
     expect(wrapper.text()).toContain('default')
+  })
+
+  // A granted directory is where a file goes, not what it is called: joining the choice to the
+  // template's last segment alone would drop the identity a template like
+  // `clusters/{namespace}/{name}/cred.yml` carries in a directory, and land every Secret on one file.
+  it('joins a chosen directory to the template tail that names the Secret', async () => {
+    const post = posts({ yaml: 'cipher-sealed', base_commit: 'def456' })
+    const wrapper = await mountCreate({ path_template: 'clusters/{namespace}/{name}/cred.yml', allowed_paths: ['tools'] })
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('api')
+    await wrapper.find('select').setValue('tools')
+    await flushPromises()
+    expect(wrapper.text()).toContain('the file will be tools/api/cred.yml')
+
+    await wrapper.find('input[aria-label="Further subdirectory under the chosen directory"]').setValue('prod')
+    await flushPromises()
+    expect(wrapper.text()).toContain('the file will be tools/prod/api/cred.yml')
+
+    await writeManifest(wrapper, 'api')
+    await pressEncrypt(wrapper)
+
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ target_path: 'tools/prod/api/cred.yml' }))
+  })
+
+  // The server writes the path it is given, so the tidying is the browser's job: what the picker
+  // names is exactly what is sent.
+  it('sends the path it displayed, not the spelling it was typed in', async () => {
+    const post = posts({ yaml: 'cipher-sealed', base_commit: 'def456' })
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}', 'tools'] })
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('api')
+    await wrapper.find('select').setValue('tools')
+    await wrapper.find('input[aria-label="Further subdirectory under the chosen directory"]').setValue('//prod/./')
+    await flushPromises()
+    expect(wrapper.text()).toContain('the file will be tools/prod/api.yaml')
+
+    await writeManifest(wrapper, 'api')
+    await pressEncrypt(wrapper)
+
+    expect(post).toHaveBeenCalledWith('/api/v1/secrets/encrypt', expect.objectContaining({ target_path: 'tools/prod/api.yaml' }))
+  })
+
+  // The one segment no tidying can resolve: honouring it would send a path outside the directory
+  // the operator just chose, which is the only thing that choice decides.
+  it('refuses a subdirectory that steps outside the directory it was typed under', async () => {
+    const post = posts({ yaml: 'cipher-sealed', base_commit: 'def456' })
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}', 'tools'] })
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('api')
+    await wrapper.find('select').setValue('tools')
+    await wrapper.find('input[aria-label="Further subdirectory under the chosen directory"]').setValue('../other')
+    await writeManifest(wrapper, 'api')
+    await pressEncrypt(wrapper)
+
+    expect(wrapper.text()).toContain('A subdirectory cannot step outside the directory you chose.')
+    expect(post).not.toHaveBeenCalled()
   })
 })
 
