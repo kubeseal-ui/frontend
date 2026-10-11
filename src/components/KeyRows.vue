@@ -285,7 +285,7 @@ defineExpose({ batchProblem, showProblems, clear })
             :aria-controls="`staged-${key}`"
             class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="editing[key] ? clear(key) : startEdit(key)"
-          >{{ editing[key] ? 'Discard' : 'Change' }}</button>
+          ><AppIcon :name="editing[key] ? 'x' : 'pencil'" :size="13" />{{ editing[key] ? 'Discard' : 'Change' }}</button>
           <!-- The one action here that pressing it again does not undo, so it is the one that
                carries danger rather than the neutral tone its neighbours use. -->
           <button
