@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -11,15 +11,21 @@ const ACCOUNT_ENDPOINT = 'https://www.gravatar.com/avatar'
 const SIGNED_IN_EMAIL = 'ada@example.com'
 
 let pinia: Pinia
+let shell: VueWrapper | undefined
 
 function mountShell() {
-  return mount(AppShell, {
+  // Attached, unlike the rest of the suite: `focus()` is a no-op on a detached tree, so the Escape
+  // path's hand-back is not assertable without it. `afterEach` unmounts, which is also what
+  // unregisters the control's document listeners.
+  shell = mount(AppShell, {
+    attachTo: document.body,
     slots: { default: '<p id="route-content">route content</p>' },
     global: {
       plugins: [pinia],
       stubs: { RouterLink: { template: '<a><slot /></a>' } },
     },
   })
+  return shell
 }
 
 /** The account control is a native disclosure, so its state is the element's own property. */
@@ -35,6 +41,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  shell?.unmount()
+  shell = undefined
   window.localStorage.clear()
   vi.unstubAllEnvs()
 })
