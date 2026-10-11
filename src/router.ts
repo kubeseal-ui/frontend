@@ -43,7 +43,7 @@ router.beforeEach(async (to) => {
     return true
   } catch (error) {
     if (error instanceof ApiError && error.status !== 401) return true
-    window.location.assign('/api/v1/auth/login')
+    auth.redirectToLogin()
     return false
   }
 })

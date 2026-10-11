@@ -14,6 +14,9 @@ export const useAuthStore = defineStore('auth', {
     user: null as User | null,
     activeNamespace: null as string | null,
     loading: false,
+    // Set once the browser is being sent into the OIDC flow, so concurrent 401s share the one
+    // redirect rather than each calling location.assign.
+    reauthenticating: false,
   }),
   getters: {
     isAuthenticated: (state) => state.user !== null,
@@ -33,6 +36,16 @@ export const useAuthStore = defineStore('auth', {
     clearSession() {
       this.user = null
       this.activeNamespace = null
+    },
+    // A 401 anywhere means the session is gone, so send the browser into the OIDC flow rather than
+    // leaving a cleared SPA sitting on a page whose data just vanished — the bug being that a
+    // runtime 401 only cleared state, and nothing re-authenticated until a hard refresh ran the
+    // router guard. One-shot, so concurrent 401s share the redirect, and skipped when the
+    // deployment disables it (VITE_DISABLE_LOGOUT_ON_401, for local and test runs).
+    redirectToLogin() {
+      if (this.reauthenticating || import.meta.env.VITE_DISABLE_LOGOUT_ON_401 === 'true') return
+      this.reauthenticating = true
+      window.location.assign('/api/v1/auth/login')
     },
     hasCapability(namespace: string, capability: Capability): boolean {
       // Additive, matching the server: the effective grant is the global set unioned

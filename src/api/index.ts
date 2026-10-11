@@ -51,7 +51,13 @@ class ApiClient {
     let body: unknown
     try { body = await response.json() } catch { body = undefined }
 
-    if (response.status === 401) useAuthStore().clearSession()
+    if (response.status === 401) {
+      // Clear the stale session and start re-auth here, not only on the next navigation: a 401 on a
+      // background request would otherwise leave the SPA cleared but in place until a hard refresh.
+      const auth = useAuthStore()
+      auth.clearSession()
+      auth.redirectToLogin()
+    }
     if (!response.ok) throw new ApiError(response.status, body as ApiErrorShape | undefined)
     return { data: body as T }
   }

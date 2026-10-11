@@ -15,12 +15,15 @@ describe('API client', () => {
     expect(new Headers(request.headers).get('Content-Type')).toBe('application/json')
   })
 
-  it('converts error envelopes into typed errors and clears sessions on 401', async () => {
+  it('converts error envelopes into typed errors, clears the session and re-auths on 401', async () => {
     const auth = useAuthStore()
     auth.setSession({ email: 'user@example.com', name: 'User', username: 'user', namespaces: {} })
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: { code: 'CAPABILITY_DENIED', message: 'Access denied' } }), { status: 401 }))
     await expect(api.get('/api/v1/namespaces')).rejects.toMatchObject({ status: 401, code: 'CAPABILITY_DENIED' })
     expect(auth.isAuthenticated).toBe(false)
+    // A runtime 401 starts re-auth rather than waiting for the next navigation.
+    expect(assign).toHaveBeenCalledWith('/api/v1/auth/login')
   })
 
   it('carries the server request id into the message the operator is shown', () => {
