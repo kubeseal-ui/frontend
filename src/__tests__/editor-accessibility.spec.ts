@@ -47,7 +47,7 @@ const button = (wrapper: ReturnType<typeof mountRows>, label: string) =>
 // Every reveal control reads the same, so they are matched by order: the row is what tells them
 // apart, and which row a press discloses is the thing under test.
 const revealButtons = (wrapper: ReturnType<typeof mountRows>) =>
-  wrapper.findAll('button').filter((candidate) => candidate.text() === 'Reveal one key')
+  wrapper.findAll('button').filter((candidate) => candidate.attributes('aria-label')?.startsWith('Reveal ') === true)
 
 // The last batch the editor mirrored up to the surface, which is what the first press would send.
 // `emitted()` does not know what an event carries, so the payload shape is asserted where it is read.
@@ -72,10 +72,9 @@ describe('revealing', () => {
 
     expect(post).toHaveBeenCalledTimes(1)
     expect(post).toHaveBeenCalledWith('/api/v1/secrets/payments/api/reveal', { key: 'password', base_commit: 'abc123' })
-    // The row says what it is holding, and the row beside it is untouched.
-    expect(wrapper.text()).toContain('revealed')
-    expect(wrapper.text()).toContain('concealed')
+    // The row holds the plaintext it asked for; every other row still holds dots.
     expect((wrapper.find('input[aria-label="Revealed value for password"]').element as HTMLInputElement).value).toBe('hunter2')
+    expect(wrapper.text()).toContain('••••••••••••')
     // No bulk control: the second key is a second press and a second disclosure.
     expect(revealButtons(wrapper)).toHaveLength(1)
   })
@@ -91,8 +90,21 @@ describe('revealing', () => {
 
     expect(wrapper.find('input[aria-label="Revealed value for password"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('hunter2')
-    expect(wrapper.text()).not.toContain('revealed')
     expect(revealButtons(wrapper)).toHaveLength(2)
+  })
+
+  it('leaves a revealed row exactly one control, and it is the one that hides the value', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { key: 'password', value: 'hunter2' } } as never)
+    const wrapper = mountRows()
+
+    await revealButtons(wrapper)[0]!.trigger('click')
+    await flushPromises()
+
+    // The plaintext is on screen, so the only thing this row can do next is take it back:
+    // Change and Remove are both gone while the value is disclosed.
+    expect(button(wrapper, 'Conceal password')).toBeDefined()
+    expect(button(wrapper, 'Change password')).toBeUndefined()
+    expect(button(wrapper, 'Remove password')).toBeUndefined()
   })
 
   it('hides the controls entirely, and says why, without reveal access', async () => {
@@ -100,9 +112,10 @@ describe('revealing', () => {
     expect(wrapper.text()).toContain('this namespace does not grant reveal access')
     expect(revealButtons(wrapper)).toHaveLength(0)
     expect(button(wrapper, 'Change password')).toBeUndefined()
-    // Names are still readable — that is what metadata:read buys.
+    // Names are still readable — that is what metadata:read buys — and the value is still there,
+    // as the dots that stand in for it.
     expect(wrapper.text()).toContain('password')
-    expect(wrapper.text()).toContain('concealed')
+    expect(wrapper.text()).toContain('••••••••••••')
   })
 })
 
@@ -141,7 +154,7 @@ describe('staging a change', () => {
     expect(active?.name).toBe('operation-password')
     expect(active?.value).toBe('delete')
     // A delete opens no value field, so nothing sits between choosing it and reviewing it.
-    expect(wrapper.text()).toContain('Deletes the key; no value is needed.')
+    expect(wrapper.find('input[aria-label="Replacement value for password"]').exists()).toBe(false)
     expect(batch(wrapper)).toEqual([{ key: 'password', operation: 'delete', value: '' }])
   })
 
@@ -205,7 +218,7 @@ describe('when a row is allowed to say it is wrong', () => {
 
     expect(vm.batchProblem).toBe('')
 
-    await button(wrapper, 'Add key')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
     await flushPromises()
     expect(vm.batchProblem).toBe('Every key being added needs a name.')
 
@@ -217,7 +230,7 @@ describe('when a row is allowed to say it is wrong', () => {
 describe('adding a key', () => {
   it('puts focus on the name field of the row it just added', async () => {
     const wrapper = mountRows()
-    await button(wrapper, 'Add key')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
     await flushPromises()
 
     const active = document.activeElement as HTMLInputElement
@@ -226,7 +239,7 @@ describe('adding a key', () => {
 
   it('refuses a name the Secret already uses, once the row has been left', async () => {
     const wrapper = mountRows()
-    await button(wrapper, 'Add key')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
     await flushPromises()
     await wrapper.find('input[aria-label="New key name 1"]').setValue('password')
     await wrapper.find('input[aria-label="New key value 1"]').setValue('rotated')
@@ -243,7 +256,7 @@ describe('adding a key', () => {
 
   it('carries a new key as an add alongside the rest of the batch', async () => {
     const wrapper = mountRows()
-    await button(wrapper, 'Add key')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
     await flushPromises()
     await wrapper.find('input[aria-label="New key name 1"]').setValue('database_url')
     await wrapper.find('input[aria-label="New key value 1"]').setValue('postgres://localhost')
@@ -256,14 +269,15 @@ describe('when the Git source is not in sync', () => {
   it('withholds every control that would read or write a value', async () => {
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: {} } as never)
     const wrapper = mountRows(ALL, { git: git({ in_sync_with_live: false, drift: 'unknown' }) })
-    expect(wrapper.text()).toContain('Git and live state differ')
+    // Every control that would read or write a value is gone; the values themselves stay, as dots.
+    expect(wrapper.text()).toContain('••••••••••••')
 
     // Reveal is withheld with the rest. The server answers a drifted reveal with 409, so offering
     // it would be a guaranteed failure and a decrypt's worth of audit trail for nothing.
     expect(revealButtons(wrapper)).toHaveLength(0)
     expect(button(wrapper, 'Change password')).toBeUndefined()
     expect(button(wrapper, 'Remove password')).toBeUndefined()
-    expect(button(wrapper, 'Add key')).toBeUndefined()
+    expect(button(wrapper, 'Add a key')).toBeUndefined()
     expect(post).not.toHaveBeenCalled()
 
     // The names are still readable — that is what metadata:read buys, drift or not.
@@ -278,7 +292,7 @@ describe('every control', () => {
   async function openEverything() {
     const wrapper = mountRows()
     await button(wrapper, 'Change password')!.trigger('click')
-    await button(wrapper, 'Add key')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
     await flushPromises()
     return wrapper
   }

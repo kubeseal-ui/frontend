@@ -2,8 +2,6 @@
 import { computed, nextTick, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import AppCard from '@/components/ui/AppCard.vue'
-import AppInput from '@/components/ui/AppInput.vue'
 import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import AppTextarea from '@/components/ui/AppTextarea.vue'
@@ -11,7 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { ApiError, describeError } from '@/api'
 import { refocusAfterCollapse } from '@/utils/refocus'
-import { renderNamespace, renderPathTemplate, renderedFileName } from '@/utils/gitPath'
+import { renderNamespace, renderPathTemplate, renderedFileName, templateDirectory } from '@/utils/gitPath'
 import type { NamespaceGitPaths } from '@/types'
 
 // One form for both ways a Secret gets managed: writing it here, and adopting a live one
@@ -20,6 +18,7 @@ import type { NamespaceGitPaths } from '@/types'
 // store — and it is cleared on discard and unmount, not on submit: a folded stage that
 // reopened empty would leave the operator no way back to what they typed.
 const props = defineProps<{ namespace: string; baseCommit?: string }>()
+const emit = defineEmits<{ 'update:name': [value: string] }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
 const mode = ref<'create' | 'adopt'>('create')
@@ -29,9 +28,18 @@ const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:sea
 // outright, so there is nothing to diff it against and the review stage never runs.
 const draft = computed(() => (store.change?.encrypted ? store.change : null))
 const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace-wide', value: 'namespace-wide' }, { label: 'Cluster-wide', value: 'cluster-wide' }]
-const sources = [{ label: 'Write a new Secret', value: 'create' }, { label: 'Adopt an existing Secret', value: 'adopt' }]
+const sources = [{ label: 'Write a new Secret', value: 'create' }, { label: 'Adopt a running Secret', value: 'adopt' }]
 const adopting = computed(() => mode.value === 'adopt')
 const kubectlCommand = computed(() => `kubectl get secret <name> -n ${props.namespace} -o yaml`)
+
+// The scope caption is the option's cost, not a repetition of its name: the three choices are
+// not three words, they are three different ties between this ciphertext and this Secret.
+const SCOPE_COSTS: Record<string, string> = {
+  strict: 'Strict ties the ciphertext to this name and this namespace, so a renamed or moved copy stops decrypting.',
+  'namespace-wide': 'Namespace-wide lets the ciphertext be copied to any name in this namespace, at the cost of the tie to this one.',
+  'cluster-wide': 'Cluster-wide lets the ciphertext be copied to any name in any namespace, and is the loosest tie the product offers.',
+}
+const scopeCost = computed(() => SCOPE_COSTS[scope.value] || '')
 
 // A mapping with no allowed directories leaves the picker unrendered and the request carrying no
 // target_path, which is what leaves the server rendering its own path template.
@@ -54,15 +62,19 @@ const destination = computed(() => {
   const fileName = renderedFileName(defaultDestination.value)
   return targetDir.value && fileName ? `${targetDir.value}/${fileName}` : ''
 })
+// The first option is the mapping's own template, named as the directory it lands in: it is a
+// different thing from any allowed directory, since only it carries the namespace default.
+const defaultDirectory = computed(() => templateDirectory(pathTemplate.value, props.namespace))
 const pathOptions = computed(() => [
-  { label: 'Use default path', value: '' },
-  ...directories.value.map((directory) => ({ label: directory, value: directory })),
+  { label: defaultDirectory.value ? `${defaultDirectory.value}/ — the namespace default` : 'The namespace default', value: '' },
+  ...directories.value.filter((directory) => directory !== `${defaultDirectory.value}/`).map((directory) => ({ label: directory, value: directory })),
 ])
 
 // The one value is empty on purpose: a template that reads like real data is one someone
 // eventually delivers.
 function templateFor(secretName: string, namespace: string): string {
   return [
+    '# Sealed in this browser. Only the ciphertext is ever stored or sent.',
     'apiVersion: v1',
     'kind: Secret',
     'metadata:',
@@ -100,7 +112,7 @@ const renderedName = ref('')
 // once that field has been left or encrypt has been pressed — a message that arrives
 // before anything has been touched reads as a fault rather than a prompt.
 const holdsOnlyTemplate = computed(() => yaml.value === pristineTemplate.value)
-const shown = reactive({ name: false, yaml: false })
+const shown = reactive({ name: false, yaml: false, manifest: false })
 
 function nameProblem() {
   if (!shown.name) return ''
@@ -108,11 +120,17 @@ function nameProblem() {
 }
 
 // An empty box and an untouched template are the same answer: nothing to seal either way.
+// The template's own first line is a comment, so the check is against the rendered template
+// rather than against emptiness.
+function manifestProblem() {
+  if (!holdsOnlyTemplate.value) return ''
+  return shown.manifest ? 'This still holds only the template. Replace the empty key with the entries this Secret needs.' : ''
+}
+
 function yamlProblem() {
   if (!shown.yaml) return ''
   if (yaml.value.trim() === '') return 'Paste the manifest, or write one in this box.'
-  if (holdsOnlyTemplate.value) return 'This still holds only the template. Replace the empty key with the entries this Secret needs.'
-  return ''
+  return manifestProblem()
 }
 
 // Leaving a field is what turns its problem on. Each box is its own unit here, so moving
@@ -121,6 +139,7 @@ function leave(field: 'name' | 'yaml', event: FocusEvent) {
   const next = event.relatedTarget as Node | null
   if (next && (event.currentTarget as HTMLElement).contains(next)) return
   shown[field] = true
+  if (field === 'yaml') shown.manifest = true
 }
 
 // Encrypting is what moves the flow on, so that is what folds this stage: the form keeps its
@@ -135,6 +154,10 @@ const summary = computed(() => [
   scope.value,
   destination.value || defaultDestination.value,
 ].filter(Boolean).join(' · '))
+
+// The page's spine names what is already in this namespace, so the typed name is mirrored up
+// rather than read back out of the form.
+watch(name, (value) => emit('update:name', value), { immediate: true })
 
 watch(draft, async () => {
   override.value = null
@@ -168,7 +191,7 @@ watch(mode, (next) => {
 
 onMounted(() => {
   if (mode.value === 'create') seedTemplate()
-  // Shared with the create page's context card: only the first to mount asks.
+  // Shared with the create page's spine: only the first to mount asks.
   if (!store.gitPaths) store.fetchGitPaths()
 })
 
@@ -176,7 +199,7 @@ onMounted(() => {
 // control greyed out with the reason in a sentence beside it answers nothing.
 async function encrypt() {
   if (!canCreate.value) return
-  shown.name = true; shown.yaml = true
+  shown.name = true; shown.yaml = true; shown.manifest = true
   await nextTick()
   if (nameProblem() || yamlProblem()) {
     ;(nameProblem() ? nameInput.value?.$el : yamlInput.value?.$el)?.focus()
@@ -193,7 +216,7 @@ async function createDraft() {
     // ciphertext, so a reopened stage showing a fresh template leaves them no way back to the
     // plaintext they typed. Discard is what starts the next Secret from a clean template.
     // The validation marks go, though — the press they answered has been acted on.
-    shown.name = false; shown.yaml = false
+    shown.name = false; shown.yaml = false; shown.manifest = false
   } catch (e) {
     // Both refusals are about which manifest this is, so they are restated in the
     // operator's terms; describeError carries the server's request id either way.
@@ -212,7 +235,7 @@ function discard() {
   store.discardChange()
   name.value = ''; targetDir.value = ''
   seedTemplate()
-  shown.name = false; shown.yaml = false
+  shown.name = false; shown.yaml = false; shown.manifest = false
   // Discarding takes the button that was pressed with it, so focus is carried to the field
   // the emptied form starts at rather than dropped on `<body>`.
   return refocusAfterCollapse(() => nameInput.value?.$el)
@@ -223,92 +246,91 @@ onUnmounted(() => { yaml.value = '' })
 </script>
 
 <template>
-  <AppCard v-if="canCreate" title="Create new SealedSecret" icon="plus">
+  <div v-if="canCreate" class="flex max-w-[640px] flex-col gap-5">
     <!-- The folded stage keeps saying what it holds, and stays the way back into it: a draft
          never sits in a state the page offers no way out of. -->
-    <div v-if="!open || draft" class="mb-3 flex flex-col gap-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <span v-if="!open" class="text-sm text-muted">{{ summary }}</span>
-        <span class="ml-auto flex flex-wrap items-center gap-2">
-          <AppButton v-if="draft" size="small" @click="discard">Discard encrypted draft</AppButton>
-          <AppButton v-if="!open" ref="toggle" size="small" variant="ghost" @click="override = true">Edit</AppButton>
-          <AppButton v-else size="small" variant="ghost" @click="override = false">Hide</AppButton>
-        </span>
-      </div>
-
-      <AppAlert v-if="draft" type="success" title="Encrypted draft ready">
-        Ciphertext for {{ draft.name }} is queued in the shared review and delivery panel below. The plaintext Secret is no longer held on this page.
-      </AppAlert>
+    <div v-if="!open" class="flex flex-wrap items-center gap-2">
+      <span class="font-mono text-xs text-muted">{{ summary }}</span>
+      <span class="ml-auto flex flex-wrap items-center gap-2">
+        <AppButton v-if="draft" size="small" @click="discard">Discard encrypted draft</AppButton>
+        <AppButton ref="toggle" size="small" variant="ghost" @click="override = true">Edit</AppButton>
+      </span>
     </div>
 
-    <div v-show="open" class="flex flex-col gap-3">
-      <AppRadioGroup
-        v-model="mode"
-        name="secret-source"
-        :options="sources"
-        label="Secret source"
-      />
+    <div v-show="open" class="flex flex-col gap-5">
+      <div class="flex flex-col gap-[7px]">
+        <span class="text-[13px] font-semibold text-ink">Where it comes from</span>
+        <AppRadioGroup v-model="mode" name="secret-source" :options="sources" ariaLabel="Secret source" />
+      </div>
 
-      <AppAlert v-if="adopting" type="info" title="Adopt an existing Secret">
-        Read it with <code class="font-mono">{{ kubectlCommand }}</code> and paste the output below.
-        The live object's runtime metadata and apply annotations are stripped before sealing, so only
-        the Secret's content is versioned. Nothing is read from the cluster by this application.
+      <AppAlert v-if="adopting" type="info" title="Adopt a running Secret">
+        <p class="m-0 max-w-[62ch] text-[13px] text-muted">
+          Read it with <code class="font-mono">{{ kubectlCommand }}</code> and paste the output below.
+          The live object's runtime metadata and apply annotations are stripped before sealing, so only
+          the Secret's content is versioned. Nothing is read from the cluster by this application.
+        </p>
       </AppAlert>
 
-      <label class="flex flex-col gap-1 text-sm font-medium text-ink" @focusout="leave('name', $event)">
-        <span>Secret name</span>
-        <AppInput
+      <label class="flex flex-col gap-[7px]" @focusout="leave('name', $event)">
+        <span class="text-[13px] font-semibold text-ink">Name</span>
+        <input
           ref="nameInput"
           v-model="name"
-          ariaLabel="New secret name"
+          type="text"
+          aria-label="New secret name"
+          :aria-invalid="nameProblem() ? 'true' : undefined"
+          :aria-describedby="nameProblem() ? 'name-problem' : undefined"
           :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'"
-          :invalid="!!nameProblem()"
-          :describedBy="nameProblem() ? 'name-problem' : ''"
+          autocomplete="off"
+          spellcheck="false"
+          class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
         />
-        <span v-if="nameProblem()" id="name-problem" class="text-xs font-normal text-danger">{{ nameProblem() }}</span>
+        <!-- The file the name produces, before the file exists. It is the path the row will
+             carry, not a summary of one. -->
+        <span class="font-mono text-[11.5px] text-faint">{{ defaultDestination || `${pathTemplate || 'the namespace default'}` }}</span>
+        <span v-if="nameProblem()" id="name-problem" class="text-[12.5px] text-danger">{{ nameProblem() }}</span>
       </label>
 
-      <AppRadioGroup
-        v-model="scope"
-        name="secret-scope"
-        :options="scopes"
-        label="Secret scope"
-      />
+      <div class="flex flex-col gap-[7px]">
+        <span class="text-[13px] font-semibold text-ink">Scope</span>
+        <AppRadioGroup v-model="scope" name="secret-scope" :options="scopes" ariaLabel="Secret scope" />
+        <!-- The consequence is the label, so the choice can be made here rather than looked up. -->
+        <span class="text-[11.5px] text-faint">{{ scopeCost }}</span>
+      </div>
 
       <AppSelect
         v-if="currentNsPaths && directories.length > 0"
         v-model="targetDir"
         label="Target directory"
-        :hint="defaultDestination ? `Default: ${defaultDestination}` : `Rendered per Secret from ${pathTemplate}`"
         :options="pathOptions"
+        :hint="defaultDestination ? `the file will be ${destination || defaultDestination}` : `Rendered per Secret from ${pathTemplate}`"
       />
 
-      <label class="flex flex-col gap-1 text-sm font-medium text-ink" @focusout="leave('yaml', $event)">
-        <span>Secret manifest</span>
+      <label class="flex flex-col gap-[7px]" @focusout="leave('yaml', $event)">
+        <span class="text-[13px] font-semibold text-ink">Secret manifest</span>
         <AppTextarea
           ref="yamlInput"
           v-model="yaml"
           ariaLabel="New secret YAML"
           :placeholder="adopting ? 'Output of the kubectl command above' : 'Complete Kubernetes Secret YAML'"
-          :rows="6"
+          :rows="10"
           :invalid="!!yamlProblem()"
-          :describedBy="yamlProblem() ? 'yaml-problem' : ''"
+          :describedBy="yamlProblem() ? 'yaml-problem' : undefined"
+          class="w-full resize-y rounded-[10px] border border-border-strong bg-bg px-3.5 py-3 font-mono text-[12.5px] leading-[1.85] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
         />
-        <span v-if="yamlProblem()" id="yaml-problem" class="text-xs font-normal text-danger">{{ yamlProblem() }}</span>
+        <span class="text-[11.5px] text-faint">
+          This box is the only place in the app holding a Secret in plaintext. It is cleared when you leave the page, and the encryption happens here, not on the server.
+        </span>
+        <span v-if="yamlProblem()" id="yaml-problem" class="text-[12.5px] text-danger">{{ yamlProblem() }}</span>
       </label>
 
-      <div>
-        <AppButton
-          variant="primary"
-          icon="lock"
-          :loading="loading"
-          @click="encrypt"
-        >
-          Encrypt for review
-        </AppButton>
+      <div class="flex items-center justify-between gap-3 border-t border-border pt-3.5">
+        <AppButton variant="primary" icon="lock" :loading="loading" @click="encrypt">Encrypt for review</AppButton>
       </div>
 
-      <AppAlert v-if="error" type="error" title="Unable to encrypt">{{ error }}</AppAlert>
+      <AppAlert v-if="error" type="error" title="Unable to encrypt">
+        <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ error }}</p>
+      </AppAlert>
     </div>
-  </AppCard>
+  </div>
 </template>

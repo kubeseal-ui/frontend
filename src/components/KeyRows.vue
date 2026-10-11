@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
-import AppButton from '@/components/ui/AppButton.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
-import AppSecretInput from '@/components/ui/AppSecretInput.vue'
-import AppTag from '@/components/ui/AppTag.vue'
 import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
@@ -40,10 +38,14 @@ const canPatch = computed(() => auth.hasCapability(namespace.value, 'secret:seal
 // one, which the controls that need it refuse rather than send.
 const baseCommit = computed(() => props.detail.git.base_commit || '')
 
+// The twelve dots the product is: a value that is there and cannot be read, until one key is
+// asked for.
+const DOTS = '••••••••••••'
+
 // An add over a key that is present is refused by the API, so it is not offered.
 const EXISTING_OPERATIONS = [
-  { label: 'Replace', value: 'replace' },
-  { label: 'Delete', value: 'delete' },
+  { label: 'Replace the value', value: 'replace' },
+  { label: 'Delete the key', value: 'delete' },
 ]
 
 let nextRowId = 0
@@ -86,7 +88,7 @@ async function startEdit(key: string) {
   editing[key] = true
   operation[key] = operationOf(key)
   await nextTick()
-  rows.value[key]?.querySelector<HTMLInputElement>('input[type="password"]')?.focus()
+  rows.value[key]?.querySelector<HTMLInputElement>(`#staged-input-${CSS.escape(key)}`)?.focus()
 }
 
 // A removal is a delete of a key that is here, and the row states it outright rather than as a
@@ -195,49 +197,93 @@ defineExpose({ batchProblem, showProblems, clear })
 
 <template>
   <div class="flex flex-col">
-    <AppAlert v-if="!props.detail.git.in_sync_with_live" type="warning" title="Revealing and editing disabled" class="mb-3">
-      Git and live state differ. Resolve drift before revealing or editing values.
+    <AppAlert v-if="!canReveal" type="info" title="Values concealed" class="my-3">
+      <p class="m-0 max-w-[62ch] text-[13px] text-muted">
+        You can inspect encrypted key names, but this namespace does not grant reveal access.
+      </p>
     </AppAlert>
-    <AppAlert v-if="!canReveal" type="info" title="Values concealed" class="mb-3">
-      You can inspect encrypted key names, but this namespace does not grant reveal access.
+    <AppAlert v-if="error" type="error" title="Operation failed" closable class="my-3" @close="error = ''">
+      <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ error }}</p>
     </AppAlert>
-    <AppAlert v-if="error" type="error" title="Operation failed" closable class="mb-3" @close="error = ''">{{ error }}</AppAlert>
 
-    <ul class="m-0 flex list-none flex-col p-0">
+    <ul class="m-0 list-none p-0">
       <li
         v-for="key in props.detail.keys || []"
         :key="key"
         :ref="(element: unknown) => setRow(key, element)"
-        class="border-t border-border py-3 first:border-t-0"
+        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px] transition-colors duration-[110ms] hover:bg-surface"
+        :class="editing[key] ? 'border-l-accent bg-surface' : 'border-l-transparent'"
         @focusout="leave(stagedRowId(key), $event)"
       >
-        <div class="flex flex-wrap items-center gap-2">
-          <code class="font-mono text-sm">{{ key }}</code>
-          <AppTag v-if="editing[key]" tone="accent">{{ operationOf(key) }}</AppTag>
-          <AppTag v-else-if="hasRevealed(key)">revealed</AppTag>
-          <AppTag v-else>concealed</AppTag>
+        <span class="truncate font-mono text-[13.5px] font-[550] text-ink">{{ key }}</span>
 
-          <div class="ml-auto flex flex-wrap items-center gap-2">
-            <AppSecretInput v-if="hasRevealed(key)" v-model="revealed[key]" readonly :ariaLabel="`Revealed value for ${key}`" />
-            <AppButton v-if="canRevealValue && !hasRevealed(key)" icon="eye" :disabled="!!activeKey" @click="reveal(key)">Reveal one key</AppButton>
-            <AppButton v-if="hasRevealed(key)" icon="eye-off" :aria-label="`Conceal ${key}`" @click="conceal(key)">Conceal</AppButton>
-            <!-- One control both ways: it opens the row's staged change and closes it again,
-                 discarding what was staged. A button that disappeared on press would leave the
-                 expansion unannounced, so this one stays and carries the state. It stays openable
-                 while `canPatch` is false only to close a row drift appeared under. -->
-            <AppButton
-              v-if="canPatch || editing[key]"
-              :icon="editing[key] ? 'trash' : 'pencil'"
-              :aria-label="editing[key] ? `Discard the staged change to ${key}` : `Change ${key}`"
-              :aria-expanded="editing[key]"
-              :aria-controls="`staged-${key}`"
-              @click="editing[key] ? clear(key) : startEdit(key)"
-            >{{ editing[key] ? 'Discard' : 'Change' }}</AppButton>
-            <AppButton v-if="canPatch && !editing[key]" variant="ghost" icon="trash" :aria-label="`Remove ${key}`" @click="removeKey(key)">Remove</AppButton>
-          </div>
-        </div>
+        <span class="min-w-0">
+          <input
+            v-if="hasRevealed(key)"
+            readonly
+            type="text"
+            :value="revealed[key]"
+            :aria-label="`Revealed value for ${key}`"
+            class="inline-block max-w-full truncate rounded-mini border border-border-strong bg-surface-raised px-2.5 py-1 font-mono text-[12.5px] text-ink"
+          />
+          <span
+            v-else
+            aria-hidden="true"
+            class="font-mono text-[13px] tracking-[0.14em] text-faint select-none"
+            :class="editing[key] && operationOf(key) === 'delete' ? 'line-through opacity-55' : ''"
+          >{{ DOTS }}</span>
+        </span>
 
-        <div v-if="editing[key]" :id="`staged-${key}`" class="mt-3 flex flex-col gap-2 rounded-card-inner border border-accent/40 bg-accent/5 p-3">
+        <!-- The value's own controls, in the row they act on. Under drift the row keeps its dots
+             and loses every button: a control that cannot act is worse than no control. -->
+        <span class="flex items-center gap-[3px]">
+          <button
+            v-if="canRevealValue && !hasRevealed(key)"
+            type="button"
+            :disabled="!!activeKey"
+            :aria-label="`Reveal ${key}`"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+            @click="reveal(key)"
+          >
+            <AppIcon name="eye" :size="13" />Reveal
+          </button>
+          <button
+            v-if="hasRevealed(key)"
+            type="button"
+            :aria-label="`Conceal ${key}`"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised"
+            @click="conceal(key)"
+          >
+            <AppIcon name="eye-off" :size="13" />Conceal
+          </button>
+
+          <!-- One control both ways: it opens the row's staged change and closes it again,
+               discarding what was staged. It stays openable while `canPatch` is false only to
+               close a row drift appeared under. -->
+          <button
+            v-if="(canPatch && !hasRevealed(key)) || editing[key]"
+            type="button"
+            :aria-label="editing[key] ? `Discard the staged change to ${key}` : `Change ${key}`"
+            :aria-expanded="editing[key]"
+            :aria-controls="`staged-${key}`"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            @click="editing[key] ? clear(key) : startEdit(key)"
+          >{{ editing[key] ? 'Discard' : 'Change' }}</button>
+          <button
+            v-if="canPatch && !editing[key] && !hasRevealed(key)"
+            type="button"
+            :aria-label="`Remove ${key}`"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            @click="removeKey(key)"
+          >Remove</button>
+        </span>
+
+        <!-- The change opens inside the row it belongs to, indented under the key it acts on. -->
+        <div
+          v-if="editing[key]"
+          :id="`staged-${key}`"
+          class="col-span-full mt-2.5 flex flex-col gap-[11px] rounded-[10px] border border-accent/45 bg-accent/8 px-[13px] py-3"
+        >
           <AppRadioGroup
             :model-value="operationOf(key)"
             :name="`operation-${key}`"
@@ -247,60 +293,75 @@ defineExpose({ batchProblem, showProblems, clear })
             @update:model-value="setOperation(key, $event)"
           />
 
-          <AppSecretInput
+          <input
             v-if="operationOf(key) !== 'delete'"
+            :id="`staged-input-${key}`"
             v-model="replacements[key]"
-            placeholder="Replacement value"
-            :ariaLabel="`Replacement value for ${key}`"
-            :invalid="!!existingProblem(key)"
-            :describedBy="existingProblem(key) ? `staged-problem-${key}` : ''"
+            type="text"
+            :aria-label="`Replacement value for ${key}`"
+            :aria-invalid="existingProblem(key) ? 'true' : undefined"
+            :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
+            placeholder="New value"
+            autocomplete="off"
+            spellcheck="false"
+            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
           />
-          <p v-else class="m-0 text-sm text-muted">Deletes the key; no value is needed.</p>
 
-          <p v-if="existingProblem(key)" :id="`staged-problem-${key}`" class="m-0 text-sm text-danger">{{ existingProblem(key) }}</p>
+          <p v-if="existingProblem(key)" :id="`staged-problem-${key}`" class="m-0 text-[13px] text-danger">{{ existingProblem(key) }}</p>
         </div>
       </li>
 
       <li
         v-for="(row, index) in added"
         :key="row.id"
-        class="border-t border-border py-3"
+        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px]"
+        :class="'border-l-transparent'"
         @focusout="leave(addedRowId(row), $event)"
       >
-        <div class="flex flex-wrap items-center gap-2.5">
-          <AppTag tone="accent">add</AppTag>
-          <input
-            :ref="(element: unknown) => setAddInput(row.id, element)"
-            v-model="row.key"
-            :aria-label="`New key name ${index + 1}`"
-            :aria-invalid="addNameProblem(row) ? 'true' : undefined"
-            :aria-describedby="addNameProblem(row) ? `new-problem-${row.id}` : undefined"
-            placeholder="Key name"
-            class="field min-w-0 flex-1 font-mono"
-          />
-          <AppSecretInput
-            v-model="row.value"
-            class="min-w-0 flex-1"
-            placeholder="Value"
-            :ariaLabel="`New key value ${index + 1}`"
-            :invalid="!!addValueProblem(row)"
-            :describedBy="addValueProblem(row) ? `new-problem-${row.id}` : ''"
-          />
-          <AppButton
-            size="small"
-            variant="ghost"
-            icon="x"
+        <input
+          :ref="(element: unknown) => setAddInput(row.id, element)"
+          v-model="row.key"
+          type="text"
+          :aria-label="`New key name ${index + 1}`"
+          :aria-invalid="addNameProblem(row) ? 'true' : undefined"
+          :aria-describedby="addNameProblem(row) ? `new-problem-${row.id}` : undefined"
+          placeholder="Key name"
+          autocomplete="off"
+          spellcheck="false"
+          class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] text-ink placeholder:font-sans placeholder:text-faint"
+        />
+        <input
+          v-model="row.value"
+          type="text"
+          :aria-label="`New key value ${index + 1}`"
+          :aria-invalid="addValueProblem(row) ? 'true' : undefined"
+          :aria-describedby="addValueProblem(row) ? `new-problem-${row.id}` : undefined"
+          placeholder="Value"
+          autocomplete="off"
+          spellcheck="false"
+          class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+        />
+        <span class="flex items-center gap-[3px]">
+          <button
+            type="button"
             :aria-label="`Remove new key ${index + 1}`"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="removeAdded(index)"
-          />
-        </div>
-        <p v-if="addProblem(row)" :id="`new-problem-${row.id}`" class="mt-2 mb-0 text-sm text-danger">{{ addProblem(row) }}</p>
+          ><AppIcon name="x" :size="13" />Discard</button>
+        </span>
+        <p v-if="addProblem(row)" :id="`new-problem-${row.id}`" class="col-span-full mt-1.5 mb-0 text-[13px] text-danger">{{ addProblem(row) }}</p>
       </li>
     </ul>
 
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-      <AppButton v-if="canPatch" icon="plus" @click="addRow">Add key</AppButton>
-      <AppButton v-if="batch.length > 0" variant="ghost" class="ml-auto" @click="clear()">Discard all</AppButton>
-    </div>
+    <!-- The ledger's last line: a key that is not here yet is added where the others are. -->
+    <button
+      v-if="canPatch"
+      type="button"
+      class="flex w-full cursor-pointer items-center gap-[7px] border-0 border-b border-border bg-transparent px-[15px] py-[11px] text-left text-[12.5px] font-semibold text-muted hover:bg-surface hover:text-accent"
+      @click="addRow"
+    >
+      <AppIcon name="plus" :size="13" />
+      Add a key
+    </button>
   </div>
 </template>

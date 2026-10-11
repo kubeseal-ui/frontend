@@ -42,39 +42,37 @@ async function logout() {
       href="#main-content"
     >Skip to main content</a>
 
-    <!-- Flat, keylined, and opaque. The bar is a band rather than a panel: every screen shares it,
-         and a rounded surface here would read as a second page. -->
-    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-surface px-[clamp(1rem,4vw,4rem)] py-2">
-      <RouterLink to="/" class="flex shrink-0 items-center gap-2 no-underline">
-        <span class="flex size-7 items-center justify-center rounded-control bg-accent text-accent-ink">
+    <!-- A band, not a panel: every screen shares it, and a rounded surface here would read as a
+         second page. -->
+    <header class="sticky top-0 z-20 flex items-center gap-[18px] border-b border-border bg-surface px-[22px] py-3">
+      <RouterLink to="/" class="flex shrink-0 items-center gap-2.5 no-underline">
+        <span class="flex size-[30px] items-center justify-center rounded-control bg-accent text-accent-ink">
           <AppIcon name="lock" :size="16" />
         </span>
-        <span class="hidden text-[1.0625rem] font-semibold tracking-tight text-ink sm:inline">kubeseal-ui</span>
+        <span class="hidden text-[15px] font-bold tracking-[-0.03em] text-ink sm:inline">kubeseal</span>
       </RouterLink>
 
-      <!-- Centred in the space the two clusters leave, and capped: a search box that spans a wide
-           window stops reading as a field and starts reading as a banner. -->
-      <div class="mx-auto w-full min-w-0 max-w-[26rem]">
-        <SecretSearch v-model="query" />
-      </div>
+      <!-- The strip is what the query is typed into even when it is answering, so it is never an
+           overlay. -->
+      <SecretSearch v-model="query" />
 
-      <div class="flex shrink-0 items-center gap-2">
-        <!-- A segmented control of pressed buttons, not a radio group: each button is its glyph
-             alone, so aria-label is its name. The selected chip takes the accent and a surface
-             fill, because the track's fill against the bar's own is under a percent apart — a
-             selection resting on that fill alone would not be one. -->
-        <div class="flex items-center gap-[2px] rounded-chip border border-border p-[2px]" role="group" aria-label="Colour theme">
+      <span class="flex-1" aria-hidden="true" />
+
+      <div class="flex shrink-0 items-center gap-2.5">
+        <!-- Pressed buttons, not a radio group: each one is its glyph alone, so aria-label is its
+             name. -->
+        <div class="flex items-center gap-[2px] rounded-control border border-border bg-bg p-[3px]" role="group" aria-label="Colour theme">
           <button
             v-for="theme in themes"
             :key="theme.value"
             type="button"
             :aria-label="theme.label"
             :title="theme.label"
-            class="inline-flex cursor-pointer items-center justify-center rounded-chip border-0 p-1.5"
+            class="inline-flex h-6 w-[26px] cursor-pointer items-center justify-center rounded-chip border-0"
             :class="
               ui.themePreference === theme.value
                 ? 'bg-surface-raised text-accent'
-                : 'bg-transparent text-muted hover:text-ink'
+                : 'bg-transparent text-faint hover:text-ink'
             "
             :aria-pressed="ui.themePreference === theme.value"
             @click="ui.setThemePreference(theme.value)"
@@ -83,18 +81,20 @@ async function logout() {
           </button>
         </div>
 
-        <!-- Who is signed in. The avatar is decorative — the name beside it is the fact — and the
-             whole cluster goes at the width where the name would start truncating instead. -->
-        <span v-if="displayName" class="hidden items-center gap-2 md:flex">
-          <span aria-hidden="true" class="flex size-6 items-center justify-center rounded-full bg-surface-raised font-mono text-[0.625rem] text-muted">{{ initials }}</span>
-          <span class="text-sm text-muted">{{ displayName }}</span>
+        <!-- The avatar is decorative — the name beside it is the fact — and the cluster goes at
+             the width where the name would start truncating. -->
+        <span v-if="displayName" class="hidden items-center gap-2 text-[13px] text-muted md:flex">
+          <span aria-hidden="true" class="flex size-[26px] items-center justify-center rounded-full border border-border-strong bg-surface-raised text-[10px] font-bold text-ink">{{ initials }}</span>
+          {{ displayName }}
         </span>
 
         <AppButton v-if="auth.isAuthenticated" variant="secondary" size="small" icon="sign-out" @click="logout">Sign out</AppButton>
       </div>
     </header>
 
-    <div class="mx-auto w-[min(1400px,calc(100%_-_2rem))] pt-8 pb-16">
+    <!-- No horizontal padding here: sections own their own `px-[26px]`, so a full-bleed row can
+         reach the edge its keyline is drawn at. -->
+    <div class="mx-auto w-[min(1320px,100%)] pb-16">
       <main id="main-content" class="min-w-0">
         <SearchResults v-if="searching" :query="query" />
         <div v-show="!searching"><slot /></div>

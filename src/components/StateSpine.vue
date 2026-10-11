@@ -1,109 +1,83 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import AppIcon from '@/components/ui/AppIcon.vue'
-import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
-import { requiredDeliveryCapability } from '@/utils/delivery'
-import { driftPresentation } from '@/utils/drift'
 import type { SealedSecretDetail } from '@/types'
 
-// The spine holds the state of the change, not a second copy of the editor: where it is going,
-// what can be done here, and which of the three presses have already happened.
-const props = defineProps<{ namespace: string; detail?: SealedSecretDetail }>()
-const auth = useAuthStore()
+// The spine holds the state of the change, not a second copy of the editor: which of the three
+// presses have happened, what the change is still against, and what this screen is allowed to do.
+const props = defineProps<{
+  detail?: SealedSecretDetail
+  staged: number
+  baseCommit: string
+  canSeal: boolean
+  canReveal: boolean
+  canDeliver: boolean
+  canSync: boolean
+}>()
 const store = useSecretsStore()
-
-const mode = computed(() => props.detail?.git.delivery_mode || store.namespaceDeliveryMode(props.namespace))
-const paths = computed(() => store.namespaceGitPaths(props.namespace))
-// What the change is made against and where it lands. The dry run's own answer wins, because
-// that is the destination the server actually verified.
-const base = computed(() => store.review?.baseCommit || store.change?.baseCommit || props.detail?.git.base_commit || '')
-const target = computed(() => store.check?.result.path || store.review?.targetPath || props.detail?.git.file_path || '')
-
-const driftState = computed(() => props.detail?.git.drift || (props.detail?.git.in_sync_with_live ? 'in-sync' : 'unknown'))
-// Drift withholds revealing, sealing and delivery on this page whatever the namespace grants, so
-// these answer what can be done here; the sentence below names the reason. With no detail there
-// is no drift to read, so no claim is made.
-const inSync = computed(() => !props.detail || driftState.value === 'in-sync')
-const canSeal = computed(() => inSync.value && auth.hasCapability(props.namespace, 'secret:seal'))
-const canReveal = computed(() => inSync.value && auth.hasCapability(props.namespace, 'secret:decrypt'))
-const deliverCapability = computed(() => requiredDeliveryCapability(mode.value))
-const canDeliver = computed(() =>
-  inSync.value && (deliverCapability.value ? auth.hasCapability(props.namespace, deliverCapability.value) : false))
-
-const drift = computed(() => (props.detail ? driftPresentation(driftState.value) : null))
 
 // A stage is done when the store holds what it produced. Nothing here is a gate on the presses —
 // the bar below owns that — so these read as history rather than as instructions.
 const stages = computed(() => [
-  { key: 'review', title: 'Review', done: Boolean(store.review), skipped: !props.detail },
-  { key: 'check', title: 'Check', done: Boolean(store.check), skipped: false },
-  { key: 'deliver', title: 'Deliver', done: Boolean(store.delivery), skipped: false },
+  { key: 'review', title: 'Review', done: Boolean(store.review) },
+  { key: 'check', title: 'Check against the branch', done: Boolean(store.check) },
+  { key: 'deliver', title: 'Deliver to Git', done: Boolean(store.delivery) },
+])
+
+// A change in flight has something to be against; with nothing staged the panel answers the other
+// question, which is what this screen will let you do at all.
+const inFlight = computed(() => props.staged > 0 || Boolean(store.review))
+
+const branchHead = computed(() => props.detail?.git.base_commit || '')
+
+const abilities = computed(() => [
+  { label: 'Seal a change', allowed: props.canSeal },
+  { label: 'Reveal values', allowed: props.canReveal },
+  { label: 'Deliver to Git', allowed: props.canDeliver },
+  ...(props.canSync ? [{ label: 'Sync to Git', allowed: true }] : []),
 ])
 </script>
 
 <template>
   <!-- The change's own column, not a second card: the document beside it carries the content, and
-       this only states where the change is going and which of the three presses have happened. A
-       rounded surface around that summary would read as a second object on the page. -->
-  <aside
-    aria-label="Change state"
-    class="flex flex-col gap-5 border-border lg:sticky lg:top-24 lg:border-l lg:pl-5"
-  >
+       this only states where the change stands. A rounded surface around that summary would read
+       as a second object on the page. -->
+  <aside aria-label="Change state" class="flex w-[258px] shrink-0 flex-col gap-[22px]">
     <div>
-      <h2 class="mb-2 text-xs font-semibold text-muted">Destination</h2>
-      <dl class="m-0 flex flex-col gap-2 text-sm">
-        <div class="flex flex-col gap-0.5">
-          <dt class="text-xs text-muted">File</dt>
-          <dd class="m-0 break-all font-mono text-xs">{{ target || 'Resolved by the check' }}</dd>
-        </div>
-        <div class="flex flex-col gap-0.5">
-          <dt class="text-xs text-muted">Base commit</dt>
-          <dd class="m-0 break-all font-mono text-xs">{{ base || 'Unavailable' }}</dd>
-        </div>
-        <div class="flex flex-col gap-0.5">
-          <dt class="text-xs text-muted">Delivery</dt>
-          <dd class="m-0">{{ mode || 'Not mapped' }}</dd>
-        </div>
-        <div v-if="paths?.branch" class="flex flex-col gap-0.5">
-          <dt class="text-xs text-muted">Branch</dt>
-          <dd class="m-0 break-all font-mono text-xs">{{ paths.branch }}</dd>
-        </div>
-      </dl>
+      <h2 class="mb-[9px] text-xs font-[650] text-muted">This change</h2>
+      <div
+        v-for="stage in stages"
+        :key="stage.key"
+        class="flex items-center gap-2 py-[3px] text-[13px]"
+        :class="stage.done ? 'text-ink' : 'text-muted'"
+      >
+        <span class="size-[7px] shrink-0 rounded-full" :class="stage.done ? 'bg-success' : 'bg-border-strong'" />
+        {{ stage.title }}
+      </div>
     </div>
 
-    <div class="border-t border-border pt-4">
-      <h2 class="mb-2 text-xs font-semibold text-muted">Here you can</h2>
-      <ul class="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
-        <li class="flex items-center gap-1.5">
-          <AppIcon :name="canSeal ? 'check' : 'x'" :size="13" :class="canSeal ? 'text-success' : 'text-danger'" />
-          Seal a change
-        </li>
-        <li class="flex items-center gap-1.5">
-          <AppIcon :name="canReveal ? 'check' : 'x'" :size="13" :class="canReveal ? 'text-success' : 'text-danger'" />
-          Reveal values
-        </li>
-        <li class="flex items-center gap-1.5">
-          <AppIcon :name="canDeliver ? 'check' : 'x'" :size="13" :class="canDeliver ? 'text-success' : 'text-danger'" />
-          {{ mode ? `Deliver (${deliverCapability})` : 'Deliver' }}
-        </li>
-      </ul>
+    <div v-if="inFlight">
+      <h2 class="mb-[9px] text-xs font-[650] text-muted">Against</h2>
+      <div class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]">
+        <span class="text-muted">Base commit</span>
+        <span class="font-mono text-xs text-ink">{{ baseCommit || 'Unavailable' }}</span>
+      </div>
+      <div class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]">
+        <span class="text-muted">Branch head</span>
+        <span class="font-mono text-xs text-ink">{{ branchHead || 'Unavailable' }}</span>
+      </div>
     </div>
 
-    <div class="border-t border-border pt-4">
-      <h2 class="mb-2 text-xs font-semibold text-muted">This change</h2>
-      <ol class="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
-        <li v-for="stage in stages" :key="stage.key" class="flex items-center gap-1.5">
-          <AppIcon v-if="stage.done" name="check" :size="13" class="text-success" />
-          <span v-else class="inline-block size-1.5 rounded-full bg-border-strong" />
-          <span :class="stage.done ? 'text-ink' : 'text-muted'">{{ stage.title }}</span>
-        </li>
-      </ol>
+    <div v-else>
+      <h2 class="mb-[9px] text-xs font-[650] text-muted">Here you can</h2>
+      <div
+        v-for="ability in abilities"
+        :key="ability.label"
+        class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]"
+      >
+        <span class="text-muted">{{ ability.label }}</span>
+        <span class="font-mono text-xs" :class="ability.allowed ? 'text-success' : 'text-danger'">{{ ability.allowed ? '✓' : '✗' }}</span>
+      </div>
     </div>
-
-    <p v-if="drift && drift.label !== 'In sync'" class="m-0 flex items-start gap-1.5 border-t border-border pt-4 text-sm text-muted">
-      <AppIcon name="alert" :size="13" class="mt-0.5 shrink-0" />
-      <span>Git status: {{ drift.label }}. Reveal, editing and delivery are disabled until it is resolved.</span>
-    </p>
   </aside>
 </template>

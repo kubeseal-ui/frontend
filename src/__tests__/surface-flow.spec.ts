@@ -284,7 +284,7 @@ describe('the surface', () => {
     expect(router.currentRoute.value.query.mode).toBe('yaml')
     // ...and both buttons announce which one is pressed rather than showing it in colour alone.
     expect(modeButton('YAML').attributes('aria-pressed')).toBe('true')
-    expect(modeButton('Key rows').attributes('aria-pressed')).toBe('false')
+    expect(modeButton('Keys').attributes('aria-pressed')).toBe('false')
     expect(wrapper.text()).toContain('Copy YAML')
     expect(refetches()).toBe(reads)
   })
@@ -343,7 +343,7 @@ describe('the surface', () => {
     await flushPromises()
 
     expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Review change')
-    expect(wrapper.text()).toContain('Nothing staged. Change, remove, or add a key to begin.')
+    expect(wrapper.text()).toContain('Nothing staged. Reveal, change, or remove a key to begin.')
   })
 })
 

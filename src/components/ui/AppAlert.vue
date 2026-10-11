@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppIcon from './AppIcon.vue'
-import { type IconName } from './icons'
 
 // The role follows the tone: an error or warning interrupts (`role="alert"`), an
 // informational or success note does not (`role="status"`).
@@ -16,11 +15,14 @@ const props = withDefaults(
 
 defineEmits<{ close: [] }>()
 
-const TONES: Record<string, { frame: string; icon: IconName }> = {
-  info: { frame: 'border-info/40 text-info', icon: 'info' },
-  success: { frame: 'border-success/40 text-success', icon: 'check' },
-  warning: { frame: 'border-warning/40 text-warning', icon: 'alert' },
-  error: { frame: 'border-danger/40 text-danger', icon: 'alert' },
+// One box, four tones: a flat surface with the tone on its left edge and its heading. It is the
+// result of something the workflow did, so it sits in the column at the page's own weight rather
+// than floating above it.
+const TONES: Record<string, { frame: string; text: string }> = {
+  info: { frame: 'border-l-info', text: 'text-info' },
+  success: { frame: 'border-l-success', text: 'text-success' },
+  warning: { frame: 'border-l-warning', text: 'text-warning' },
+  error: { frame: 'border-l-danger', text: 'text-danger' },
 }
 
 const tone = computed(() => TONES[props.type])
@@ -30,24 +32,20 @@ const interrupts = computed(() => props.type === 'error' || props.type === 'warn
 <template>
   <div
     :role="interrupts ? 'alert' : 'status'"
-    class="flex items-start gap-2.5 rounded-card-inner border bg-surface-raised/70 px-4 py-3"
+    class="flex flex-col gap-[7px] rounded-[10px] border border-l-[3px] border-border bg-surface px-[15px] py-[14px]"
     :class="tone.frame"
   >
-    <AppIcon :name="tone.icon" :size="17" class="mt-0.5" />
-
-    <div class="min-w-0 flex-1 text-[0.95rem] text-ink">
-      <strong v-if="title" class="block font-semibold">{{ title }}</strong>
-      <slot />
-    </div>
+    <h3 v-if="title" class="m-0 text-[13.5px] font-[650]" :class="tone.text">{{ title }}</h3>
+    <slot />
 
     <button
       v-if="closable"
       type="button"
       aria-label="Dismiss"
-      class="-mr-1 cursor-pointer rounded-chip border-0 bg-transparent p-1 text-muted hover:text-ink"
+      class="cursor-pointer self-start rounded-mini border border-border-strong bg-transparent px-2 py-0.5 text-xs text-muted hover:text-ink"
       @click="$emit('close')"
     >
-      <AppIcon name="x" :size="15" />
+      <AppIcon name="x" :size="12" />
     </button>
   </div>
 </template>

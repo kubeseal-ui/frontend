@@ -5,9 +5,9 @@ import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import type { Fact } from '@/components/ui/AppPageFacts.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
-import AppTag from '@/components/ui/AppTag.vue'
 import DiffBlocks from '@/components/DiffBlocks.vue'
 import DocumentEditor from '@/components/DocumentEditor.vue'
 import KeyRows from '@/components/KeyRows.vue'
@@ -60,6 +60,26 @@ const driftStatus = () => {
 }
 const driftLabel = computed(() => driftPresentation(driftStatus()).label)
 
+const inSync = computed(() => driftStatus() === 'in-sync')
+const canReveal = computed(() => inSync.value && scoped('secret:decrypt'))
+
+const facts = computed<Fact[]>(() => {
+  if (!detail.value) return []
+  return [
+    { value: detail.value.scope || 'strict', label: 'scope' },
+    { value: String(detail.value.key_count), label: 'encrypted keys' },
+    inSync.value
+      ? { label: 'in sync', tone: 'success' }
+      : { label: driftLabel.value.toLowerCase(), tone: 'danger' },
+  ]
+})
+
+// Where a change here lands, and how it gets there: the file, the branch, the mode.
+const destination = computed(() =>
+  [detail.value?.git.repository ?? '', detail.value?.git.branch ?? ''].filter(Boolean).join(' @ '))
+
+const staged = computed(() => batch.value.length || (store.change?.mutations.length ?? 0))
+
 // --- The three presses -----------------------------------------------------
 const step = computed<WorkflowStep>(() => {
   if (!store.review) return 'review'
@@ -80,20 +100,18 @@ const ready = computed(() => {
 // store drops the change it consumed, and pressing again would meet a base-commit conflict.
 const idle = computed(() => {
   if (store.delivery) return 'Delivered. Change another key to run the workflow again.'
+  if (!inSync.value) return 'Reveal and editing are disabled while the Git source is not confirmed in sync.'
   if (step.value === 'review' && batch.value.length === 0) {
     // "Change, remove, or add a key" is only true when this page is offering those controls. Over
-    // a Secret whose drift or grants have withheld all three, it sends the operator looking for a
-    // button that is not there, so each reason gets its own sentence instead.
-    if (!detail.value?.git.in_sync_with_live) {
-      return 'Git and live state differ, so nothing can be staged until the drift is resolved.'
-    }
+    // a Secret whose grants have withheld all three, it sends the operator looking for a button
+    // that is not there, so that reason gets its own sentence instead.
     if (!scoped('secret:seal') || !scoped('secret:decrypt')) {
       return 'Staging a change needs the secret:seal and secret:decrypt capabilities in this namespace.'
     }
     if (baseCommit.value === '') {
       return 'The Git source reported no base commit, so there is nothing to stage a change against.'
     }
-    return 'Nothing staged. Change, remove, or add a key to begin.'
+    return 'Nothing staged. Reveal, change, or remove a key to begin.'
   }
   return ''
 })
@@ -185,27 +203,22 @@ watch([() => route.params.namespace, () => route.params.name], load)
 </script>
 
 <template>
-  <section aria-labelledby="page-title" class="flex flex-col">
-    <RouterLink
-      :to="`/namespaces/${encodeURIComponent(namespace())}`"
-      class="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent no-underline hover:underline"
-    >
-      <AppIcon name="chevron-left" :size="14" />
-      {{ namespace() }}
-    </RouterLink>
+  <section aria-labelledby="page-title">
+    <AppPageHeader :title="title" title-id="page-title" :facts="facts">
+      <template #back>
+        <RouterLink
+          :to="`/namespaces/${encodeURIComponent(namespace())}`"
+          class="inline-flex items-center gap-1.5 text-[12.5px] text-muted no-underline hover:text-ink"
+        >
+          <AppIcon name="chevron-left" :size="12" />
+          {{ namespace() }}
+        </RouterLink>
+      </template>
 
-    <AppPageHeader :title="title" title-id="page-title" mono>
-      <template #eyebrow>
-        <AppTag v-if="detail" tone="accent">{{ detail.scope || 'strict' }}</AppTag>
-      </template>
-      <template #subtitle>
-        <p v-if="detail" class="m-0 text-muted">
-          {{ detail.namespace }} · {{ countLabel(detail.key_count, 'encrypted key') }}
-        </p>
-      </template>
+      <template v-if="detail" #context><span v-if="detail.git.file_path">{{ detail.git.file_path }} · </span><span v-if="destination" class="font-mono text-muted">{{ destination }}</span><template v-if="destination"> · </template>{{ deliveryMode }}</template>
     </AppPageHeader>
 
-    <p v-if="loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
+    <p v-if="loading" role="status" class="flex items-center gap-2 px-[26px] pt-4 text-sm text-muted">
       <AppSpinner :size="15" />
       Loading SealedSecret…
     </p>
@@ -213,70 +226,85 @@ watch([() => route.params.namespace, () => route.params.name], load)
     <!-- The detail is cleared before every load, so an empty result and a failed one are told
          apart rather than both reading as "not found". -->
     <template v-else>
-      <AppAlert v-if="error" type="error" title="Could not load SealedSecret">
-        <p class="m-0">{{ error }}</p>
-        <AppButton class="mt-2" icon="refresh" @click="load">Retry</AppButton>
-      </AppAlert>
+      <div class="px-[26px]">
+        <AppAlert v-if="error" type="error" title="Could not load SealedSecret">
+          <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ error }}</p>
+          <AppButton class="mt-1 self-start" icon="refresh" @click="load">Retry</AppButton>
+        </AppAlert>
 
-      <AppEmpty v-else-if="!detail" icon="lock" description="SealedSecret not found" />
+        <AppEmpty v-else-if="!detail" icon="lock" description="SealedSecret not found" />
+      </div>
 
-      <div v-else class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_210px]">
-        <div class="flex min-w-0 flex-col">
+      <div v-if="detail" class="flex items-start gap-7 px-[26px] pb-10">
+        <div class="min-w-0 flex-1">
           <!-- Reported like a delivery, because it is the same result shape. -->
-          <AppAlert v-if="syncOutcome" type="success" closable :title="syncTitle" class="mb-4" @close="syncOutcome = null">
-            <span class="block">{{ syncSummary }}</span>
+          <AppAlert v-if="syncOutcome" type="success" :title="syncTitle" class="mb-5">
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncSummary }}</p>
             <a
               v-if="syncOutcome?.proposal_url"
               :href="syncOutcome?.proposal_url"
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-1 block break-all text-accent no-underline hover:underline"
+              class="font-mono text-xs break-all text-accent no-underline hover:underline"
             >{{ syncOutcome?.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
-            <span v-if="!syncOutcome?.argocd_sync_verified" class="mt-1 block">ArgoCD synchronization is not verified by this workflow.</span>
+            <p v-if="!syncOutcome?.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
+              ArgoCD synchronization is not verified by this workflow.
+            </p>
           </AppAlert>
-          <AppAlert v-if="syncError" type="error" closable class="mb-4" @close="syncError = ''">{{ syncError }}</AppAlert>
+
+          <AppAlert v-if="syncError" type="error" title="The live Secret could not be synced to Git" class="mb-[3px]">
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncError }}</p>
+          </AppAlert>
 
           <!-- Drift gates revealing and editing, so it is stated before the content it disables. -->
-          <AppAlert v-if="driftStatus() !== 'in-sync'" type="warning" title="Git source is not confirmed in sync" class="mb-4">
-            <p class="m-0">Status: {{ driftLabel }}. Reveal, editing, and delivery are disabled.</p>
+          <AppAlert v-if="!inSync" type="error" title="Git source is not confirmed in sync" class="mb-5">
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">
+              Status: <strong class="font-semibold text-ink">{{ driftLabel }}</strong>. Reveal, editing, and delivery are disabled.
+            </p>
             <!-- Git-only is the one drift nothing here can act on: this page never writes to
                  the cluster. -->
-            <p v-if="driftStatus() === 'git_only'" class="mt-2 mb-0">
+            <p v-if="driftStatus() === 'git_only'" class="m-0 max-w-[62ch] text-[13px] text-muted">
               The manifest is in Git and there is no Secret for it in the cluster. Nothing on this page writes to the
               cluster — a GitOps controller managing this namespace is what would apply it.
             </p>
             <!-- Git moved past the cluster, so a sync would overwrite a change this Secret
                  predates. Withheld rather than removed, and the sentence says what pressing it
                  would discard. -->
-            <p v-if="canSync && syncBaseCommit && gitMovedAhead" class="mt-2 mb-0">
+            <p v-if="canSync && syncBaseCommit && gitMovedAhead" class="m-0 max-w-[62ch] text-[13px] text-muted">
               Git holds a change this Secret predates: the mapped file was rewritten after the version in the
               cluster. Syncing would overwrite that change with this Secret's content.
             </p>
-            <AppButton
-              v-if="canSync && syncBaseCommit"
-              :variant="gitMovedAhead ? 'secondary' : 'primary'"
-              size="small"
-              icon="git-branch"
-              class="mt-2"
-              :loading="syncing"
-              @click="onSync"
-            >{{ gitMovedAhead ? 'Sync anyway' : 'Sync Live Secret to Git' }}</AppButton>
-            <p v-else class="mt-2 mb-0">{{ syncUnavailable }}</p>
+            <div v-if="canSync && syncBaseCommit" class="mt-1 flex items-center gap-2.5">
+              <AppButton
+                :variant="gitMovedAhead ? 'secondary' : 'primary'"
+                icon="file"
+                :loading="syncing"
+                @click="onSync"
+              >{{ gitMovedAhead ? 'Sync anyway' : 'Sync Live Secret to Git' }}</AppButton>
+              <span class="text-xs text-faint">writes what is in the cluster to the mapped file</span>
+            </div>
+            <p v-else class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncUnavailable }}</p>
+            <p class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
+              ArgoCD synchronization is not verified by this workflow.
+            </p>
           </AppAlert>
 
-          <!-- The mode switch: real pressed buttons, so the state is announced and keyboard
-               reachable, and selection is never colour alone. -->
-          <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Document mode">
-            <button
-              v-for="option in (['rows', 'yaml'] as const)"
-              :key="option"
-              type="button"
-              class="cursor-pointer rounded-chip border px-2.5 py-1 text-xs font-semibold transition"
-              :class="mode === option ? 'border-accent bg-accent/10 text-accent' : 'border-border text-muted hover:text-ink'"
-              :aria-pressed="mode === option"
-              @click="setMode(option)"
-            >{{ option === 'rows' ? 'Key rows' : 'YAML' }}</button>
-            <span class="ml-auto text-sm text-muted">{{ countLabel(detail.key_count, 'encrypted key') }}</span>
+          <!-- The mode switch: pressed buttons, so the state is announced, keyboard reachable,
+               and never colour alone. -->
+          <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Document mode">
+            <span class="flex gap-[3px] rounded-control border border-border bg-surface p-[3px]">
+              <button
+                v-for="option in (['rows', 'yaml'] as const)"
+                :key="option"
+                type="button"
+                class="h-[26px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
+                :class="mode === option ? 'bg-surface-raised text-accent' : 'text-muted hover:text-ink'"
+                :aria-pressed="mode === option"
+                @click="setMode(option)"
+              >{{ option === 'rows' ? 'Keys' : 'YAML' }}</button>
+            </span>
+            <span v-if="staged" class="ml-auto font-mono text-xs text-faint">{{ countLabel(staged, 'change') }} staged</span>
+            <span v-else-if="!inSync" class="ml-auto font-mono text-xs text-faint">read only</span>
           </div>
 
           <KeyRows v-if="mode === 'rows'" ref="editor" :detail="detail" @update:batch="batch = $event" />
@@ -285,45 +313,44 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <!-- What the review returned, and what the check verified. Both read from the store:
                the review is frozen at the moment it was made, so it keeps showing the ciphertext
                that was reviewed even after the rows move on. -->
-          <section v-if="store.review" class="mt-6" aria-label="Reviewed ciphertext">
-            <h2 class="mb-2 text-[0.8125rem] font-semibold text-ink">
-              Review · includes {{ store.review.mutations.map((m) => `${m.operation} ${m.key}`).join(', ') }}
-            </h2>
+          <template v-if="store.review">
+            <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
+              Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code>
+            </h3>
             <DiffBlocks :before="store.review.before" :after="store.review.after" />
-          </section>
+          </template>
 
-          <section v-if="store.check" class="mt-6" aria-label="Checked against the branch">
-            <h2 class="mb-2 text-[0.8125rem] font-semibold text-ink">
-              Check · {{ store.check.result.path }}
-            </h2>
-            <DiffBlocks
-              :before="store.check.result.before"
-              :after="store.check.result.after"
-              before-label="Git before"
-              :after-label="store.check.result.before ? 'Git after' : 'What will be written'"
-            />
-          </section>
+          <template v-if="store.check">
+            <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
+              Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code>
+            </h3>
+            <DiffBlocks :before="store.check.result.before" :after="store.check.result.after" />
+          </template>
 
-          <AppAlert v-if="pressError" type="error" closable title="Operation failed" class="mt-4" @close="pressError = ''">{{ pressError }}</AppAlert>
+          <AppAlert v-if="pressError" type="error" title="Operation failed" class="mt-4">
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
+          </AppAlert>
 
           <AppAlert v-if="store.delivery" type="success" :title="deliveryHeading(store.delivery)" class="mt-4">
-            <span class="block">{{ summarizeDelivery(store.delivery, { branch: detail.git.branch, file: store.check?.result.path || detail.git.file_path }) }}</span>
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ summarizeDelivery(store.delivery, { branch: detail.git.branch, file: store.check?.result.path || detail.git.file_path }) }}</p>
             <a
               v-if="store.delivery.proposal_url"
               :href="store.delivery.proposal_url"
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-1 block break-all text-accent no-underline hover:underline"
+              class="font-mono text-xs break-all text-accent no-underline hover:underline"
             >{{ store.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
             <!-- False for every delivery: this workflow writes to Git and never watches the
                  cluster afterwards. -->
-            <span v-if="!store.delivery.argocd_sync_verified" class="mt-1 block">ArgoCD synchronization is not verified by this workflow.</span>
+            <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
+              ArgoCD synchronization is not verified by this workflow.
+            </p>
           </AppAlert>
 
           <PendingBar
             :step="step"
             :mode="deliveryMode"
-            :count="batch.length || (store.change?.mutations.length ?? 0)"
+            :count="staged"
             :ready="ready"
             :busy="busy"
             :idle="idle"
@@ -331,7 +358,15 @@ watch([() => route.params.namespace, () => route.params.name], load)
           />
         </div>
 
-        <StateSpine :namespace="namespace()" :detail="detail" />
+        <StateSpine
+          :detail="detail"
+          :staged="staged"
+          :base-commit="baseCommit"
+          :can-seal="canPatch"
+          :can-reveal="canReveal"
+          :can-deliver="canDeliver"
+          :can-sync="Boolean(canSync && syncBaseCommit && !inSync)"
+        />
       </div>
     </template>
   </section>

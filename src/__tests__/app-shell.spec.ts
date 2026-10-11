@@ -33,7 +33,7 @@ describe('app shell', () => {
   it('renders the brand, the signed-in user, and sign out', () => {
     const wrapper = mountShell()
 
-    expect(wrapper.findAll('a').map((link) => link.text())).toContain('kubeseal-ui')
+    expect(wrapper.findAll('a').map((link) => link.text())).toContain('kubeseal')
     expect(wrapper.text()).toContain('Ada')
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('Sign out')
   })
@@ -104,12 +104,12 @@ describe('app shell', () => {
     const wrapper = mountShell()
     await wrapper.find('#secret-search').setValue('api')
 
-    expect(wrapper.text()).toContain('1 SealedSecret in 1 namespace')
+    expect(wrapper.text()).toContain('1 match in 1 namespace')
     expect(wrapper.find('#route-content').exists()).toBe(true)
     expect(wrapper.find('main#main-content').text()).toContain('route content')
 
     // Clearing it hands the page back.
     await wrapper.find('button[aria-label="Clear the search"]').trigger('click')
-    expect(wrapper.text()).not.toContain('1 SealedSecret in 1 namespace')
+    expect(wrapper.text()).not.toContain('match in 1 namespace')
   })
 })

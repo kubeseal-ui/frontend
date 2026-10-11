@@ -130,7 +130,7 @@ describe('the results panel', () => {
       '/secrets/payments/queue',
       '/secrets/platform/database-urls',
     ])
-    expect(wrapper.text()).toContain('3 SealedSecrets in 2 namespaces')
+    expect(wrapper.text()).toContain('3 matches in 2 namespaces')
   })
 
   it('names the matched key, which is why the row is in the list', () => {
@@ -158,7 +158,7 @@ describe('the results panel', () => {
     // them is worth reading as "no results".
     const wrapper = mountResults('queue', [], false)
 
-    expect(wrapper.text()).toContain('Building the search index…')
+    expect(wrapper.text()).toContain('Searching…')
     expect(wrapper.text()).not.toContain('No Secret or key matches')
   })
 

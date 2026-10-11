@@ -11,6 +11,7 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 
 const secrets = useSecretsStore()
 const box = ref<HTMLInputElement | null>(null)
+const focused = ref(false)
 
 // A whole cross-namespace listing, so it is built on first use rather than on every page load.
 function ensureIndex() {
@@ -43,10 +44,10 @@ function onKeydown(event: KeyboardEvent) {
     focus()
     return
   }
-  // Escape clears the query before it blurs: the first press is "show me the page again", and
-  // blurring alone would leave the results on screen with nothing focused to say why.
-  if (event.key === 'Escape' && document.activeElement === box.value && props.modelValue) {
+  if (event.key === 'Escape' && document.activeElement === box.value) {
+    event.preventDefault()
     emit('update:modelValue', '')
+    box.value?.blur()
   }
 }
 
@@ -55,42 +56,47 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="relative min-w-0">
+  <!-- Capped and never wider: a box that spans a wide window stops reading as a field and starts
+       reading as a banner. Focus is the whole "on" state — the accent keyline, the raised fill and
+       the halo — and a query set without focus keeps it, because a strip that is answering is not
+       an idle one. -->
+  <div
+    class="flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-control border pr-[9px] pl-[10px]"
+    :class="
+      focused || modelValue
+        ? 'border-accent bg-surface-raised shadow-[0_0_0_3px_color-mix(in_srgb,var(--app-accent)_16%,transparent)]'
+        : 'border-border bg-bg'
+    "
+  >
     <label for="secret-search" class="sr-only">Search Secrets and key names</label>
-    <AppIcon
-      name="search"
-      :size="14"
-      class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted"
-    />
-    <!-- Written longhand rather than through the `field` utility: this box needs its own padding
-         to clear the glyph and the shortcut hint, and two utilities on the same property are
-         resolved by stylesheet order rather than by the order they appear here. -->
+    <AppIcon name="search" :size="14" class="pointer-events-none shrink-0 text-faint" />
     <input
       id="secret-search"
       ref="box"
       :value="modelValue"
       type="search"
-      placeholder="Search Secrets and keys"
+      placeholder="Search any Secret or key in the cluster"
       autocomplete="off"
       spellcheck="false"
-      class="h-9 w-full rounded-control border border-border-strong bg-bg pr-16 pl-8 text-sm text-ink placeholder:text-muted"
-      @focus="ensureIndex"
+      class="min-w-0 flex-1 border-0 bg-transparent text-ink outline-none placeholder:text-faint"
+      :class="modelValue ? 'font-mono text-sm' : 'text-[13px]'"
+      @focus="focused = true; ensureIndex()"
+      @blur="focused = false"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
+    <!-- The query's own clear, drawn as the keycap it mirrors. It is a button and not a keycap,
+         but it is read as one: the shortcut works whether or not it is read at all. -->
     <button
       v-if="modelValue"
       type="button"
       aria-label="Clear the search"
-      class="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-mini border-0 bg-transparent p-1 text-muted hover:text-ink"
-      @click="emit('update:modelValue', '')"
-    >
-      <AppIcon name="x" :size="12" />
-    </button>
-    <!-- Decorative: it states a shortcut, and the shortcut works whether or not it is read. -->
+      class="shrink-0 cursor-pointer rounded-[5px] border border-accent/40 bg-transparent px-[5px] py-px font-mono text-[11px] text-accent"
+      @click="emit('update:modelValue', ''); box?.focus()"
+    >esc</button>
     <kbd
       v-else
       aria-hidden="true"
-      class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded-mini border border-border px-1 font-sans text-[0.6875rem] text-faint select-none"
+      class="pointer-events-none shrink-0 select-none rounded-[5px] border border-border-strong px-[5px] py-px font-mono text-[11px] text-faint"
     >⌘K</kbd>
   </div>
 </template>

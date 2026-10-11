@@ -23,20 +23,20 @@ const props = withDefaults(
 )
 
 const VARIANTS: Record<string, string> = {
-  // `text-bg`, not a fixed white: the accent is dark on the light theme and pale on
+  // `text-accent-ink`, not a fixed white: the accent is dark on the light theme and pale on
   // the dark one, so the readable foreground inverts with it.
-  primary: 'border-transparent bg-accent font-semibold text-bg hover:brightness-110',
-  secondary: 'border-border-strong bg-surface/70 font-medium text-ink hover:bg-surface',
-  ghost: 'border-transparent bg-transparent font-medium text-accent hover:bg-surface/60',
+  primary: 'border-transparent bg-accent font-semibold text-accent-ink hover:brightness-110',
+  secondary: 'border-border-strong bg-surface-raised font-[550] text-ink hover:border-muted',
+  ghost: 'border-transparent bg-transparent font-[550] text-accent hover:bg-surface-raised',
 }
 
 const SIZES: Record<string, string> = {
-  small: 'px-2.5 py-1 text-xs',
-  medium: 'px-3.5 py-1.5 text-sm',
+  small: 'h-7 px-2.5 text-xs',
+  medium: 'h-[34px] px-3.5 text-[13px]',
 }
 
 const classes = computed(() => [
-  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-chip border transition disabled:cursor-not-allowed disabled:opacity-50',
+  'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-control border transition disabled:cursor-not-allowed disabled:opacity-50',
   SIZES[props.size],
   VARIANTS[props.variant],
 ])

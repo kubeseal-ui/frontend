@@ -35,20 +35,22 @@ const summary = computed(() => (props.count === 1 ? '1 change' : `${props.count}
 </script>
 
 <template>
-  <!-- Sticky, and opaque: a bar that let the ciphertext show through it would make the one
-       primary control on the screen the least legible thing on it. -->
-  <div class="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border bg-bg pt-3 pb-2">
-    <span v-if="idle" class="text-sm text-muted">{{ idle }}</span>
+  <!-- The next press, and only ever one of them: no toolbar to work out the order of. Sticky and
+       opaque, because a bar that let the ciphertext show through it would make the one primary
+       control on the screen the least legible thing on it. -->
+  <div class="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-bg pt-3.5 pb-2">
+    <span v-if="idle" class="text-[12.5px] text-muted">{{ idle }}</span>
     <template v-else>
-      <span class="text-sm text-muted">{{ summary }}</span>
+      <span class="font-mono text-xs text-muted">{{ summary }}</span>
       <AppButton
-        class="ml-auto"
         variant="primary"
-        icon="lock"
         :loading="busy"
         :disabled="!ready"
         @click="$emit('press')"
-      >{{ label }}</AppButton>
+      >
+        <!-- Keyed on the label, so the roll replays exactly when the step moves on. -->
+        <span :key="label" class="roll-in">{{ label }}</span>
+      </AppButton>
     </template>
   </div>
 </template>

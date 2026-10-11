@@ -134,12 +134,12 @@
 }
 
 /* Motion. The palette specs capture colour values only and reject a var() they did not
-   capture, so the durations are literals here rather than palette entries. One pair is in
-   use — `--mo-quick` and `--mo-out`, on the pointer transition below; the other steps are
-   the stated scale, kept whole so a surface that needs a longer one has a name to reach
-   for. Rows and tiles use Tailwind's `transition` utility, which carries its own
-   duration rather than reading these. */
+   capture, so the durations are literals here rather than palette entries. Only four things
+   use the long steps — the tile draw, the reveal, the staged panel, and the press label —
+   and every one of them collapses under the reduced-motion switch below. Everything else
+   rides the pointer transition, which is the quick step. */
 :root {
+  --mo-flip: 90ms;
   --mo-quick: 150ms;
   --mo-base: 240ms;
   --mo-reveal: 380ms;
@@ -178,29 +178,51 @@ button, a {
    their position to settle. */
 :focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 
-/* A keylined panel: one border, one surface, and never a rounded container inside another. What
-   sits inside one is separated with plain border rules rather than a second rounded container. */
-@utility panel {
-  @apply rounded-card border border-border bg-surface;
+/* ---------------------------------------------------------------------------------------
+   The four moves. Each answers something a person did, so nothing here runs on its own;
+   the one exception is the spinner, which is a progress indicator and stops when the work
+   does. The concealed dots never animate: a pulsing mask would say the value is doing
+   something while it sits still in the cluster.
+   --------------------------------------------------------------------------------------- */
+@keyframes mgrow { from { width: 0 } to { width: var(--w) } }
+@keyframes mgrown { from { width: 0 } to { width: var(--nw) } }
+@keyframes mgrowd { from { width: 0 } to { width: var(--dw) } }
+@keyframes mwipe { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
+@keyframes mwipeout { from { clip-path: inset(0 0 0 0) } to { clip-path: inset(0 100% 0 0) } }
+@keyframes msweep { 0% { left: 0; opacity: 0 } 12% { opacity: 1 } 80% { opacity: 1 } 100% { left: 100%; opacity: 0 } }
+@keyframes mspin { to { transform: rotate(360deg) } }
+@keyframes mroll { from { transform: translateY(65%); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes mlblout { to { transform: translateY(-70%); opacity: 0 } }
+@keyframes mlblin { from { transform: translateY(70%); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes mpop { from { transform: scale(0.2) } to { transform: none } }
+
+/* 1 — the draw, once per page load and only on the fleet. Size first, then health: the red
+   segment of a drifted tile arrives after its grey one, so the motion leads the eye to the
+   tiles that need work. `--d` staggers the tiles 40ms apart. */
+.draw .level .ok { animation: mgrown 260ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 70ms); }
+.draw .level .bad { animation: mgrowd 200ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 210ms); }
+
+/* 2 — the reveal. The mask is wiped back rather than faded out, and an accent edge crosses
+   the slot and leaves the value behind it. */
+.reveal-in { animation: mwipe var(--mo-reveal) var(--mo-out); }
+.reveal-out { animation: mwipeout 180ms var(--mo-inout) forwards; }
+.sweep { animation: msweep var(--mo-reveal) var(--mo-out); }
+.spin {
+  display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--app-border-strong); border-top-color: var(--app-accent);
+  animation: mspin 700ms linear infinite;
 }
 
-/*
- * Form controls: one utility rather than the same declarations in every input, select,
- * and textarea. Written longhand rather than with @apply so the placeholder and focus
- * colours can name palette tokens directly — the contrast spec resolves every var() in
- * this file, so they must stay tokens rather than literals.
- *
- * The fill is the page background, not a raised surface: a field is a well cut into the
- * panel it sits on, in both themes. The placeholder takes --app-muted rather than
- * --app-faint: a hint is still text someone reads, and faint is the decorative step.
- */
-@utility field {
-  @apply w-full rounded-control border border-border-strong bg-bg px-3 py-2 text-sm text-ink;
+/* 3 — a panel opening: the staged change inside its row, and nothing else. */
+.fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--mo-base) var(--mo-out); }
+.fold.open { grid-template-rows: 1fr; }
+.fold > * { overflow: hidden; }
 
-  &::placeholder { color: var(--app-muted); }
-  &:focus-visible { border-color: var(--app-accent); }
-  &:disabled { cursor: not-allowed; opacity: 0.6; }
-}
+/* 4 — a label advancing down the flow, which only ever moves one way. */
+.roll-in { animation: mroll 180ms var(--mo-out); }
+.roll-out { animation: mlblout var(--mo-quick) var(--mo-out) both; }
+.roll-next { animation: mlblin var(--mo-quick) var(--mo-out) both; }
+.stage-mark { animation: mpop 180ms var(--mo-out); }
 
 /* Reduced motion is a switch honoured from two places, and both are needed: the media
    query serves the operating system, and the attribute serves the in-app preference.
