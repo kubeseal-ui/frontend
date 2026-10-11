@@ -217,21 +217,34 @@ defineExpose({ batchProblem, showProblems, clear })
       >
         <span class="truncate font-mono text-[13.5px] font-[550] text-ink">{{ key }}</span>
 
-        <span class="min-w-0">
+        <span class="relative min-w-0">
           <input
             v-if="hasRevealed(key)"
             readonly
             type="text"
             :value="revealed[key]"
             :aria-label="`Revealed value for ${key}`"
-            class="inline-block max-w-full truncate rounded-mini border border-border-strong bg-surface-raised px-2.5 py-1 font-mono text-[12.5px] text-ink"
+            class="reveal-in inline-block max-w-full truncate rounded-mini border border-border-strong bg-surface-raised px-2.5 py-1 font-mono text-[12.5px] text-ink"
           />
+          <!-- A reveal is one decryption and one audit event, and the row says what it is waiting
+               for rather than leaving the dots in place as if nothing had been asked. Announced,
+               because the press that started it is disabled while it runs. -->
+          <span
+            v-else-if="activeKey === key"
+            role="status"
+            class="inline-flex items-center gap-1.5 text-[12.5px] text-muted"
+          >
+            <span class="spin" aria-hidden="true" />Decrypting
+          </span>
           <span
             v-else
             aria-hidden="true"
             class="font-mono text-[13px] tracking-[0.14em] text-faint select-none"
             :class="editing[key] && operationOf(key) === 'delete' ? 'line-through opacity-55' : ''"
           >{{ DOTS }}</span>
+          <!-- The accent edge that crosses the slot with the wipe. Decorative, and gone by the
+               time the wipe ends. -->
+          <span v-if="hasRevealed(key)" class="sweep" aria-hidden="true" />
         </span>
 
         <!-- The value's own controls, in the row they act on. Under drift the row keeps its dots
@@ -278,36 +291,43 @@ defineExpose({ batchProblem, showProblems, clear })
           >Remove</button>
         </span>
 
-        <!-- The change opens inside the row it belongs to, indented under the key it acts on. -->
-        <div
-          v-if="editing[key]"
-          :id="`staged-${key}`"
-          class="col-span-full mt-2.5 flex flex-col gap-[11px] rounded-[10px] border border-accent/45 bg-accent/8 px-[13px] py-3"
-        >
-          <AppRadioGroup
-            :model-value="operationOf(key)"
-            :name="`operation-${key}`"
-            :options="EXISTING_OPERATIONS"
-            :ariaLabel="`Operation for ${key}`"
-            :disabled="!canPatch"
-            @update:model-value="setOperation(key, $event)"
-          />
+        <!-- The change opens inside the row it belongs to, indented under the key it acts on, and
+             the rows below move down rather than jumping. The fold is one-way on purpose:
+             discarding unmounts the panel in the same frame, so a form holding a password field
+             is never left in the document at a height of nothing. -->
+        <div class="fold col-span-full" :class="{ open: editing[key] }">
+          <div>
+            <div
+              v-if="editing[key]"
+              :id="`staged-${key}`"
+              class="mt-2.5 flex flex-col gap-[11px] rounded-[10px] border border-accent/45 bg-accent/8 px-[13px] py-3"
+            >
+              <AppRadioGroup
+                :model-value="operationOf(key)"
+                :name="`operation-${key}`"
+                :options="EXISTING_OPERATIONS"
+                :ariaLabel="`Operation for ${key}`"
+                :disabled="!canPatch"
+                @update:model-value="setOperation(key, $event)"
+              />
 
-          <input
-            v-if="operationOf(key) !== 'delete'"
-            :id="`staged-input-${key}`"
-            v-model="replacements[key]"
-            type="password"
-            :aria-label="`Replacement value for ${key}`"
-            :aria-invalid="existingProblem(key) ? 'true' : undefined"
-            :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
-            placeholder="New value"
-            autocomplete="off"
-            spellcheck="false"
-            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
-          />
+              <input
+                v-if="operationOf(key) !== 'delete'"
+                :id="`staged-input-${key}`"
+                v-model="replacements[key]"
+                type="password"
+                :aria-label="`Replacement value for ${key}`"
+                :aria-invalid="existingProblem(key) ? 'true' : undefined"
+                :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
+                placeholder="New value"
+                autocomplete="off"
+                spellcheck="false"
+                class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+              />
 
-          <p v-if="existingProblem(key)" :id="`staged-problem-${key}`" class="m-0 text-[13px] text-danger">{{ existingProblem(key) }}</p>
+              <p v-if="existingProblem(key)" :id="`staged-problem-${key}`" class="m-0 text-[13px] text-danger">{{ existingProblem(key) }}</p>
+            </div>
+          </div>
         </div>
       </li>
 

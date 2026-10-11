@@ -123,6 +123,21 @@ describe('the namespace index', () => {
     expect(tile(wrapper, 'platform').text()).toContain('1 secret')
   })
 
+  it('draws the bars in by the names the stylesheet animates by', async () => {
+    const wrapper = await mountIndex()
+
+    // `.draw .level .ok` and `.draw .level .bad` are the whole of the tile's entrance. A tile
+    // whose segments lost those names still renders a level, and simply appears — the stylesheet
+    // is not wrong about anything, it just has nothing left to match.
+    expect(wrapper.find('ul.draw').exists()).toBe(true)
+    expect(tile(wrapper, 'payments').findAll('.level > i').map((segment) => segment.classes())).toEqual([
+      expect.arrayContaining(['ok']),
+      expect.arrayContaining(['bad']),
+    ])
+    // The stagger belongs to the tile, so its delay reaches the segments by inheritance.
+    expect(wrapper.find('ul.draw li').attributes('style')).toContain('--d')
+  })
+
   it('counts the namespaces and the Secrets they hold', async () => {
     const wrapper = await mountIndex()
 

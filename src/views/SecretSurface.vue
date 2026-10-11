@@ -324,40 +324,54 @@ watch([() => route.params.namespace, () => route.params.name], load)
 
           <!-- What the review returned, and what the check verified. Both read from the store:
                the review is frozen at the moment it was made, so it keeps showing the ciphertext
-               that was reviewed even after the rows move on. -->
-          <template v-if="store.review">
-            <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
-              Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code>
-            </h3>
-            <DiffBlocks :before="store.review.before" :after="store.review.after" />
-          </template>
+               that was reviewed even after the rows move on. Each folds open where it lands, so
+               the presses below it move down rather than jumping. The fold's child stays mounted
+               only while the panel is; a result that has been spent leaves at once. -->
+          <div class="fold" :class="{ open: Boolean(store.review) }">
+            <div>
+              <template v-if="store.review">
+                <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
+                  Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code>
+                </h3>
+                <DiffBlocks :before="store.review.before" :after="store.review.after" />
+              </template>
+            </div>
+          </div>
 
-          <template v-if="store.check">
-            <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
-              Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code>
-            </h3>
-            <DiffBlocks :before="store.check.result.before" :after="store.check.result.after" />
-          </template>
+          <div class="fold" :class="{ open: Boolean(store.check) }">
+            <div>
+              <template v-if="store.check">
+                <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
+                  Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code>
+                </h3>
+                <DiffBlocks :before="store.check.result.before" :after="store.check.result.after" />
+              </template>
+            </div>
+          </div>
 
           <AppAlert v-if="pressError" type="error" title="Operation failed" class="mt-4">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
           </AppAlert>
 
-          <AppAlert v-if="store.delivery" type="success" :title="deliveryHeading(store.delivery)" class="mt-4">
-            <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ summarizeDelivery(store.delivery, { branch: detail.git.branch, file: store.check?.result.path || detail.git.file_path }) }}</p>
-            <a
-              v-if="store.delivery.proposal_url"
-              :href="store.delivery.proposal_url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="font-mono text-xs break-all text-accent no-underline hover:underline"
-            >{{ store.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
-            <!-- False for every delivery: this workflow writes to Git and never watches the
-                 cluster afterwards. -->
-            <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
-              ArgoCD synchronization is not verified by this workflow.
-            </p>
-          </AppAlert>
+          <div class="fold" :class="{ open: Boolean(store.delivery) }">
+            <div>
+              <AppAlert v-if="store.delivery" type="success" :title="deliveryHeading(store.delivery)" class="mt-4">
+                <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ summarizeDelivery(store.delivery, { branch: detail.git.branch, file: store.check?.result.path || detail.git.file_path }) }}</p>
+                <a
+                  v-if="store.delivery.proposal_url"
+                  :href="store.delivery.proposal_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="font-mono text-xs break-all text-accent no-underline hover:underline"
+                >{{ store.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
+                <!-- False for every delivery: this workflow writes to Git and never watches the
+                     cluster afterwards. -->
+                <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
+                  ArgoCD synchronization is not verified by this workflow.
+                </p>
+              </AppAlert>
+            </div>
+          </div>
 
           <PendingBar
             :step="step"

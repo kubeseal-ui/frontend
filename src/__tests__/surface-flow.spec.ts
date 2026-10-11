@@ -10,6 +10,7 @@ import { pinia } from '@/pinia'
 import { router } from '@/router'
 import { api } from '@/api'
 import PendingBar from '@/components/PendingBar.vue'
+import StateSpine from '@/components/StateSpine.vue'
 import NewSecretView from '@/views/NewSecretView.vue'
 import SecretSurface from '@/views/SecretSurface.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -529,5 +530,35 @@ describe('the one button', () => {
   it('is disabled until the press would be allowed', () => {
     expect(bar({ ready: false }).find('button').attributes('disabled')).toBeDefined()
     expect(bar({ ready: true }).find('button').attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps its first label still, and rolls only when the step moves on', () => {
+    const wrapper = bar({ step: 'review' })
+
+    // The roll is a transition over the keyed label rather than an entrance: nothing on this
+    // screen moves until someone presses something, and the bar is no exception.
+    expect(wrapper.find('button > span').text()).toBe('Review change')
+    expect(wrapper.find('button > span').classes()).not.toContain('roll-next')
+    expect(wrapper.find('button > span').classes()).not.toContain('roll-out')
+  })
+})
+
+describe('the spine', () => {
+  it('fills a stage mark at the press that produced it, and only then', () => {
+    useSecretsStore(pinia).review = DIFF as never
+    const wrapper = mount(StateSpine, {
+      props: { detail: detail(), staged: 0, baseCommit: 'abc123', canSeal: true, canReveal: true, canDeliver: true, canSync: false },
+      global: { plugins: [pinia] },
+    })
+
+    const marks = wrapper.findAll('span').filter((span) => span.classes().includes('rounded-full'))
+    // Review is done, the other two are not: the pop is what says a press landed, so it belongs
+    // to the mark that just filled and to no other.
+    expect(marks).toHaveLength(3)
+    expect(marks.map((mark) => mark.classes())).toEqual([
+      expect.arrayContaining(['stage-mark']),
+      expect.not.arrayContaining(['stage-mark']),
+      expect.not.arrayContaining(['stage-mark']),
+    ])
   })
 })

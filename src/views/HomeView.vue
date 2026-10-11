@@ -218,7 +218,9 @@ onMounted(async () => {
       <!-- One tile per namespace, and the tile — not a panel around the grid — is the surface.
            Its foot is its level: filled against the fleet's largest namespace with the drifted
            share carved out, so one mark carries both size and health. It is decorative — the
-           count and the chip above it say both in words. -->
+           count and the chip above it say both in words.
+           `draw` on the grid and `ok`/`bad` on the segments are the names `style.css` animates
+           the bars in by; the tile publishes its own width as `--bar-ok`/`--bar-bad`. -->
       <ul v-else class="tiles draw m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(232px,1fr))] gap-2.5 px-[26px] pb-10">
         <li v-for="(row, index) in visibleRows" :key="row.name" :style="{ '--d': `${Math.min(index, 8) * 40}ms` }">
           <RouterLink
@@ -247,8 +249,8 @@ onMounted(async () => {
             <span v-if="!shared.repository && row.repository" class="mt-1.5 block truncate font-mono text-xs text-faint">{{ row.repository }}</span>
 
             <span v-if="secrets.indexLoaded" class="level absolute inset-x-0 bottom-0 flex h-[3px]" aria-hidden="true">
-              <i class="block h-full bg-accent/55" :style="{ width: row.ok, '--bar-ok': row.ok }" />
-              <i class="block h-full bg-danger" :style="{ width: row.bad, '--bar-bad': row.bad }" />
+              <i class="ok block h-full bg-accent/55" :style="{ width: row.ok, '--bar-ok': row.ok }" />
+              <i class="bad block h-full bg-danger" :style="{ width: row.bad, '--bar-bad': row.bad }" />
             </span>
           </RouterLink>
         </li>

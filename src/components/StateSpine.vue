@@ -45,13 +45,15 @@ const abilities = computed(() => [
   <aside aria-label="Change state" class="flex w-[258px] shrink-0 flex-col gap-[22px]">
     <div>
       <h2 class="mb-[9px] text-xs font-[650] text-muted">This change</h2>
+      <!-- Keyed on whether it is done, so the mark pops at the moment the press produced it
+           rather than sitting filled from the start. -->
       <div
         v-for="stage in stages"
-        :key="stage.key"
+        :key="`${stage.key}-${stage.done}`"
         class="flex items-center gap-2 py-[3px] text-[13px]"
         :class="stage.done ? 'text-ink' : 'text-muted'"
       >
-        <span class="size-[7px] shrink-0 rounded-full" :class="stage.done ? 'bg-success' : 'bg-border-strong'" />
+        <span class="size-[7px] shrink-0 rounded-full" :class="stage.done ? 'stage-mark bg-success' : 'bg-border-strong'" />
         {{ stage.title }}
       </div>
     </div>

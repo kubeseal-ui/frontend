@@ -48,8 +48,12 @@ const summary = computed(() => (props.count === 1 ? '1 change' : `${props.count}
         :disabled="!ready"
         @click="$emit('press')"
       >
-        <!-- Keyed on the label, so the roll replays exactly when the step moves on. -->
-        <span :key="label" class="roll-in">{{ label }}</span>
+        <!-- Keyed on the label, so the roll plays exactly when the step moves on: the label it
+             replaces leaves upward and the next arrives from below, because the flow only ever
+             moves one way. -->
+        <Transition mode="out-in" enter-active-class="roll-next" leave-active-class="roll-out">
+          <span :key="label">{{ label }}</span>
+        </Transition>
       </AppButton>
     </template>
   </div>

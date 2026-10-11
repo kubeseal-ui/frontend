@@ -191,10 +191,8 @@ button, a {
 @keyframes mgrown { from { width: 0 } to { width: var(--bar-ok) } }
 @keyframes mgrowd { from { width: 0 } to { width: var(--bar-bad) } }
 @keyframes mwipe { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
-@keyframes mwipeout { from { clip-path: inset(0 0 0 0) } to { clip-path: inset(0 100% 0 0) } }
 @keyframes msweep { 0% { left: 0; opacity: 0 } 12% { opacity: 1 } 80% { opacity: 1 } 100% { left: 100%; opacity: 0 } }
 @keyframes mspin { to { transform: rotate(360deg) } }
-@keyframes mroll { from { transform: translateY(65%); opacity: 0 } to { transform: none; opacity: 1 } }
 @keyframes mlblout { to { transform: translateY(-70%); opacity: 0 } }
 @keyframes mlblin { from { transform: translateY(70%); opacity: 0 } to { transform: none; opacity: 1 } }
 @keyframes mpop { from { transform: scale(0.2) } to { transform: none } }
@@ -206,9 +204,9 @@ button, a {
 .draw .level .bad { animation: mgrowd 200ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 210ms); }
 
 /* 2 — the reveal. The mask is wiped back rather than faded out, and an accent edge crosses
-   the slot and leaves the value behind it. */
+   the slot and leaves the value behind it. Concealing has no counterpart: the value leaves the
+   document in the frame the operator asks for it to, plaintext not being something to animate. */
 .reveal-in { animation: mwipe var(--mo-reveal) var(--mo-out); }
-.reveal-out { animation: mwipeout 180ms var(--mo-inout) forwards; }
 .sweep { animation: msweep var(--mo-reveal) var(--mo-out); }
 .spin {
   display: inline-block; width: 11px; height: 11px; border-radius: 50%;
@@ -216,13 +214,14 @@ button, a {
   animation: mspin 700ms linear infinite;
 }
 
-/* 3 — a panel opening: the staged change inside its row, and nothing else. */
+/* 3 — a panel opening: the staged change inside its row, and a press's result underneath. Both
+   draw their content only while open, so a closed one has already left the document. */
 .fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--mo-base) var(--mo-out); }
 .fold.open { grid-template-rows: 1fr; }
 .fold > * { overflow: hidden; }
 
-/* 4 — a label advancing down the flow, which only ever moves one way. */
-.roll-in { animation: mroll 180ms var(--mo-out); }
+/* 4 — a label advancing down the flow, which only ever moves one way: the label being left
+   behind goes up, and the next press arrives from below. */
 .roll-out { animation: mlblout var(--mo-quick) var(--mo-out) both; }
 .roll-next { animation: mlblin var(--mo-quick) var(--mo-out) both; }
 .stage-mark { animation: mpop 180ms var(--mo-out); }

@@ -79,6 +79,29 @@ describe('revealing', () => {
     expect(revealButtons(wrapper)).toHaveLength(1)
   })
 
+  it('says it is decrypting while the reveal is in flight, then wipes the value in', async () => {
+    let release!: (value: unknown) => void
+    const inflight = new Promise((resolve) => { release = resolve })
+    vi.spyOn(api, 'post').mockReturnValue(inflight as never)
+    const wrapper = mountRows()
+
+    await revealButtons(wrapper)[0]!.trigger('click')
+    await flushPromises()
+
+    // The wait is the request, not a transition: a reveal is one decrypt and one audit event,
+    // and the row says what it is waiting for instead of leaving the dots sitting there.
+    expect(wrapper.text()).toContain('Decrypting')
+    expect(wrapper.find('.spin').exists()).toBe(true)
+
+    release({ data: { key: 'password', value: 'hunter2' } })
+    await flushPromises()
+
+    // The mask is wiped back rather than faded, with an accent edge crossing the slot with it.
+    expect(wrapper.find('input[aria-label="Revealed value for password"]').classes()).toContain('reveal-in')
+    expect(wrapper.find('.sweep').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Decrypting')
+  })
+
   it('drops the plaintext when the key is concealed again', async () => {
     vi.spyOn(api, 'post').mockResolvedValue({ data: { key: 'password', value: 'hunter2' } } as never)
     const wrapper = mountRows()
@@ -139,9 +162,13 @@ describe('staging a change', () => {
     await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
     expect(batch(wrapper)).toEqual([{ key: 'password', operation: 'replace', value: 'rotated' }])
 
+    // The panel opened through the fold, so the rows below it moved down rather than jumping.
+    expect(wrapper.find('.fold.open').exists()).toBe(true)
+
     await button(wrapper, 'Discard the staged change to password')!.trigger('click')
     await flushPromises()
     expect(wrapper.find('#staged-password').exists()).toBe(false)
+    expect(wrapper.find('.fold.open').exists()).toBe(false)
     expect(batch(wrapper)).toEqual([])
   })
 
