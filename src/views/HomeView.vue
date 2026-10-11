@@ -146,6 +146,25 @@ onMounted(async () => {
   // pick up their counts when this lands.
   if (!secrets.indexLoaded && !secrets.indexLoading) secrets.fetchIndex().catch(() => {})
 })
+
+// Refresh re-fetches everything the page renders from, not just the namespace list. The tiles'
+// counts and drift come from the cross-namespace index, so refreshing namespaces alone left those
+// numbers unchanged and the button looked dead — the common case, since the namespace set rarely
+// moves while its Secrets drift. The loading flag gives the press visible feedback either way.
+const refreshing = ref(false)
+async function refresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    await Promise.all([
+      secrets.fetchNamespaces().catch(() => {}),
+      secrets.fetchIndex().catch(() => {}),
+      secrets.fetchGitPaths().catch(() => {}),
+    ])
+  } finally {
+    refreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -153,7 +172,7 @@ onMounted(async () => {
     <AppPageHeader title="Namespaces" title-id="page-title" :facts="facts">
       <template v-if="hasContext" #context><span v-if="grantClause">{{ grantClause }}<template v-if="shared.repository">, </template></span><span v-if="shared.repository">delivering to <span class="font-mono text-muted">{{ shared.repository }}</span></span></template>
       <template #actions>
-        <AppButton icon="refresh" @click="secrets.fetchNamespaces">Refresh</AppButton>
+        <AppButton icon="refresh" :loading="refreshing" @click="refresh">Refresh</AppButton>
       </template>
     </AppPageHeader>
 
@@ -165,7 +184,7 @@ onMounted(async () => {
     <div class="px-[26px]">
       <AppAlert v-if="secrets.error" type="error" title="Unable to load namespaces">
         <p class="m-0">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
-        <AppButton class="mt-2" icon="refresh" @click="secrets.fetchNamespaces">Try again</AppButton>
+        <AppButton class="mt-2" icon="refresh" :loading="refreshing" @click="refresh">Try again</AppButton>
       </AppAlert>
 
       <AppEmpty

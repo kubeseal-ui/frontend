@@ -92,6 +92,19 @@ describe('the namespace ledger', () => {
     expect(scoped).toHaveLength(1)
   })
 
+  it('forces a re-fetch on Refresh, where the cached listing would not reload', async () => {
+    const { wrapper, get } = await mountNamespaceView()
+    const scoped = () => get.mock.calls.filter(([path]) => String(path).includes('namespace=payments')).length
+    const before = scoped()
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Refresh'))!.trigger('click')
+    await flushPromises()
+
+    // ensureSecrets returns the cached listing once loaded, so Refresh must bypass it; otherwise the
+    // button does nothing on exactly the already-loaded page where someone presses it for fresh drift.
+    expect(scoped()).toBeGreaterThan(before)
+  })
+
   it('lists every Secret, and names each state in words rather than colour alone', async () => {
     const { wrapper } = await mountNamespaceView()
 

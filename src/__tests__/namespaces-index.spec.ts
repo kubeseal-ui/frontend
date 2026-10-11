@@ -114,6 +114,18 @@ describe('the namespace index', () => {
     expect(wrapper.text()).toContain('Seal and Reveal everywhere, delivering to acme/kube @ main')
   })
 
+  it('refetches the index on Refresh, since the tiles’ drift counts come from it', async () => {
+    const wrapper = await mountIndex()
+    const indexCalls = () => vi.mocked(api.get).mock.calls.filter(([path]) => path === '/api/v1/secrets').length
+    const before = indexCalls()
+
+    await buttonWith(wrapper, 'Refresh')!.trigger('click')
+    await flushPromises()
+
+    // Refreshing namespaces alone left the counts frozen; the fix re-reads the cross-namespace index.
+    expect(indexCalls()).toBeGreaterThan(before)
+  })
+
   it('leaves the tiles their names and their tally', async () => {
     const wrapper = await mountIndex()
 

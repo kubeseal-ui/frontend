@@ -350,6 +350,23 @@ describe('the create path', () => {
     expect(wrapper.text()).not.toContain('What will be written')
     expect(wrapper.text()).not.toContain('Delivered. Encrypt another manifest')
   })
+
+  // A new Secret has no file in Git to diff against, so a passing dry-run must say so rather than
+  // only relabelling the button from Check to Deliver.
+  it('confirms the dry-run passed, advancing the rail and stating the result', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    const current = () => wrapper.find('nav[aria-label="Workflow progress"] [aria-current="step"]')
+    const store = useSecretsStore(pinia)
+    store.change = { namespace: 'payments', name: 'api', mutations: [], baseCommit: 'c', targetPath: 'payments/api.yaml', scope: 'strict', encrypted: 'cipher' }
+    await flushPromises()
+    expect(current().text()).toContain('Review')
+    expect(wrapper.text()).not.toContain('applies cleanly')
+
+    store.check = { yaml: 'cipher', checksum: '', result: CHECKED, idempotencyKey: 'k' }
+    await flushPromises()
+    expect(current().text()).toContain('Check')
+    expect(wrapper.text()).toContain('applies cleanly')
+  })
 })
 
 describe('the surface', () => {

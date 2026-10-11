@@ -59,16 +59,22 @@ const canDeliver = computed(() => {
 })
 const ready = computed(() => (step.value === 'deliver' ? canDeliver.value : true))
 
-// The three stops the create flow passes through. Compose is the home base — the only stop with a
-// way back — and the rail marks which one the operator is standing on across the whole page.
+// The four stops the create flow passes through. Compose is the home base — the only stop with a
+// way back — and the rail marks which one the operator is standing on, so pressing Check moves it
+// from Review to Check rather than only relabelling the button.
 const editorRef = ref<{ reopen?: () => void } | null>(null)
 const composeSection = ref<HTMLElement | null>(null)
 const railSteps = [
   { key: 'compose', label: 'Compose', back: true },
   { key: 'review', label: 'Review' },
+  { key: 'check', label: 'Check' },
   { key: 'deliver', label: 'Deliver' },
 ]
-const activeStep = computed(() => (secrets.delivery ? 2 : secrets.change?.encrypted ? 1 : 0))
+const activeStep = computed(() => (secrets.delivery ? 3 : secrets.check ? 2 : secrets.change?.encrypted ? 1 : 0))
+// Where the checked dry-run says the manifest will land. A new Secret has no file in Git yet, so
+// the diff shows no before and the check otherwise leaves no mark; this is what makes "it passed"
+// visible rather than only renaming the button.
+const checkedPath = computed(() => secrets.check?.result.path || '')
 function onRailNavigate(key: string) {
   // Only Compose steps back. From a landed delivery that means starting a fresh Secret; from an
   // encrypted-but-undelivered draft it reopens the editor the way the fold's Edit button does.
@@ -170,7 +176,14 @@ onUnmounted(() => secrets.discardChange())
               v-if="!secrets.delivery"
               :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
               :before="secrets.check?.result.before"
+              :after-label="secrets.check ? 'Checked against the branch' : undefined"
             />
+            <!-- A new Secret has no file in Git to diff against, so a passing dry-run would otherwise
+                 be invisible. This is the check's result stated outright. -->
+            <p v-if="secrets.check && !secrets.delivery" class="flex items-center gap-1.5 text-[13px] text-success">
+              <AppIcon name="check" :size="14" />
+              <span>The sealed manifest applies cleanly<template v-if="checkedPath"> at <span class="font-mono">{{ checkedPath }}</span></template>. Deliver writes it to Git.</span>
+            </p>
             <!-- The edit path reports a delivery; a create that delivered and said nothing left a
                  spent draft on screen with no record of where it went. -->
             <AppAlert v-if="secrets.delivery" ref="deliveryAlert" type="success" :title="deliveryHeading(secrets.delivery)">

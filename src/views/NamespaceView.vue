@@ -102,6 +102,20 @@ const grantLine = computed(() =>
 // Joins a listing already in flight rather than asking twice: the store keys it by namespace.
 const load = () => secrets.ensureSecrets(props.namespace).catch(() => {})
 
+// Refresh forces a re-fetch, where load() would be a no-op: ensureSecrets returns the cached
+// listing once it has loaded, so wiring Refresh to it left the button doing nothing on an
+// already-loaded namespace — exactly when someone presses Refresh to see new drift.
+const refreshing = ref(false)
+async function refresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    await secrets.fetchSecrets(props.namespace).catch(() => {})
+  } finally {
+    refreshing.value = false
+  }
+}
+
 load()
 // The route record is the same one for every namespace and <RouterView /> is unkeyed, so this
 // instance is reused when the parameter changes. Without the watch, going Back from one namespace
@@ -135,7 +149,7 @@ watch(() => props.namespace, load)
           <AppIcon name="plus" :size="16" />
           New Secret
         </RouterLink>
-        <AppButton icon="refresh" @click="load">Refresh</AppButton>
+        <AppButton icon="refresh" :loading="refreshing" @click="refresh">Refresh</AppButton>
       </template>
     </AppPageHeader>
 
@@ -151,7 +165,7 @@ watch(() => props.namespace, load)
     <div class="px-[26px] pt-4">
       <AppAlert v-if="secrets.error" type="error" title="Unable to load secrets">
         <p class="m-0">{{ describeError(secrets.error, 'Unable to load secrets') }}</p>
-        <AppButton class="mt-2" icon="refresh" @click="load">Try again</AppButton>
+        <AppButton class="mt-2" icon="refresh" :loading="refreshing" @click="refresh">Try again</AppButton>
       </AppAlert>
 
       <AppEmpty
