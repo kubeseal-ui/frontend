@@ -113,6 +113,11 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         platforms: linux/amd64,linux/arm64
+        # Account photos are baked at build (Vite inlines import.meta.env.VITE_*), so the endpoint
+        # is turned on here, not by a runtime container env. Point the repo variable at a self-hosted
+        # Libravatar mirror to keep the lookup in-house; unset falls back to Gravatar.
+        build-args: |
+          VITE_AVATAR_ENDPOINT=${{ vars.VITE_AVATAR_ENDPOINT || 'https://www.gravatar.com/avatar' }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
