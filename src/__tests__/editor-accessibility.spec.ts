@@ -292,6 +292,62 @@ describe('adding a key', () => {
   })
 })
 
+// A staged value is the one thing on the page nothing else can be checked against: the operator
+// typed it a moment ago and the row answers with dots. Peeking at it reads nothing back from the
+// server, which is why this is not the row's Reveal — that is a decrypt and an audit event.
+describe('the value being staged', () => {
+  it("masks what was typed until the field's own control is pressed", async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
+
+    const field = wrapper.find('input[aria-label="Replacement value for password"]')
+    expect(field.attributes('type')).toBe('password')
+    const show = button(wrapper, 'Show the replacement value for password')!
+    expect(show.attributes('aria-pressed')).toBe('false')
+
+    await show.trigger('click')
+    expect(field.attributes('type')).toBe('text')
+    // One control both ways, so the press that revealed is the press that hides.
+    await button(wrapper, 'Hide the replacement value for password')!.trigger('click')
+    expect(field.attributes('type')).toBe('password')
+  })
+
+  it('gives a new key row its own, and re-masks the field when the row is discarded', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Add a key')!.trigger('click')
+    await flushPromises()
+
+    const field = wrapper.find('input[aria-label="New key value 1"]')
+    expect(field.attributes('type')).toBe('password')
+    await button(wrapper, 'Show the new key value 1')!.trigger('click')
+    expect(field.attributes('type')).toBe('text')
+
+    // Discarded and added again, the row is a new one and comes back masked rather than holding
+    // the previous row's disclosure.
+    await button(wrapper, 'Remove new key 1')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[aria-label="New key value 1"]').attributes('type')).toBe('password')
+    expect(button(wrapper, 'Show the new key value 1')).toBeDefined()
+  })
+})
+
+describe('Remove', () => {
+  it('carries the trash glyph and the danger tone', () => {
+    const wrapper = mountRows()
+    const remove = button(wrapper, 'Remove password')!
+
+    // The one action here that pressing its own control again does not undo, so it is the one that
+    // does not wear the neutral tone its neighbours use.
+    expect(remove.classes()).toContain('text-danger')
+    expect(remove.find('svg').exists()).toBe(true)
+    // The word survives beside the glyph, so the control is never an icon-only target.
+    expect(remove.text()).toBe('Remove')
+  })
+})
+
 describe('when the Git source is not in sync', () => {
   it('withholds every control that would read or write a value', async () => {
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: {} } as never)

@@ -504,10 +504,13 @@ describe('once the change has landed', () => {
 describe('the one button', () => {
   type BarProps = { step: 'review' | 'apply-check' | 'check' | 'deliver'; mode: 'direct' | 'proposal' | ''; count: number; ready: boolean; busy: boolean }
 
+  // Test Utils stubs `transition` by default: the pair becomes a `<transition-stub>` element
+  // that runs no enter hooks, so the label's roll would be unobservable and the label would no
+  // longer be the button's own child. This file is about the real component, so it renders.
   function bar(props: Partial<BarProps> = {}) {
     return mount(PendingBar, {
       props: { step: 'review', mode: 'direct', count: 1, ready: true, busy: false, ...props },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia], stubs: { transition: false } },
     })
   }
 
@@ -536,9 +539,8 @@ describe('the one button', () => {
     const wrapper = bar({ step: 'review' })
 
     // The roll is a transition over the keyed label rather than an entrance: nothing on this
-    // screen moves until someone presses something, and the bar is no exception. It is read
-    // through the DOM, so the assertion states the shape it needs — the label is the button's
-    // own child, and it wears neither half of the pair at mount.
+    // screen moves until someone presses something, and the bar is no exception — so at mount
+    // the label wears neither half of the pair, as the button's own child.
     const labels = wrapper.findAll('span').filter((span) => span.text() === 'Review change')
     expect(labels).toHaveLength(1)
     expect(labels[0]!.element.parentElement?.tagName).toBe('BUTTON')

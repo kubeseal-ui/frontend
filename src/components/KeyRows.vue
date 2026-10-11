@@ -21,6 +21,10 @@ const operation = reactive<Record<string, MutationOperation>>({})
 /** Keys whose row is open for editing. The row states what the Secret has; the change is
  *  staged inside it rather than in a tray below, so nothing folds away. */
 const editing = reactive<Record<string, boolean>>({})
+/** Value fields showing what was typed into them rather than dots. This is not the row's Reveal:
+ *  that decrypts one key for the audit trail, while a field the operator is typing into holds a
+ *  value nothing else on the page can check, so unmasking it costs nothing and asks no capability. */
+const peek = reactive<Record<string, boolean>>({})
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const error = ref('')
@@ -110,7 +114,7 @@ async function addRow() {
 
 function removeAdded(index: number) {
   const [row] = added.value.splice(index, 1)
-  if (row) delete shown[addedRowId(row)]
+  if (row) { delete shown[addedRowId(row)]; delete peek[addedRowId(row)] }
 }
 
 const setAddInput = (id: number, element: unknown) => { addInputs.value[id] = element instanceof HTMLInputElement ? element : null }
@@ -119,9 +123,9 @@ const setRow = (key: string, element: unknown) => { rows.value[key] = element in
 function clear(key?: string) {
   if (key) {
     delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
-    delete shown[stagedRowId(key)]
+    delete shown[stagedRowId(key)]; delete peek[stagedRowId(key)]
   } else {
-    for (const bag of [revealed, replacements, operation, editing, shown]) {
+    for (const bag of [revealed, replacements, operation, editing, shown, peek]) {
       Object.keys(bag).forEach((item) => delete bag[item])
     }
     added.value = []
@@ -282,13 +286,15 @@ defineExpose({ batchProblem, showProblems, clear })
             class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="editing[key] ? clear(key) : startEdit(key)"
           >{{ editing[key] ? 'Discard' : 'Change' }}</button>
+          <!-- The one action here that pressing it again does not undo, so it is the one that
+               carries danger rather than the neutral tone its neighbours use. -->
           <button
             v-if="canPatch && !editing[key] && !hasRevealed(key)"
             type="button"
             :aria-label="`Remove ${key}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-danger hover:border-danger/40 hover:bg-danger/10"
             @click="removeKey(key)"
-          >Remove</button>
+          ><AppIcon name="trash" :size="13" />Remove</button>
         </span>
 
         <!-- The change opens inside the row it belongs to, indented under the key it acts on, and
@@ -311,19 +317,27 @@ defineExpose({ batchProblem, showProblems, clear })
                 @update:model-value="setOperation(key, $event)"
               />
 
-              <input
-                v-if="operationOf(key) !== 'delete'"
-                :id="`staged-input-${key}`"
-                v-model="replacements[key]"
-                type="password"
-                :aria-label="`Replacement value for ${key}`"
-                :aria-invalid="existingProblem(key) ? 'true' : undefined"
-                :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
-                placeholder="New value"
-                autocomplete="off"
-                spellcheck="false"
-                class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
-              />
+              <span v-if="operationOf(key) !== 'delete'" class="relative block">
+                <input
+                  :id="`staged-input-${key}`"
+                  v-model="replacements[key]"
+                  :type="peek[stagedRowId(key)] ? 'text' : 'password'"
+                  :aria-label="`Replacement value for ${key}`"
+                  :aria-invalid="existingProblem(key) ? 'true' : undefined"
+                  :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
+                  placeholder="New value"
+                  autocomplete="off"
+                  spellcheck="false"
+                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-9 pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+                />
+                <button
+                  type="button"
+                  :aria-label="peek[stagedRowId(key)] ? `Hide the replacement value for ${key}` : `Show the replacement value for ${key}`"
+                  :aria-pressed="!!peek[stagedRowId(key)]"
+                  class="absolute top-1/2 right-1.5 inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  @click="peek[stagedRowId(key)] = !peek[stagedRowId(key)]"
+                ><AppIcon :name="peek[stagedRowId(key)] ? 'eye-off' : 'eye'" :size="13" /></button>
+              </span>
 
               <p v-if="existingProblem(key)" :id="`staged-problem-${key}`" class="m-0 text-[13px] text-danger">{{ existingProblem(key) }}</p>
             </div>
@@ -350,17 +364,26 @@ defineExpose({ batchProblem, showProblems, clear })
           spellcheck="false"
           class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] text-ink placeholder:font-sans placeholder:text-faint"
         />
-        <input
-          v-model="row.value"
-          type="password"
-          :aria-label="`New key value ${index + 1}`"
-          :aria-invalid="addValueProblem(row) ? 'true' : undefined"
-          :aria-describedby="addValueProblem(row) ? `new-problem-${row.id}` : undefined"
-          placeholder="Value"
-          autocomplete="off"
-          spellcheck="false"
-          class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
-        />
+        <span class="relative block">
+          <input
+            v-model="row.value"
+            :type="peek[addedRowId(row)] ? 'text' : 'password'"
+            :aria-label="`New key value ${index + 1}`"
+            :aria-invalid="addValueProblem(row) ? 'true' : undefined"
+            :aria-describedby="addValueProblem(row) ? `new-problem-${row.id}` : undefined"
+            placeholder="Value"
+            autocomplete="off"
+            spellcheck="false"
+            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-9 pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+          />
+          <button
+            type="button"
+            :aria-label="peek[addedRowId(row)] ? `Hide the new key value ${index + 1}` : `Show the new key value ${index + 1}`"
+            :aria-pressed="!!peek[addedRowId(row)]"
+            class="absolute top-1/2 right-1.5 inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            @click="peek[addedRowId(row)] = !peek[addedRowId(row)]"
+          ><AppIcon :name="peek[addedRowId(row)] ? 'eye-off' : 'eye'" :size="13" /></button>
+        </span>
         <span class="flex items-center gap-[3px]">
           <button
             type="button"

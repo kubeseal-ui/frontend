@@ -25,7 +25,6 @@ export const ICONS = {
   alert: ['M12 3.5 2.5 20h19L12 3.5Z', 'M12 10v4.5', 'M12 17v.5'],
   info: ['M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', 'M12 11v5.5', 'M12 7.5v.5'],
   x: ['m6 6 12 12', 'M18 6 6 18'],
-  pencil: ['M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5 13.5-13.5Z'],
   // Two paths rather than the four that add the lid's ridges: at 14px they read as noise.
   trash: [
     'M3 6h18',
