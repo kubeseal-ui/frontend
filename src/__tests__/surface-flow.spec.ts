@@ -547,7 +547,7 @@ describe('the surface', () => {
     // would re-post the same base commit into a conflict. The spent bar is gone, and the next step
     // rides with the confirmation instead.
     expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Review change')
-    expect(wrapper.text()).toContain('Change another key above to run the workflow again.')
+    expect(wrapper.text()).toContain('Edit this Secret again')
     // The report still names where it went.
     expect(wrapper.text()).toContain('Delivered directly')
   })

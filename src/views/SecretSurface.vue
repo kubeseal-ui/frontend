@@ -125,6 +125,10 @@ const idle = computed(() => {
   return ''
 })
 
+// Composing is the editing stage: no review, check, or delivery on screen. The document shows only
+// here; once a diff or confirmation is up, that one block is the task instead.
+const composing = computed(() => !store.review && !store.check && !store.delivery)
+
 // The four stops this flow passes through. Edit is home base — the only stop with a way back,
 // which is the existing "Start over" — and it is a back target only while the delivery has not
 // landed. The rail shows only while the Secret is editable; drift takes the screen otherwise.
@@ -352,29 +356,32 @@ watch([() => route.params.namespace, () => route.params.name], load)
             </p>
           </AppAlert>
 
-          <!-- The mode switch: pressed buttons, so the state is announced, keyboard reachable,
-               and never colour alone. -->
-          <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Document mode">
-            <span class="flex gap-[3px] rounded-control border border-border bg-surface p-[3px]">
-              <button
-                v-for="option in (['rows', 'yaml'] as const)"
-                :key="option"
-                type="button"
-                class="h-[26px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
-                :class="mode === option ? 'bg-surface-raised text-accent' : 'text-muted hover:text-ink'"
-                :aria-pressed="mode === option"
-                @click="setMode(option)"
-              >{{ option === 'rows' ? 'Keys' : 'YAML' }}</button>
-            </span>
-            <span v-if="staged" class="ml-auto font-mono text-xs text-faint">{{ countLabel(staged, 'change') }} staged</span>
-            <span v-else-if="!inSync" class="ml-auto font-mono text-xs text-faint">read only</span>
-          </div>
+          <!-- The document region. It is hidden while a diff is under review or the change has
+               landed, so that one block — the diff, or the confirmation — is the task rather than a
+               panel stacked below the whole key list. Both editors stay mounted (v-show, never
+               v-if) so a staged batch survives the trip through review and back via Start over. -->
+          <div v-show="composing">
+            <!-- The mode switch: pressed buttons, so the state is announced, keyboard reachable,
+                 and never colour alone. -->
+            <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Document mode">
+              <span class="flex gap-[3px] rounded-control border border-border bg-surface p-[3px]">
+                <button
+                  v-for="option in (['rows', 'yaml'] as const)"
+                  :key="option"
+                  type="button"
+                  class="h-[26px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
+                  :class="mode === option ? 'bg-surface-raised text-accent' : 'text-muted hover:text-ink'"
+                  :aria-pressed="mode === option"
+                  @click="setMode(option)"
+                >{{ option === 'rows' ? 'Keys' : 'YAML' }}</button>
+              </span>
+              <span v-if="staged" class="ml-auto font-mono text-xs text-faint">{{ countLabel(staged, 'change') }} staged</span>
+              <span v-else-if="!inSync" class="ml-auto font-mono text-xs text-faint">read only</span>
+            </div>
 
-          <!-- Both editors stay mounted and the mode toggles their visibility, so flipping to YAML
-               to read the manifest and back does not throw away a draft the operator has staged in
-               the rows. v-if would unmount the rows editor and take its staged change with it. -->
-          <KeyRows v-show="mode === 'rows'" ref="editor" :detail="detail" @update:batch="batch = $event" />
-          <DocumentEditor v-show="mode === 'yaml'" :detail="detail" />
+            <KeyRows v-show="mode === 'rows'" ref="editor" :detail="detail" @update:batch="batch = $event" />
+            <DocumentEditor v-show="mode === 'yaml'" :detail="detail" />
+          </div>
 
           <!-- What the review returned, and what the check verified. Both read from the store:
                the review is frozen at the moment it was made, so it keeps showing the ciphertext
@@ -427,9 +434,10 @@ watch([() => route.params.namespace, () => route.params.name], load)
                 <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
                   ArgoCD synchronization is not verified by this workflow.
                 </p>
-                <!-- The next step rides with the confirmation rather than a spent workflow bar: the
-                     staged rows have already cleared, so the editor above is ready for the next one. -->
-                <p class="mt-[3px] mb-0 text-[13px] text-muted">Change another key above to run the workflow again.</p>
+                <!-- The next step rides with the confirmation rather than a spent workflow bar.
+                     Editing again reloads the Secret so the next change is staged against the commit
+                     this delivery just made, not the stale one it started from. -->
+                <AppButton class="mt-2.5 self-start" icon="pencil" @click="load">Edit this Secret again</AppButton>
               </AppAlert>
             </div>
           </div>
