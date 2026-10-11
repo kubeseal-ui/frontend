@@ -1,6 +1,6 @@
-// The namespace index: what every namespace shares is stated once above the list, and the rows
-// carry only what is left. These pin that collapse — a fact withheld from a row has to appear
-// above it, or it is lost — along with the count and the filter that makes a long list scannable.
+// The namespace index. Two things are pinned here: what the fleet shares is stated once in the
+// header rather than on every row, and the rows answer "how big, and is it healthy" from the one
+// cross-namespace listing — the only request in the app that can.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
@@ -10,7 +10,7 @@ import { api } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import HomeView from '@/views/HomeView.vue'
-import type { Capability, Namespace, NamespaceGitPaths } from '@/types'
+import type { Capability, GitState, Namespace, NamespaceGitPaths, SealedSecretSummary } from '@/types'
 
 const FLEET: Namespace[] = [
   { name: 'payments', capabilities: [] },
@@ -40,14 +40,39 @@ const OWN_MAPPING: NamespaceGitPaths = {
 
 const EVERYTHING: Capability[] = ['metadata:read', 'secret:seal', 'secret:decrypt']
 
+function entry(namespace: string, name: string, drift: GitState['drift']): SealedSecretSummary {
+  return {
+    name,
+    namespace,
+    keys: ['TOKEN'],
+    key_count: 1,
+    scope: 'strict',
+    created_at: '2026-09-01T00:00:00Z',
+    git: { managed: true, in_sync_with_live: drift === 'in-sync', drift },
+  }
+}
+
+// One namespace is sick; the other two are not.
+const INDEX: SealedSecretSummary[] = [
+  entry('payments', 'api', 'in-sync'),
+  entry('payments', 'queue', 'diverged'),
+  entry('platform', 'database-urls', 'in-sync'),
+  entry('search', 'crawler', 'in-sync'),
+]
+
 function session(namespaces: Record<string, Capability[]>) {
   useAuthStore(pinia).setSession({ email: 'u@example.com', name: 'User', username: 'u', namespaces })
 }
 
-async function mountIndex(paths: NamespaceGitPaths[] = [WILDCARD], namespaces: Namespace[] = FLEET) {
+async function mountIndex(
+  paths: NamespaceGitPaths[] = [WILDCARD],
+  namespaces: Namespace[] = FLEET,
+  index: SealedSecretSummary[] = INDEX,
+) {
   vi.spyOn(api, 'get').mockImplementation((async (path: string) => {
     if (path === '/api/v1/namespaces') return { data: { namespaces } }
     if (path === '/api/v1/gitops/paths') return { data: { namespaces: paths } }
+    if (path === '/api/v1/secrets') return { data: { secrets: index } }
     return { data: {} }
   }) as never)
 
@@ -56,9 +81,13 @@ async function mountIndex(paths: NamespaceGitPaths[] = [WILDCARD], namespaces: N
   return wrapper
 }
 
-/** Each namespace row's own text, which is what the row is claiming about that namespace. */
-function rowTexts(wrapper: VueWrapper) {
-  return wrapper.findAll('a[href^="/namespaces/"]').map((link) => link.text())
+/** The namespaces the page is listing, read from each row's own heading. */
+function rowNames(wrapper: VueWrapper) {
+  return wrapper.findAll('a[href^="/namespaces/"] h2').map((heading) => heading.text())
+}
+
+function buttonWith(wrapper: VueWrapper, text: string) {
+  return wrapper.findAll('button').find((button) => button.text().includes(text))
 }
 
 beforeEach(() => {
@@ -70,25 +99,64 @@ beforeEach(() => {
 })
 
 describe('the namespace index', () => {
-  it('states the shared destination and grants once, and leaves the rows their names', async () => {
+  it('states the fleet’s delivery policy once, in the header', async () => {
     const wrapper = await mountIndex()
 
-    expect(wrapper.text()).toContain('Every namespace delivers straight to acme/kube @ main and grants Seal and Reveal.')
-    // Not one chip per row: the rows are the names and nothing they all share.
-    expect(rowTexts(wrapper)).toEqual(['payments', 'platform', 'search'])
+    expect(wrapper.text()).toContain('delivers to acme/kube @ main · Seal, Reveal')
   })
 
-  it('counts the namespaces above the list', async () => {
+  it('leaves the rows their names and their tally', async () => {
     const wrapper = await mountIndex()
 
-    expect(wrapper.text()).toContain('3 namespaces')
+    expect(rowNames(wrapper)).toEqual(['payments', 'platform', 'search'])
+    // The bar is decorative; the count beside it is the fact.
+    const payments = wrapper.find('a[href="/namespaces/payments"]')
+    expect(payments.text()).toContain('2 secrets')
+    expect(wrapper.find('a[href="/namespaces/platform"]').text()).toContain('1 secret')
+  })
+
+  it('counts the namespaces and the Secrets they hold', async () => {
+    const wrapper = await mountIndex()
+
+    expect(wrapper.text()).toContain('3 namespaces · 4 SealedSecrets')
+  })
+
+  it('names what is wrong, and only when something is', async () => {
+    const wrapper = await mountIndex()
+
+    expect(wrapper.text()).toContain('1 SealedSecret out of sync in 1 namespace')
+    // Healthy rows are silent, so the sick one is the only mark on the page.
+    expect(wrapper.find('a[href="/namespaces/payments"]').text()).toContain('1 out of sync')
+    expect(wrapper.find('a[href="/namespaces/platform"]').text()).not.toContain('out of sync')
+  })
+
+  it('says nothing at all when the fleet is clean', async () => {
+    const wrapper = await mountIndex([WILDCARD], FLEET, [entry('payments', 'api', 'in-sync')])
+
+    expect(wrapper.text()).not.toContain('out of sync')
+  })
+
+  it('narrows the list to the namespaces that need attention', async () => {
+    const wrapper = await mountIndex()
+
+    const attention = buttonWith(wrapper, 'out of sync')!
+    expect(attention.attributes('aria-pressed')).toBe('false')
+
+    await attention.trigger('click')
+
+    expect(rowNames(wrapper)).toEqual(['payments'])
+    expect(buttonWith(wrapper, 'out of sync')!.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.text()).toContain('Show all')
+
+    await buttonWith(wrapper, 'out of sync')!.trigger('click')
+    expect(rowNames(wrapper)).toEqual(['payments', 'platform', 'search'])
   })
 
   it('states a listing that failed rather than counting nothing', async () => {
     vi.spyOn(api, 'get').mockImplementation((async (path: string) => {
       if (path === '/api/v1/namespaces') throw new Error('gateway')
       if (path === '/api/v1/gitops/paths') return { data: { namespaces: [WILDCARD] } }
-      return { data: {} }
+      return { data: { secrets: INDEX } }
     }) as never)
 
     const wrapper = mount(HomeView, { global: { plugins: [pinia, router] } })
@@ -104,7 +172,6 @@ describe('the namespace index', () => {
     session({ payments: EVERYTHING, platform: ['metadata:read'], search: EVERYTHING })
     const wrapper = await mountIndex([OWN_MAPPING, WILDCARD])
 
-    expect(wrapper.text()).not.toContain('Every namespace')
     // Payments delivers by proposal from its own repository, so its row says so itself.
     const payments = wrapper.find('a[href="/namespaces/payments"]')
     expect(payments.text()).toContain('Seal')
@@ -112,13 +179,15 @@ describe('the namespace index', () => {
     expect(payments.text()).toContain('1 directory · proposal')
     // Read-only is a fact about this namespace alone, so it stays on its row.
     expect(wrapper.find('a[href="/namespaces/platform"]').text()).toContain('Read only')
+    // A fact no row shares is not stated above them.
+    expect(wrapper.text()).not.toContain('delivers to acme/kube')
   })
 
   it('leaves a lone namespace its facts on its own row', async () => {
-    const wrapper = await mountIndex([WILDCARD], [FLEET[0]])
+    const wrapper = await mountIndex([WILDCARD], [FLEET[0]], [entry('payments', 'api', 'in-sync')])
 
     // One row is not a repetition to collapse, and "every namespace" would be describing one.
-    expect(wrapper.text()).not.toContain('Every namespace')
+    expect(wrapper.text()).not.toContain('delivers to')
     expect(wrapper.text()).toContain('1 namespace')
     expect(wrapper.find('a[href="/namespaces/payments"]').text()).toContain('Seal')
     expect(wrapper.find('input[aria-label="Filter namespaces"]').exists()).toBe(false)
@@ -130,10 +199,10 @@ describe('the namespace index', () => {
     await wrapper.find('input[aria-label="Filter namespaces"]').setValue('plat')
     await flushPromises()
 
-    expect(rowTexts(wrapper)).toEqual(['platform'])
+    expect(rowNames(wrapper)).toEqual(['platform'])
     expect(wrapper.text()).toContain('Showing 1 of 3 namespaces.')
-    // The shared facts are the page's, not the filter's: they stay whatever the query is.
-    expect(wrapper.text()).toContain('Every namespace delivers straight to acme/kube @ main')
+    // The shared policy is the page's, not the filter's: it stays whatever the query is.
+    expect(wrapper.text()).toContain('delivers to acme/kube @ main')
   })
 
   it('returns every namespace when the filter is cleared', async () => {
@@ -142,7 +211,7 @@ describe('the namespace index', () => {
     await wrapper.find('input[aria-label="Filter namespaces"]').setValue('plat')
     await wrapper.find('input[aria-label="Filter namespaces"]').setValue('')
 
-    expect(rowTexts(wrapper)).toEqual(['payments', 'platform', 'search'])
+    expect(rowNames(wrapper)).toEqual(['payments', 'platform', 'search'])
   })
 
   it('says a filter matched nothing rather than rendering an empty list', async () => {
@@ -150,7 +219,7 @@ describe('the namespace index', () => {
 
     await wrapper.find('input[aria-label="Filter namespaces"]').setValue('nope')
 
-    expect(rowTexts(wrapper)).toHaveLength(0)
+    expect(rowNames(wrapper)).toHaveLength(0)
     expect(wrapper.text()).toContain('No namespace matches')
     expect(wrapper.text()).toContain('nope')
   })

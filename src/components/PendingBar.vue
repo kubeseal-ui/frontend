@@ -35,7 +35,9 @@ const summary = computed(() => (props.count === 1 ? '1 change' : `${props.count}
 </script>
 
 <template>
-  <div class="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border bg-bg/90 pt-3 pb-2 backdrop-blur">
+  <!-- Sticky, and opaque: a bar that let the ciphertext show through it would make the one
+       primary control on the screen the least legible thing on it. -->
+  <div class="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border bg-bg pt-3 pb-2">
     <span v-if="idle" class="text-sm text-muted">{{ idle }}</span>
     <template v-else>
       <span class="text-sm text-muted">{{ summary }}</span>

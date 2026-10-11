@@ -14,13 +14,13 @@ const afterHeading = computed(() => props.afterLabel || (props.before ? 'Encrypt
 <template>
   <div class="min-w-0 rounded-card-inner border border-border bg-surface-raised/70">
     <template v-if="before">
-      <div class="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+      <div class="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold text-muted">
         <AppIcon name="lock" :size="13" />{{ beforeLabel || 'Encrypted before' }}
       </div>
       <pre class="m-0 max-h-72 overflow-auto p-3 text-xs leading-relaxed"><code class="font-mono whitespace-pre">{{ before }}</code></pre>
     </template>
 
-    <div class="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+    <div class="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold text-muted">
       <AppIcon name="lock" :size="13" />{{ afterHeading }}
     </div>
     <pre class="m-0 max-h-72 overflow-auto p-3 text-xs leading-relaxed"><code class="font-mono whitespace-pre">{{ after }}</code></pre>

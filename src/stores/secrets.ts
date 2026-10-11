@@ -28,8 +28,8 @@ const secretPath = (namespace: string, name: string) =>
 export const useSecretsStore = defineStore('secrets', {
   state: () => ({
     namespaces: [] as Namespace[], secrets: [] as SealedSecretSummary[], currentDetail: null as SealedSecretDetail | null,
-    // Which namespace `secrets` describes. The rail and the namespace page render the same set,
-    // so they share one fetch rather than issuing the same request twice.
+    // Which namespace `secrets` describes. Held so two callers that mount in the same tick
+    // share one fetch rather than issuing the same request twice.
     secretsNamespace: '' as string,
     secretsLoaded: false,
     // The namespace whose listing is in flight. Separate from `loading`, which the namespaces
@@ -46,11 +46,11 @@ export const useSecretsStore = defineStore('secrets', {
     // Not derivable from `gitPaths` being null, which fetchGitPaths also stores on
     // failure: a card would otherwise state "no Git mapping" for a listing that failed.
     gitPathsLoaded: false,
-    // The rail's search index: one cross-namespace listing. Names, key names, scope and drift
+    // The strip's search index: one cross-namespace listing. Names, key names, scope and drift
     // only — nothing decrypted — so it survives clearSensitiveState() and a route change.
     index: [] as SealedSecretSummary[],
     indexLoaded: false,
-    // Read by the rail as well as the box: while the index is in flight a query has no
+    // Read by the results panel as well as the box: while the index is in flight a query has no
     // matches *yet*, and "No Secret or key matches." would be an answer it cannot give.
     indexLoading: false,
     indexError: null as Error | null,
@@ -72,16 +72,16 @@ export const useSecretsStore = defineStore('secrets', {
 
     /** Cached by namespace: an empty listing is a loaded one, which is why this needs the flag.
      *  A caller that arrives while the same namespace is already in flight joins it instead of
-     *  issuing a second request — `secretsLoaded` only records a *finished* fetch, so the rail
-     *  and the page, which mount in the same tick, would otherwise both start one. */
+     *  issuing a second request — `secretsLoaded` only records a *finished* fetch, so two callers
+     *  in the same tick would otherwise both start one. */
     async ensureSecrets(namespace: string) {
       if (this.secretsNamespace === namespace && this.secretsLoaded) return this.secrets
       if (this.secretsPending === namespace) return this.secrets
       return this.fetchSecrets(namespace)
     },
 
-    /** The rail's index. An unscoped listing is not an error case for `loading`/`error`: the rail
-     *  is chrome around the route, and a search index that failed must not blank the page. */
+    /** The strip's index. An unscoped listing is not an error case for `loading`/`error`: a search
+     *  index that failed must not blank the page the strip merely sits above. */
     async fetchIndex() {
       this.indexError = null
       this.indexLoading = true

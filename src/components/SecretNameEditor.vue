@@ -168,7 +168,7 @@ watch(mode, (next) => {
 
 onMounted(() => {
   if (mode.value === 'create') seedTemplate()
-  // Shared with the create page's rail: only the first to mount asks.
+  // Shared with the create page's context card: only the first to mount asks.
   if (!store.gitPaths) store.fetchGitPaths()
 })
 

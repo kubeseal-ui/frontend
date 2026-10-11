@@ -18,7 +18,8 @@ export function renderPathTemplate(template: string, namespace: string, name: st
 }
 
 // The directory a template renders into, with its file-name segment dropped. Needs no Secret
-// name, which is what lets the namespace rail say where the default lands before one is typed.
+// name, which is what lets the create page's context card mark where the default lands before
+// one is typed.
 export function templateDirectory(template: string, namespace: string): string {
   const parts = renderNamespace(template, namespace).split('/')
   parts.pop()

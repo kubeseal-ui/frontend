@@ -43,9 +43,15 @@ const stages = computed(() => [
 </script>
 
 <template>
-  <aside aria-label="Change state" class="glass flex flex-col gap-4 rounded-card p-4 lg:sticky lg:top-24">
+  <!-- The change's own column, not a second card: the document beside it carries the content, and
+       this only states where the change is going and which of the three presses have happened. A
+       rounded surface around that summary would read as a second object on the page. -->
+  <aside
+    aria-label="Change state"
+    class="flex flex-col gap-5 border-border lg:sticky lg:top-24 lg:border-l lg:pl-5"
+  >
     <div>
-      <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">Destination</h2>
+      <h2 class="mb-2 text-xs font-semibold text-muted">Destination</h2>
       <dl class="m-0 flex flex-col gap-2 text-sm">
         <div class="flex flex-col gap-0.5">
           <dt class="text-xs text-muted">File</dt>
@@ -67,7 +73,7 @@ const stages = computed(() => [
     </div>
 
     <div class="border-t border-border pt-4">
-      <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">Here you can</h2>
+      <h2 class="mb-2 text-xs font-semibold text-muted">Here you can</h2>
       <ul class="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
         <li class="flex items-center gap-1.5">
           <AppIcon :name="canSeal ? 'check' : 'x'" :size="13" :class="canSeal ? 'text-success' : 'text-danger'" />
@@ -85,7 +91,7 @@ const stages = computed(() => [
     </div>
 
     <div class="border-t border-border pt-4">
-      <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">This change</h2>
+      <h2 class="mb-2 text-xs font-semibold text-muted">This change</h2>
       <ol class="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
         <li v-for="stage in stages" :key="stage.key" class="flex items-center gap-1.5">
           <AppIcon v-if="stage.done" name="check" :size="13" class="text-success" />

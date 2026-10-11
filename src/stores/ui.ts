@@ -3,6 +3,10 @@ import { defineStore } from 'pinia'
 // The only thing this store persists is a non-sensitive layout preference, which the
 // frontend state contract allows in localStorage. Secret values, drafts, and session
 // state are never stored here.
+//
+// The search query is deliberately NOT here either. It lives in AppShell, above the route —
+// where the strip that owns it also decides what the page below renders. Nothing else needs
+// to read it, so nothing else can.
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'kubeseal-ui.theme'
@@ -29,22 +33,11 @@ function persistPreference(value: ThemePreference): void {
 export const useUiStore = defineStore('ui', {
   state: () => ({
     themePreference: readPreference(),
-    // The narrow-screen rail drawer: chrome, not a preference, so not persisted.
-    railOpen: false,
-    // A counter rather than a flag: asking twice has to reach the box twice.
-    searchRequests: 0,
   }),
   actions: {
     setThemePreference(value: ThemePreference) {
       this.themePreference = value
       persistPreference(value)
-    },
-    openRail(focusSearch = false) {
-      this.railOpen = true
-      if (focusSearch) this.searchRequests += 1
-    },
-    closeRail() {
-      this.railOpen = false
     },
   },
 })

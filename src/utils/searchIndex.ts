@@ -33,3 +33,31 @@ export function searchSecrets(index: SealedSecretSummary[], query: string): Sear
     (a, b) => a.namespace.localeCompare(b.namespace) || a.name.localeCompare(b.name),
   )
 }
+
+export interface HighlightSegment {
+  text: string
+  /** True for the runs that matched, so a row can mark why it is in the list. */
+  hit: boolean
+}
+
+/** Splits `text` into the runs the query matched and the runs it did not. Returned as data
+ *  rather than markup, so the row renders it with v-for and the product never needs v-html.
+ *  Case-insensitive, and an empty query is one unmatched run rather than every-character. */
+export function highlightSegments(text: string, query: string): HighlightSegment[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return [{ text, hit: false }]
+
+  const haystack = text.toLowerCase()
+  const segments: HighlightSegment[] = []
+  let cursor = 0
+  // A zero-length match would never advance `cursor`, which is why the empty needle returns
+  // above instead of being handled here.
+  for (let found = haystack.indexOf(needle); found !== -1; found = haystack.indexOf(needle, cursor)) {
+    if (found > cursor) segments.push({ text: text.slice(cursor, found), hit: false })
+    segments.push({ text: text.slice(found, found + needle.length), hit: true })
+    cursor = found + needle.length
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), hit: false })
+  return segments
+}
+

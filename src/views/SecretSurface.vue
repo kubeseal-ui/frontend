@@ -81,6 +81,18 @@ const ready = computed(() => {
 const idle = computed(() => {
   if (store.delivery) return 'Delivered. Change another key to run the workflow again.'
   if (step.value === 'review' && batch.value.length === 0) {
+    // "Change, remove, or add a key" is only true when this page is offering those controls. Over
+    // a Secret whose drift or grants have withheld all three, it sends the operator looking for a
+    // button that is not there, so each reason gets its own sentence instead.
+    if (!detail.value?.git.in_sync_with_live) {
+      return 'Git and live state differ, so nothing can be staged until the drift is resolved.'
+    }
+    if (!scoped('secret:seal') || !scoped('secret:decrypt')) {
+      return 'Staging a change needs the secret:seal and secret:decrypt capabilities in this namespace.'
+    }
+    if (baseCommit.value === '') {
+      return 'The Git source reported no base commit, so there is nothing to stage a change against.'
+    }
     return 'Nothing staged. Change, remove, or add a key to begin.'
   }
   return ''
@@ -182,7 +194,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
       {{ namespace() }}
     </RouterLink>
 
-    <AppPageHeader :title="title" title-id="page-title">
+    <AppPageHeader :title="title" title-id="page-title" mono>
       <template #eyebrow>
         <AppTag v-if="detail" tone="accent">{{ detail.scope || 'strict' }}</AppTag>
       </template>
@@ -274,14 +286,14 @@ watch([() => route.params.namespace, () => route.params.name], load)
                the review is frozen at the moment it was made, so it keeps showing the ciphertext
                that was reviewed even after the rows move on. -->
           <section v-if="store.review" class="mt-6" aria-label="Reviewed ciphertext">
-            <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+            <h2 class="mb-2 text-[0.8125rem] font-semibold text-ink">
               Review · includes {{ store.review.mutations.map((m) => `${m.operation} ${m.key}`).join(', ') }}
             </h2>
             <DiffBlocks :before="store.review.before" :after="store.review.after" />
           </section>
 
           <section v-if="store.check" class="mt-6" aria-label="Checked against the branch">
-            <h2 class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+            <h2 class="mb-2 text-[0.8125rem] font-semibold text-ink">
               Check · {{ store.check.result.path }}
             </h2>
             <DiffBlocks
