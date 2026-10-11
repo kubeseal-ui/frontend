@@ -4,11 +4,14 @@
 // This file replaces namespace-rail.spec.ts: the rail is gone, and the search it held now lives in
 // the top strip and replaces the page below it.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { router } from '@/router'
 import { pinia } from '@/pinia'
+import AppShell from '@/components/AppShell.vue'
 import SearchResults from '@/components/SearchResults.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { highlightSegments, searchSecrets } from '@/utils/searchIndex'
 import type { GitState, SealedSecretSummary } from '@/types'
@@ -173,5 +176,41 @@ describe('the results panel', () => {
 
     await wrapper.find('button').trigger('click')
     expect(get).toHaveBeenCalled()
+  })
+})
+
+// The strip replaces the page rather than floating over it, so following a hit has to clear the
+// query — otherwise the results stay mounted over the Secret the link just loaded. A local router
+// with stub components isolates this from the real router's auth guard and lazy loads.
+describe('following a search hit', () => {
+  it('clears the strip on navigation so the page it loaded is what shows', async () => {
+    const store = useSecretsStore(pinia)
+    store.index = INDEX
+    store.indexLoaded = true
+    useAuthStore(pinia).setSession({ email: 'o@example.com', name: 'Op', username: 'op', namespaces: {} })
+
+    const stub = { template: '<div />' }
+    const testRouter = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: stub },
+        { path: '/secrets/:namespace/:name', component: stub },
+      ],
+    })
+    await testRouter.push('/')
+    await testRouter.isReady()
+
+    const wrapper = mount(AppShell, {
+      global: { plugins: [pinia, testRouter] },
+      slots: { default: '<div class="page-slot">PAGE</div>' },
+    })
+
+    await wrapper.find('input[type="search"]').setValue('queue')
+    await flushPromises()
+    expect(wrapper.findComponent(SearchResults).exists()).toBe(true)
+
+    await testRouter.push('/secrets/payments/queue')
+    await flushPromises()
+    expect(wrapper.findComponent(SearchResults).exists()).toBe(false)
   })
 })

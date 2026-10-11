@@ -318,6 +318,36 @@ describe('the create path', () => {
     expect(wrapper.text()).toContain('A subdirectory cannot step outside the directory you chose.')
     expect(post).not.toHaveBeenCalled()
   })
+
+  // The rail is the stage made legible: it names where the operator is standing while the one
+  // button at the foot only ever names the next press.
+  it('shows a progress rail that moves from Compose to Review once a draft exists', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    const current = () => wrapper.find('nav[aria-label="Workflow progress"] [aria-current="step"]')
+    expect(current().text()).toContain('Compose')
+
+    useSecretsStore(pinia).change = { namespace: 'payments', name: 'api', mutations: [], baseCommit: 'c', targetPath: 'payments/api.yaml', scope: 'strict', encrypted: 'cipher' }
+    await flushPromises()
+    expect(current().text()).toContain('Review')
+  })
+
+  // The manifest box is the one place in the app holding a Secret in plaintext; once that Secret is
+  // sealed and committed, it must not linger there.
+  it('clears the typed manifest once the draft is delivered', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    await wrapper.find('textarea').setValue('apiVersion: v1\nkind: Secret\nmetadata:\n  name: api\nstringData:\n  token: "SENTINELVALUE"\n')
+    await flushPromises()
+
+    const store = useSecretsStore(pinia)
+    store.check = { yaml: 'cipher-sealed', checksum: 'sum', result: CHECKED, idempotencyKey: 'k' }
+    store.delivery = DELIVERED
+    await flushPromises()
+
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).not.toContain('SENTINELVALUE')
+    // The next step rides with the confirmation, not a trailing bar line below the spent draft.
+    expect(wrapper.text()).toContain('Encrypt another manifest above to run the workflow again.')
+    expect(wrapper.text()).not.toContain('Delivered. Encrypt another manifest')
+  })
 })
 
 describe('the surface', () => {
@@ -496,7 +526,7 @@ describe('the surface', () => {
     expect(press().attributes('disabled')).toBeDefined()
   })
 
-  it('stops offering the press once the change has landed, and says why', async () => {
+  it('stops offering the press once the change has landed, and says what comes next', async () => {
     const { wrapper } = await mountSurface(detail())
     await flushPromises()
 
@@ -512,10 +542,10 @@ describe('the surface', () => {
     await flushPromises()
 
     // A landed delivery is terminal: the store dropped the change it consumed, so a press here
-    // would re-post the same base commit into a conflict. The bar states that instead of
-    // offering a button the server would refuse.
+    // would re-post the same base commit into a conflict. The spent bar is gone, and the next step
+    // rides with the confirmation instead.
     expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Review change')
-    expect(wrapper.text()).toContain('Delivered. Change another key to run the workflow again.')
+    expect(wrapper.text()).toContain('Change another key above to run the workflow again.')
     // The report still names where it went.
     expect(wrapper.text()).toContain('Delivered directly')
   })
@@ -526,6 +556,18 @@ describe('the surface', () => {
 
     expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Review change')
     expect(wrapper.text()).toContain('Nothing staged. Reveal, change, or remove a key to begin.')
+  })
+
+  // Drift takes the screen: there is no workflow to be partway through, so the rail yields to the
+  // alert that explains why editing is disabled.
+  it('shows the workflow rail only while the Secret is in sync', async () => {
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+    expect(wrapper.find('nav[aria-label="Workflow progress"]').exists()).toBe(true)
+
+    useSecretsStore(pinia).currentDetail = detail({ git: git({ drift: 'diverged', in_sync_with_live: false }) })
+    await flushPromises()
+    expect(wrapper.find('nav[aria-label="Workflow progress"]').exists()).toBe(false)
   })
 })
 

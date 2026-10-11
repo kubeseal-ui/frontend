@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import DiffBlocks from '@/components/DiffBlocks.vue'
 import PendingBar from '@/components/PendingBar.vue'
+import ProgressRail from '@/components/ProgressRail.vue'
 import SecretNameEditor from '@/components/SecretNameEditor.vue'
 import { describeError } from '@/api'
 import { renderNamespace, templateDirectory } from '@/utils/gitPath'
+import { revealRegion } from '@/utils/reveal'
 import { deliveryHeading, requiredDeliveryCapability, summarizeDelivery } from '@/utils/delivery'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
@@ -56,9 +58,23 @@ const canDeliver = computed(() => {
 })
 const ready = computed(() => (step.value === 'deliver' ? canDeliver.value : true))
 
-// The create path ends the way the edit path does: the delivery consumes the draft it was built
-// from, leaving no next press.
-const idle = computed(() => (secrets.delivery ? 'Delivered. Encrypt another manifest to run the workflow again.' : ''))
+// The three stops the create flow passes through. Compose is the home base — the only stop with a
+// way back — and the rail marks which one the operator is standing on across the whole page.
+const editorRef = ref<{ reopen?: () => void } | null>(null)
+const composeSection = ref<HTMLElement | null>(null)
+const railSteps = [
+  { key: 'compose', label: 'Compose', back: true },
+  { key: 'review', label: 'Review' },
+  { key: 'deliver', label: 'Deliver' },
+]
+const activeStep = computed(() => (secrets.delivery ? 2 : secrets.change?.encrypted ? 1 : 0))
+function onRailNavigate(key: string) {
+  // Only Compose steps back; it reopens the editor the way the fold's Edit button does, then the
+  // viewport is carried up to the form the operator asked to return to.
+  if (key !== 'compose') return
+  editorRef.value?.reopen?.()
+  revealRegion(() => composeSection.value)
+}
 
 async function press() {
   if (!ready.value) return
@@ -70,6 +86,19 @@ async function press() {
     pressError.value = describeError(e, 'The workflow could not be advanced')
   } finally { busy.value = false }
 }
+
+// Each press opens its result below the form, so the viewport is carried to the new stage rather
+// than leaving the operator to scroll for what the press produced. The draft section is brought up
+// when the ciphertext first appears; the delivery confirmation takes focus when it lands, by which
+// time the form above has reset and nothing else is competing for attention.
+const draftSection = ref<HTMLElement | null>(null)
+const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
+watch(() => Boolean(secrets.change?.encrypted), (encrypted) => {
+  if (encrypted) revealRegion(() => draftSection.value)
+})
+watch(() => secrets.delivery, (delivered) => {
+  if (delivered) revealRegion(() => deliveryAlert.value?.$el, { focus: true })
+})
 
 // A half-finished encrypted draft belongs to this page and would follow the user to the
 // next one, where it has no meaning.
@@ -111,16 +140,24 @@ onUnmounted(() => secrets.discardChange())
 
       <div v-else class="flex flex-wrap items-start gap-x-12 gap-y-8">
         <div class="flex min-w-[22rem] flex-1 flex-col gap-6">
-          <SecretNameEditor :namespace="props.namespace" @update:name="typedName = $event" />
+          <!-- Where you are, pinned above the workflow, so the one changing button at its foot is
+               not the only thing saying how far along the flow is. -->
+          <div class="sticky top-0 z-10 -mt-1 bg-bg pt-1 pb-3">
+            <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
+          </div>
 
-          <section v-if="secrets.change?.encrypted || secrets.delivery" class="flex max-w-[640px] flex-col gap-3" aria-label="Encrypted draft">
+          <div ref="composeSection">
+            <SecretNameEditor ref="editorRef" :namespace="props.namespace" @update:name="typedName = $event" />
+          </div>
+
+          <section v-if="secrets.change?.encrypted || secrets.delivery" ref="draftSection" class="flex max-w-[640px] flex-col gap-3" aria-label="Encrypted draft">
             <DiffBlocks
               :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
               :before="secrets.check?.result.before"
             />
             <!-- The edit path reports a delivery; a create that delivered and said nothing left a
                  spent draft on screen with no record of where it went. -->
-            <AppAlert v-if="secrets.delivery" type="success" :title="deliveryHeading(secrets.delivery)">
+            <AppAlert v-if="secrets.delivery" ref="deliveryAlert" type="success" :title="deliveryHeading(secrets.delivery)">
               <span class="block text-[13px] text-muted">{{ summarizeDelivery(secrets.delivery) }}</span>
               <a
                 v-if="secrets.delivery.proposal_url"
@@ -130,17 +167,22 @@ onUnmounted(() => secrets.discardChange())
                 class="mt-1 block break-all text-[13px] text-accent no-underline hover:underline"
               >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
               <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">ArgoCD synchronization is not verified by this workflow.</span>
+              <!-- The next step belongs with the confirmation, not in a workflow bar below the spent
+                   draft: the form above has already reset for it. -->
+              <span class="mt-1 block text-[13px] text-muted">Encrypt another manifest above to run the workflow again.</span>
             </AppAlert>
             <AppAlert v-if="pressError" type="error" closable title="Operation failed" @close="pressError = ''">
               <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
             </AppAlert>
+            <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,
+                 and its confirmation above carries what comes next. -->
             <PendingBar
+              v-if="!secrets.delivery"
               :step="step"
               :mode="deliveryMode"
               :count="0"
               :ready="ready"
               :busy="busy"
-              :idle="idle"
               @press="press"
             />
           </section>

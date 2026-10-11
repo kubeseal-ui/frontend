@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
@@ -13,6 +14,12 @@ const SIGNED_IN_EMAIL = 'ada@example.com'
 let pinia: Pinia
 let shell: VueWrapper | undefined
 
+// The shell reads the current route to close the search strip on navigation, so it needs a router
+// installed. These tests never navigate, so a one-route memory router is enough.
+function testRouter() {
+  return createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })
+}
+
 function mountShell() {
   // Attached, unlike the rest of the suite: `focus()` is a no-op on a detached tree, so the Escape
   // path's hand-back is not assertable without it. `afterEach` unmounts, which is also what
@@ -21,7 +28,7 @@ function mountShell() {
     attachTo: document.body,
     slots: { default: '<p id="route-content">route content</p>' },
     global: {
-      plugins: [pinia],
+      plugins: [pinia, testRouter()],
       stubs: { RouterLink: { template: '<a><slot /></a>' } },
     },
   })

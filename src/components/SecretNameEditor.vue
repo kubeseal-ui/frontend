@@ -196,6 +196,21 @@ watch(draft, async () => {
   await refocusAfterCollapse(() => toggle.value?.$el)
 }, { flush: 'post' })
 
+// A delivered draft has been sealed and committed, so the plaintext it was built from is spent:
+// the form clears to a fresh template rather than reopening on a Secret that is now in Git. The
+// delivery record below is driven by the store, not this form, so it stays.
+watch(() => store.delivery, (next) => {
+  if (!next) return
+  name.value = ''; targetDir.value = ''; subdirectory.value = ''
+  seedTemplate()
+  shown.name = false; shown.yaml = false; shown.manifest = false; shown.subdirectory = false
+})
+
+// Reopening from outside: the progress rail's "Compose" stop steps back to this form the same way
+// the fold's own Edit button does, keeping the encrypted draft rather than discarding it.
+function reopen() { override.value = true }
+defineExpose({ reopen })
+
 function seedTemplate() {
   renderedName.value = name.value
   yaml.value = pristineTemplate.value

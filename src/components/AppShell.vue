@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import { type IconName } from '@/components/ui/icons'
 import SearchResults from '@/components/SearchResults.vue'
@@ -17,6 +17,13 @@ const ui = useUiStore()
 // `v-if` — so a Secret with a half-staged change is still there when the search is cleared.
 const query = ref('')
 const searching = computed(() => query.value.trim() !== '')
+
+// A result in the strip is a link, and the strip replaces the page rather than floating over it, so
+// following a hit has to clear the query — otherwise the results stay mounted over the Secret the
+// link just loaded (the route changes and the fetch runs, but `v-if="searching"` keeps covering it).
+// The query lives here, not in the URL, so no navigation clears it on its own; any route change does.
+const route = useRoute()
+watch(() => route.fullPath, () => { query.value = '' })
 
 const displayName = computed(() => auth.user?.name || auth.user?.username || '')
 // Two letters at most: an avatar is a mark, and three initials at 10px is a smudge.

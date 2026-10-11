@@ -12,12 +12,14 @@ import DiffBlocks from '@/components/DiffBlocks.vue'
 import DocumentEditor from '@/components/DocumentEditor.vue'
 import KeyRows from '@/components/KeyRows.vue'
 import PendingBar from '@/components/PendingBar.vue'
+import ProgressRail from '@/components/ProgressRail.vue'
 import StateSpine from '@/components/StateSpine.vue'
 import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { deliveryHeading, requiredDeliveryCapability, summarizeDelivery } from '@/utils/delivery'
 import { driftFieldList, driftPresentation, driftReasonSentence } from '@/utils/drift'
+import { revealRegion } from '@/utils/reveal'
 import { countLabel } from '@/utils/format'
 import type { DeliveryResult, Mutation, WorkflowStep } from '@/types'
 
@@ -100,10 +102,10 @@ const ready = computed(() => {
   return true
 })
 
-// A press is offered only when there is a next one. A landed delivery is the terminal case: the
-// store drops the change it consumed, and pressing again would meet a base-commit conflict.
+// A press is offered only when there is a next one. A landed delivery is terminal: the bar is
+// hidden entirely in that case (its confirmation carries what comes next), so the delivered state
+// needs no sentence here.
 const idle = computed(() => {
-  if (store.delivery) return 'Delivered. Change another key to run the workflow again.'
   // A batch staged before drift arrived keeps its button, disabled: the alert above is what says
   // why, and a sentence here would hide that anything is staged at all.
   const withheldByDrift = !inSync.value && !(step.value === 'review' && batch.value.length > 0)
@@ -122,6 +124,30 @@ const idle = computed(() => {
   }
   return ''
 })
+
+// The four stops this flow passes through. Edit is home base — the only stop with a way back,
+// which is the existing "Start over" — and it is a back target only while the delivery has not
+// landed. The rail shows only while the Secret is editable; drift takes the screen otherwise.
+const railSteps = computed(() => [
+  { key: 'edit', label: 'Edit', back: !store.delivery },
+  { key: 'review', label: 'Review' },
+  { key: 'check', label: 'Check' },
+  { key: 'deliver', label: 'Deliver' },
+])
+const activeStep = computed(() => (store.delivery ? 3 : store.check ? 2 : store.review ? 1 : 0))
+function onRailNavigate(key: string) {
+  if (key === 'edit' && !store.delivery) startOver()
+}
+
+// Each press opens its result below the editor; the viewport is carried to it so the operator is
+// not left scrolling past the key rows to find what the press produced. One diff shows at a time
+// (the review folds away when the check lands), so each watcher reveals the panel now on screen.
+const reviewFold = ref<HTMLElement | null>(null)
+const checkFold = ref<HTMLElement | null>(null)
+const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
+watch(() => Boolean(store.review) && !store.check, (open) => { if (open) revealRegion(() => reviewFold.value) })
+watch(() => Boolean(store.check), (open) => { if (open) revealRegion(() => checkFold.value) })
+watch(() => store.delivery, (delivered) => { if (delivered) revealRegion(() => deliveryAlert.value?.$el, { focus: true }) })
 
 async function press() {
   if (!ready.value) return
@@ -262,6 +288,13 @@ watch([() => route.params.namespace, () => route.params.name], load)
 
       <div v-if="detail" class="flex items-start gap-7 px-[26px] pb-10">
         <div class="min-w-0 flex-1">
+          <!-- Where you are in the workflow, pinned above the editor. It shows only while the
+               Secret is editable; when the Git source has drifted the alert below takes the screen
+               and there is no workflow to be partway through. -->
+          <div v-if="inSync" class="sticky top-0 z-10 mb-4 bg-bg py-1">
+            <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
+          </div>
+
           <!-- Reported like a delivery, because it is the same result shape. -->
           <AppAlert v-if="syncOutcome" type="success" :title="syncTitle" class="mb-5">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncSummary }}</p>
@@ -352,7 +385,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
                the branch are near-identical YAML, so showing both stacks two walls of text that
                say almost the same thing; once the check lands it supersedes the review, so the
                review folds away and the check takes its place. -->
-          <div class="fold" :class="{ open: Boolean(store.review) && !store.check }">
+          <div class="fold" ref="reviewFold" :class="{ open: Boolean(store.review) && !store.check }">
             <div>
               <template v-if="store.review">
                 <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
@@ -363,7 +396,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             </div>
           </div>
 
-          <div class="fold" :class="{ open: Boolean(store.check) }">
+          <div class="fold" ref="checkFold" :class="{ open: Boolean(store.check) }">
             <div>
               <template v-if="store.check">
                 <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
@@ -380,7 +413,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
 
           <div class="fold" :class="{ open: Boolean(store.delivery) }">
             <div>
-              <AppAlert v-if="store.delivery" type="success" :title="deliveryHeading(store.delivery)" class="mt-4">
+              <AppAlert v-if="store.delivery" ref="deliveryAlert" type="success" :title="deliveryHeading(store.delivery)" class="mt-4">
                 <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ summarizeDelivery(store.delivery, { branch: detail.git.branch, file: store.check?.result.path || detail.git.file_path }) }}</p>
                 <a
                   v-if="store.delivery.proposal_url"
@@ -394,11 +427,15 @@ watch([() => route.params.namespace, () => route.params.name], load)
                 <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
                   ArgoCD synchronization is not verified by this workflow.
                 </p>
+                <!-- The next step rides with the confirmation rather than a spent workflow bar: the
+                     staged rows have already cleared, so the editor above is ready for the next one. -->
+                <p class="mt-[3px] mb-0 text-[13px] text-muted">Change another key above to run the workflow again.</p>
               </AppAlert>
             </div>
           </div>
 
           <PendingBar
+            v-if="!store.delivery"
             :step="step"
             :mode="deliveryMode"
             :count="staged"
