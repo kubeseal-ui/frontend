@@ -297,7 +297,7 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="operationOf(key) !== 'delete'"
             :id="`staged-input-${key}`"
             v-model="replacements[key]"
-            type="text"
+            type="password"
             :aria-label="`Replacement value for ${key}`"
             :aria-invalid="existingProblem(key) ? 'true' : undefined"
             :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
@@ -332,7 +332,7 @@ defineExpose({ batchProblem, showProblems, clear })
         />
         <input
           v-model="row.value"
-          type="text"
+          type="password"
           :aria-label="`New key value ${index + 1}`"
           :aria-invalid="addValueProblem(row) ? 'true' : undefined"
           :aria-describedby="addValueProblem(row) ? `new-problem-${row.id}` : undefined"

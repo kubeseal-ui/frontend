@@ -73,10 +73,15 @@ const rows = computed(() =>
 
 // A fact every namespace shares is stated once, in the header. Printed per tile it was the same
 // mapping on twenty tiles, when the name is the only thing that differs between them.
-const shared = computed(() => ({
-  repository: sharedString(rows.value.map((row) => row.repository)) || '',
-  grants: sharedString(rows.value.map((row) => row.grants.join(', '))) === null ? null : rows.value[0].grants,
-}))
+const shared = computed((): { repository: string; grants: string[] | null } => {
+  // The header renders before the listing lands, so this is read with no rows at all.
+  const first = rows.value[0]
+  if (!first) return { repository: '', grants: null }
+  return {
+    repository: sharedString(rows.value.map((row) => row.repository)) || '',
+    grants: sharedString(rows.value.map((row) => row.grants.join(', '))) === null ? null : first.grants,
+  }
+})
 
 const grantClause = computed(() => {
   const grants = shared.value.grants
@@ -239,8 +244,8 @@ onMounted(async () => {
             <span v-if="!shared.repository && row.repository" class="mt-1.5 block truncate font-mono text-xs text-faint">{{ row.repository }}</span>
 
             <span v-if="secrets.indexLoaded" class="level absolute inset-x-0 bottom-0 flex h-[3px]" aria-hidden="true">
-              <i class="block h-full bg-accent/55" :style="{ width: row.ok }" />
-              <i class="block h-full bg-danger" :style="{ width: row.bad }" />
+              <i class="block h-full bg-accent/55" :style="{ width: row.ok, '--bar-ok': row.ok }" />
+              <i class="block h-full bg-danger" :style="{ width: row.bad, '--bar-bad': row.bad }" />
             </span>
           </RouterLink>
         </li>

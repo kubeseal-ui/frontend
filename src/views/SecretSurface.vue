@@ -100,7 +100,10 @@ const ready = computed(() => {
 // store drops the change it consumed, and pressing again would meet a base-commit conflict.
 const idle = computed(() => {
   if (store.delivery) return 'Delivered. Change another key to run the workflow again.'
-  if (!inSync.value) return 'Reveal and editing are disabled while the Git source is not confirmed in sync.'
+  // A batch staged before drift arrived keeps its button, disabled: the alert above is what says
+  // why, and a sentence here would hide that anything is staged at all.
+  const withheldByDrift = !inSync.value && !(step.value === 'review' && batch.value.length > 0)
+  if (withheldByDrift) return 'Reveal and editing are disabled while the Git source is not confirmed in sync.'
   if (step.value === 'review' && batch.value.length === 0) {
     // "Change, remove, or add a key" is only true when this page is offering those controls. Over
     // a Secret whose grants have withheld all three, it sends the operator looking for a button

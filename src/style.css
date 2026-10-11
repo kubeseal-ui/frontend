@@ -139,6 +139,10 @@
    and every one of them collapses under the reduced-motion switch below. Everything else
    rides the pointer transition, which is the quick step. */
 :root {
+  /* What each drawn bar grows to. The tile publishes its own width here, because an animation
+     cannot read the inline `width` it is replacing. */
+  --bar-ok: 0%;
+  --bar-bad: 0%;
   --mo-flip: 90ms;
   --mo-quick: 150ms;
   --mo-base: 240ms;
@@ -184,9 +188,8 @@ button, a {
    does. The concealed dots never animate: a pulsing mask would say the value is doing
    something while it sits still in the cluster.
    --------------------------------------------------------------------------------------- */
-@keyframes mgrow { from { width: 0 } to { width: var(--w) } }
-@keyframes mgrown { from { width: 0 } to { width: var(--nw) } }
-@keyframes mgrowd { from { width: 0 } to { width: var(--dw) } }
+@keyframes mgrown { from { width: 0 } to { width: var(--bar-ok) } }
+@keyframes mgrowd { from { width: 0 } to { width: var(--bar-bad) } }
 @keyframes mwipe { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
 @keyframes mwipeout { from { clip-path: inset(0 0 0 0) } to { clip-path: inset(0 100% 0 0) } }
 @keyframes msweep { 0% { left: 0; opacity: 0 } 12% { opacity: 1 } 80% { opacity: 1 } 100% { left: 100%; opacity: 0 } }
