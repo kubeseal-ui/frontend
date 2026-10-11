@@ -536,10 +536,14 @@ describe('the one button', () => {
     const wrapper = bar({ step: 'review' })
 
     // The roll is a transition over the keyed label rather than an entrance: nothing on this
-    // screen moves until someone presses something, and the bar is no exception.
-    expect(wrapper.find('button > span').text()).toBe('Review change')
-    expect(wrapper.find('button > span').classes()).not.toContain('roll-next')
-    expect(wrapper.find('button > span').classes()).not.toContain('roll-out')
+    // screen moves until someone presses something, and the bar is no exception. It is read
+    // through the DOM, so the assertion states the shape it needs — the label is the button's
+    // own child, and it wears neither half of the pair at mount.
+    const labels = wrapper.findAll('span').filter((span) => span.text() === 'Review change')
+    expect(labels).toHaveLength(1)
+    expect(labels[0]!.element.parentElement?.tagName).toBe('BUTTON')
+    expect(labels[0]!.classes()).not.toContain('roll-next')
+    expect(labels[0]!.classes()).not.toContain('roll-out')
   })
 })
 
