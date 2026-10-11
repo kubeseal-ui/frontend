@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
+import AppButton from '@/components/ui/AppButton.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import DiffBlocks from '@/components/DiffBlocks.vue'
 import PendingBar from '@/components/PendingBar.vue'
@@ -69,10 +70,19 @@ const railSteps = [
 ]
 const activeStep = computed(() => (secrets.delivery ? 2 : secrets.change?.encrypted ? 1 : 0))
 function onRailNavigate(key: string) {
-  // Only Compose steps back; it reopens the editor the way the fold's Edit button does, then the
-  // viewport is carried up to the form the operator asked to return to.
+  // Only Compose steps back. From a landed delivery that means starting a fresh Secret; from an
+  // encrypted-but-undelivered draft it reopens the editor the way the fold's Edit button does.
   if (key !== 'compose') return
+  if (secrets.delivery) { startAnother(); return }
   editorRef.value?.reopen?.()
+  revealRegion(() => composeSection.value)
+}
+
+// A landed delivery is terminal: the spent draft and its diff come off the screen, leaving the
+// confirmation alone, and starting another clears that confirmation so the flow returns to Compose
+// with the already-reset form.
+function startAnother() {
+  secrets.discardChange()
   revealRegion(() => composeSection.value)
 }
 
@@ -140,18 +150,24 @@ onUnmounted(() => secrets.discardChange())
 
       <div v-else class="flex flex-wrap items-start gap-x-12 gap-y-8">
         <div class="flex min-w-[22rem] flex-1 flex-col gap-6">
-          <!-- Where you are, pinned above the workflow, so the one changing button at its foot is
-               not the only thing saying how far along the flow is. -->
-          <div class="sticky top-0 z-10 -mt-1 bg-bg pt-1 pb-3">
+          <!-- Where you are, pinned below the app header so it stays in view as the one changing
+               button at the foot moves the flow on. -->
+          <div class="sticky top-14 z-10 -mt-1 bg-bg pt-1 pb-3">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 
-          <div ref="composeSection">
+          <!-- A delivered draft takes the editor off the screen: the confirmation below is the whole
+               task now, and "Encrypt another" brings a fresh form back rather than leaving a spent
+               one stacked above the result. -->
+          <div v-show="!secrets.delivery" ref="composeSection">
             <SecretNameEditor ref="editorRef" :namespace="props.namespace" @update:name="typedName = $event" />
           </div>
 
           <section v-if="secrets.change?.encrypted || secrets.delivery" ref="draftSection" class="flex max-w-[640px] flex-col gap-3" aria-label="Encrypted draft">
+            <!-- The ciphertext under review. Once delivered it is spent, so it comes off the screen
+                 and the confirmation stands alone. -->
             <DiffBlocks
+              v-if="!secrets.delivery"
               :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
               :before="secrets.check?.result.before"
             />
@@ -167,9 +183,9 @@ onUnmounted(() => secrets.discardChange())
                 class="mt-1 block break-all text-[13px] text-accent no-underline hover:underline"
               >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
               <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">ArgoCD synchronization is not verified by this workflow.</span>
-              <!-- The next step belongs with the confirmation, not in a workflow bar below the spent
-                   draft: the form above has already reset for it. -->
-              <span class="mt-1 block text-[13px] text-muted">Encrypt another manifest above to run the workflow again.</span>
+              <!-- The next step rides with the confirmation rather than a workflow bar below a spent
+                   draft; pressing it brings a fresh form back and returns the rail to Compose. -->
+              <AppButton class="mt-2.5 self-start" size="small" icon="lock" @click="startAnother">Encrypt another Secret</AppButton>
             </AppAlert>
             <AppAlert v-if="pressError" type="error" closable title="Operation failed" @close="pressError = ''">
               <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>

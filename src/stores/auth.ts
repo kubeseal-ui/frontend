@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { api } from '@/api'
+import { rememberReturnPath } from '@/utils/returnPath'
 import type { Capability, Namespace, User } from '@/types'
 
 // Tolerates an older server that omits `namespaces`: without the map, the flat
@@ -45,6 +46,8 @@ export const useAuthStore = defineStore('auth', {
     redirectToLogin() {
       if (this.reauthenticating || import.meta.env.VITE_DISABLE_LOGOUT_ON_401 === 'true') return
       this.reauthenticating = true
+      // Remember where they were so the callback returns them here, not to the app root.
+      rememberReturnPath(window.location.pathname + window.location.search)
       window.location.assign('/api/v1/auth/login')
     },
     hasCapability(namespace: string, capability: Capability): boolean {

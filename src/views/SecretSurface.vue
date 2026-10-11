@@ -396,7 +396,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             </div>
           </div>
 
-          <div class="fold" ref="checkFold" :class="{ open: Boolean(store.check) }">
+          <div class="fold" ref="checkFold" :class="{ open: Boolean(store.check) && !store.delivery }">
             <div>
               <template v-if="store.check">
                 <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">

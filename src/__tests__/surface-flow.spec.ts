@@ -344,8 +344,10 @@ describe('the create path', () => {
     await flushPromises()
 
     expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).not.toContain('SENTINELVALUE')
-    // The next step rides with the confirmation, not a trailing bar line below the spent draft.
-    expect(wrapper.text()).toContain('Encrypt another manifest above to run the workflow again.')
+    // The spent diff comes off the screen and the next step rides with the confirmation, not a
+    // trailing bar line below a stacked draft.
+    expect(wrapper.text()).toContain('Encrypt another Secret')
+    expect(wrapper.text()).not.toContain('What will be written')
     expect(wrapper.text()).not.toContain('Delivered. Encrypt another manifest')
   })
 })
