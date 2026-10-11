@@ -17,7 +17,7 @@ import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { deliveryHeading, requiredDeliveryCapability, summarizeDelivery } from '@/utils/delivery'
-import { driftPresentation } from '@/utils/drift'
+import { driftFieldList, driftPresentation, driftReasonSentence } from '@/utils/drift'
 import { countLabel } from '@/utils/format'
 import type { DeliveryResult, Mutation, WorkflowStep } from '@/types'
 
@@ -59,6 +59,10 @@ const driftStatus = () => {
   return git?.drift || (git?.in_sync_with_live ? 'in-sync' : 'unknown')
 }
 const driftLabel = computed(() => driftPresentation(driftStatus()).label)
+// Which part of the two documents disagrees. Without it the only way to find out is to fetch the
+// live resource and the file and diff them by hand, which is what this page exists to save.
+const driftReason = computed(() => driftReasonSentence(detail.value?.git.drift_reason))
+const driftFields = computed(() => driftFieldList(detail.value?.git.drift_fields))
 
 const inSync = computed(() => driftStatus() === 'in-sync')
 const canReveal = computed(() => inSync.value && scoped('secret:decrypt'))
@@ -264,6 +268,11 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">
               Status: <strong class="font-semibold text-ink">{{ driftLabel }}</strong>. Reveal, editing, and delivery are disabled.
             </p>
+            <!-- What differs, named here rather than left to a manual diff of the live resource
+                 against the file. The paths are set with the sentence they explain, apart from the
+                 paragraphs below, because they are one answer rather than two. -->
+            <p v-if="driftReason" class="m-0 max-w-[62ch] text-[13px] text-muted">{{ driftReason }}</p>
+            <p v-if="driftFields" class="mt-[3px] mb-0 max-w-[62ch] font-mono text-xs text-muted">{{ driftFields }}</p>
             <!-- Git-only is the one drift nothing here can act on: this page never writes to
                  the cluster. -->
             <p v-if="driftStatus() === 'git_only'" class="m-0 max-w-[62ch] text-[13px] text-muted">

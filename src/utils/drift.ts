@@ -33,3 +33,33 @@ const STATES: Record<string, DriftPresentation> = {
 export function driftPresentation(status: string): DriftPresentation {
   return STATES[status] ?? { ...UNKNOWN, label: status }
 }
+
+// Why the two sides disagree, in the product's own words. Every sentence is a claim about the
+// documents only: the report compares ciphertext and never decrypts, so none of these may say that
+// the values match — "the encrypted values are the same" is the most any of them has established.
+const REASONS: Record<string, string> = {
+  ciphertext:
+    'The file and the cluster hold separate encryptions of the same keys. Sealing is not deterministic, so re-sealing unchanged values produces this.',
+  keys: 'The file and the cluster do not carry the same key names.',
+  template: 'The Secret template differs. The encrypted values on both sides are the same.',
+  metadata: 'The encrypted values on both sides are the same. What differs is the document around them.',
+  identity: 'The file at this path is a manifest for a different Secret.',
+}
+
+/** The sentence for a diverged Secret's reason. Empty for a payload that carries none, which is
+ *  every drift but `diverged` and every response from a server older than the field. */
+export function driftReasonSentence(reason?: string): string {
+  return reason ? REASONS[reason] ?? '' : ''
+}
+
+// The paths are the answer, so they are named rather than counted; the cap only keeps a Secret with
+// a hundred resealed keys from filling the alert with a paragraph of field names.
+const MAX_FIELDS = 6
+
+/** The differing paths as one line: `a.b, a.c and 3 more`. */
+export function driftFieldList(fields?: string[]): string {
+  if (!fields?.length) return ''
+  const shown = fields.slice(0, MAX_FIELDS)
+  const rest = fields.length - shown.length
+  return rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.join(', ')
+}

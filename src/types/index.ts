@@ -40,7 +40,15 @@ export interface GitState {
   // Set with `diverged` only, and only when the live Secret still matches the version the file
   // held before its last change: Git moved ahead of the cluster, so syncing would discard that.
   git_moved_ahead?: boolean
+  // Set with `diverged` only: which part of the two documents disagrees, and every path that
+  // disagrees. The comparison is structural, so this never says whether the values behind the
+  // ciphertext match — only which part of the documents is not the same.
+  drift_reason?: DriftReason
+  drift_fields?: string[]
 }
+
+/** Which part of the live SealedSecret and the Git manifest disagrees. */
+export type DriftReason = 'ciphertext' | 'keys' | 'template' | 'metadata' | 'identity'
 
 export interface SealedSecretSummary {
   name: string

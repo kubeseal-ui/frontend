@@ -262,6 +262,38 @@ describe('the surface', () => {
     expect(labels).not.toContain('Sync Live Secret to Git')
   })
 
+  it('names what differs, so the operator is not left diffing both sides by hand', async () => {
+    const { wrapper } = await mountSurface(detail({
+      git: git({
+        drift: 'diverged', in_sync_with_live: false, drift_reason: 'ciphertext',
+        drift_fields: ['spec.encryptedData.password', 'spec.encryptedData.username'],
+      }),
+    }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sealing is not deterministic')
+    expect(wrapper.text()).toContain('spec.encryptedData.password, spec.encryptedData.username')
+  })
+
+  it('keeps a long field list to one line', async () => {
+    const fields = Array.from({ length: 9 }, (_, index) => `spec.encryptedData.key${index}`)
+    const { wrapper } = await mountSurface(detail({
+      git: git({ drift: 'diverged', in_sync_with_live: false, drift_reason: 'keys', drift_fields: fields }),
+    }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('spec.encryptedData.key5 and 3 more')
+    expect(wrapper.text()).not.toContain('spec.encryptedData.key6')
+  })
+
+  it('reports the status alone when the payload carries no reason', async () => {
+    const { wrapper } = await mountSurface(detail({ git: git({ drift: 'diverged', in_sync_with_live: false }) }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Status: Diverged')
+    expect(wrapper.text()).not.toContain('Sealing is not deterministic')
+  })
+
   it('offers the ordinary sync when the file simply changed on the cluster side', async () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'live_only' }) }))
     await flushPromises()
