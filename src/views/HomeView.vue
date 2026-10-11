@@ -138,6 +138,9 @@ onMounted(async () => {
     // Reported through the store, which the error branch renders; catching here only
     // stops it leaving this hook as an unhandled rejection.
     secrets.namespaces.length === 0 ? secrets.fetchNamespaces().catch(() => {}) : Promise.resolve(),
+    // Every destination this page states — the header's shared clause and a tile's own
+    // repository — is resolved from the mappings, so the page has to ask for them itself.
+    secrets.gitPathsLoaded ? Promise.resolve() : secrets.fetchGitPaths(),
   ])
   // Off the critical path, and never awaited: the tiles render from the namespace listing and
   // pick up their counts when this lands.
