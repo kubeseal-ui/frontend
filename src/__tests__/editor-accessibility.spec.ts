@@ -73,7 +73,7 @@ describe('revealing', () => {
     expect(post).toHaveBeenCalledTimes(1)
     expect(post).toHaveBeenCalledWith('/api/v1/secrets/payments/api/reveal', { key: 'password', base_commit: 'abc123' })
     // The row holds the plaintext it asked for; every other row still holds dots.
-    expect((wrapper.find('input[aria-label="Revealed value for password"]').element as HTMLInputElement).value).toBe('hunter2')
+    expect(wrapper.find('[aria-label="Revealed value for password"]').text()).toBe('hunter2')
     expect(wrapper.text()).toContain('••••••••••••')
     // No bulk control: the second key is a second press and a second disclosure.
     expect(revealButtons(wrapper)).toHaveLength(1)
@@ -97,7 +97,7 @@ describe('revealing', () => {
     await flushPromises()
 
     // The mask is wiped back rather than faded, with an accent edge crossing the slot with it.
-    expect(wrapper.find('input[aria-label="Revealed value for password"]').classes()).toContain('reveal-in')
+    expect(wrapper.find('[aria-label="Revealed value for password"]').classes()).toContain('reveal-in')
     expect(wrapper.find('.sweep').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Decrypting')
   })
@@ -111,23 +111,23 @@ describe('revealing', () => {
     await button(wrapper, 'Conceal password')!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('input[aria-label="Revealed value for password"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Revealed value for password"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('hunter2')
     expect(revealButtons(wrapper)).toHaveLength(2)
   })
 
-  it('leaves a revealed row exactly one control, and it is the one that hides the value', async () => {
+  it('keeps Change and Remove available while a value is revealed', async () => {
     vi.spyOn(api, 'post').mockResolvedValue({ data: { key: 'password', value: 'hunter2' } } as never)
     const wrapper = mountRows()
 
     await revealButtons(wrapper)[0]!.trigger('click')
     await flushPromises()
 
-    // The plaintext is on screen, so the only thing this row can do next is take it back:
-    // Change and Remove are both gone while the value is disclosed.
+    // Revealing a value to read it must not take away the ability to change it: Conceal joins the
+    // row's controls rather than replacing them.
     expect(button(wrapper, 'Conceal password')).toBeDefined()
-    expect(button(wrapper, 'Change password')).toBeUndefined()
-    expect(button(wrapper, 'Remove password')).toBeUndefined()
+    expect(button(wrapper, 'Change password')).toBeDefined()
+    expect(button(wrapper, 'Remove password')).toBeDefined()
   })
 
   it('hides the controls entirely, and says why, without reveal access', async () => {

@@ -149,6 +149,18 @@ async function press() {
 // so leaving them standing would show a change that has already landed.
 watch(() => store.delivery, (outcome) => { if (outcome) { editor.value?.clear(); batch.value = [] } })
 
+// Editing a row after a review was taken makes that review stale — it diffed a batch the rows no
+// longer match — so the review and check are dropped and the workflow returns to its first step,
+// reflecting the new edits. Skipped while a delivery is on screen: that batch-clear is the delivery
+// landing, not an edit, and its success must not be wiped. The explicit control is startOver below.
+watch(batch, () => {
+  if ((store.review || store.check) && !store.delivery) store.discardReview()
+})
+
+// "Start over" from a review or check: drop the derived steps and return to editing the rows,
+// which are still holding the staged change.
+function startOver() { store.discardReview() }
+
 // --- Sync ------------------------------------------------------------------
 const syncError = ref('')
 const syncOutcome = ref<DeliveryResult | null>(null)
@@ -325,15 +337,22 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <span v-else-if="!inSync" class="ml-auto font-mono text-xs text-faint">read only</span>
           </div>
 
-          <KeyRows v-if="mode === 'rows'" ref="editor" :detail="detail" @update:batch="batch = $event" />
-          <DocumentEditor v-else :detail="detail" />
+          <!-- Both editors stay mounted and the mode toggles their visibility, so flipping to YAML
+               to read the manifest and back does not throw away a draft the operator has staged in
+               the rows. v-if would unmount the rows editor and take its staged change with it. -->
+          <KeyRows v-show="mode === 'rows'" ref="editor" :detail="detail" @update:batch="batch = $event" />
+          <DocumentEditor v-show="mode === 'yaml'" :detail="detail" />
 
           <!-- What the review returned, and what the check verified. Both read from the store:
                the review is frozen at the moment it was made, so it keeps showing the ciphertext
                that was reviewed even after the rows move on. Each folds open where it lands, so
                the presses below it move down rather than jumping. The fold's child stays mounted
                only while the panel is; a result that has been spent leaves at once. -->
-          <div class="fold" :class="{ open: Boolean(store.review) }">
+          <!-- One diff at a time. The review's predicted ciphertext and the check's dry-run against
+               the branch are near-identical YAML, so showing both stacks two walls of text that
+               say almost the same thing; once the check lands it supersedes the review, so the
+               review folds away and the check takes its place. -->
+          <div class="fold" :class="{ open: Boolean(store.review) && !store.check }">
             <div>
               <template v-if="store.review">
                 <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
@@ -386,7 +405,9 @@ watch([() => route.params.namespace, () => route.params.name], load)
             :ready="ready"
             :busy="busy"
             :idle="idle"
+            :can-back="Boolean((store.review || store.check) && !store.delivery)"
             @press="press"
+            @back="startOver"
           />
         </div>
 

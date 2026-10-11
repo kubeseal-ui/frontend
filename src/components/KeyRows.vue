@@ -222,14 +222,18 @@ defineExpose({ batchProblem, showProblems, clear })
         <span class="truncate font-mono text-[13.5px] font-[550] text-ink">{{ key }}</span>
 
         <span class="relative min-w-0">
-          <input
+          <!-- A revealed value wraps and scrolls rather than truncating: a sealed value is often a
+               long token, and a row that shows the first few characters and hides the rest is the
+               opposite of what revealing is for. Focusable so a keyboard user can scroll it, and
+               one click selects the whole value to copy. -->
+          <div
             v-if="hasRevealed(key)"
-            readonly
-            type="text"
-            :value="revealed[key]"
+            role="textbox"
+            aria-readonly="true"
+            tabindex="0"
             :aria-label="`Revealed value for ${key}`"
-            class="reveal-in inline-block max-w-full truncate rounded-mini border border-border-strong bg-surface-raised px-2.5 py-1 font-mono text-[12.5px] text-ink"
-          />
+            class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised px-2.5 py-1 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
+          >{{ revealed[key] }}</div>
           <!-- A reveal is one decryption and one audit event, and the row says what it is waiting
                for rather than leaving the dots in place as if nothing had been asked. Announced,
                because the press that started it is disabled while it runs. -->
@@ -275,10 +279,11 @@ defineExpose({ batchProblem, showProblems, clear })
           </button>
 
           <!-- One control both ways: it opens the row's staged change and closes it again,
-               discarding what was staged. It stays openable while `canPatch` is false only to
-               close a row drift appeared under. -->
+               discarding what was staged. Offered alongside Reveal/Conceal rather than instead of
+               them, so revealing a value to read it does not take away the ability to change it. It
+               stays openable while `canPatch` is false only to close a row drift appeared under. -->
           <button
-            v-if="(canPatch && !hasRevealed(key)) || editing[key]"
+            v-if="canPatch || editing[key]"
             type="button"
             :aria-label="editing[key] ? `Discard the staged change to ${key}` : `Change ${key}`"
             :aria-expanded="editing[key]"
@@ -289,7 +294,7 @@ defineExpose({ batchProblem, showProblems, clear })
           <!-- The one action here that pressing it again does not undo, so it is the one that
                carries danger rather than the neutral tone its neighbours use. -->
           <button
-            v-if="canPatch && !editing[key] && !hasRevealed(key)"
+            v-if="canPatch && !editing[key]"
             type="button"
             :aria-label="`Remove ${key}`"
             class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-danger hover:border-danger/40 hover:bg-danger/10"

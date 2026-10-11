@@ -166,6 +166,12 @@ export const useSecretsStore = defineStore('secrets', {
 
     discardChange() { this.change = null; this.review = null; this.check = null; this.delivery = null },
 
+    /** Drops the review and the check but keeps the staged change, returning the workflow to its
+     *  first step. Used when the operator edits a row after reviewing — the diff they saw no longer
+     *  matches the rows — and by the explicit "Start over" control. The delivery is left alone: a
+     *  landed delivery is a result to keep showing, not progress to unwind. */
+    discardReview() { this.review = null; this.check = null },
+
     // The push has already happened by the time the re-read runs, so a refresh that fails
     // must not surface as a failed sync — the operator would press the control again and
     // meet a base-commit conflict on a push that landed.
