@@ -404,6 +404,73 @@ describe('the surface', () => {
     expect(refetches()).toBe(reads)
   })
 
+  it('keeps a staged draft when the mode flips to YAML and back', async () => {
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+    const modeButton = (label: string) => wrapper.findAll('button').find((candidate) => candidate.text() === label)!
+
+    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Change')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await flushPromises()
+    expect(wrapper.text()).toContain('1 change staged')
+
+    // Both editors stay mounted, so the round trip to YAML and back must not throw the draft away.
+    await modeButton('YAML').trigger('click')
+    await flushPromises()
+    await modeButton('Keys').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.find('input[aria-label="Replacement value for password"]').element as HTMLInputElement).value).toBe('rotated')
+    expect(wrapper.text()).toContain('1 change staged')
+  })
+
+  it('steps back from a review with Start over, keeping the staged row', async () => {
+    posts(DIFF)
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+
+    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Change')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await flushPromises()
+    await wrapper.findAll('button').find((candidate) => candidate.text().includes('Review change'))!.trigger('click')
+    await flushPromises()
+
+    const store = useSecretsStore(pinia)
+    expect(store.review).not.toBeNull()
+
+    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Start over')!.trigger('click')
+    await flushPromises()
+
+    // The review is dropped and the forward press returns to the first step, with the row still staged.
+    expect(store.review).toBeNull()
+    expect(wrapper.findAll('button').map((candidate) => candidate.text())).toContain('Review change')
+    expect((wrapper.find('input[aria-label="Replacement value for password"]').element as HTMLInputElement).value).toBe('rotated')
+  })
+
+  it('drops a stale review when a row is edited after reviewing', async () => {
+    posts(DIFF)
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+
+    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Change')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await flushPromises()
+    await wrapper.findAll('button').find((candidate) => candidate.text().includes('Review change'))!.trigger('click')
+    await flushPromises()
+
+    const store = useSecretsStore(pinia)
+    expect(store.review).not.toBeNull()
+
+    // Editing after the review makes it stale, so it is dropped rather than left showing a diff of a
+    // batch the rows no longer match.
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated-again')
+    await flushPromises()
+    expect(store.review).toBeNull()
+  })
+
   it('withholds editing and says so when the Git source is not in sync', async () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'unknown', in_sync_with_live: false }) }))
     await flushPromises()

@@ -252,6 +252,25 @@ describe('when a row is allowed to say it is wrong', () => {
     await wrapper.find('input[aria-label="New key name 1"]').setValue('password')
     expect(vm.batchProblem).toBe('Every key being changed needs a value.')
   })
+
+  it('refuses deleting the only key, but allows it when the same batch adds one', async () => {
+    const wrapper = mountRows(ALL, { keys: ['only'], key_count: 1 })
+    const vm = wrapper.vm as unknown as { batchProblem: string }
+
+    await button(wrapper, 'Remove only')!.trigger('click')
+    await flushPromises()
+    // Deleting the last key would leave the Secret with no encryptedData, which the server refuses
+    // with a 400 after a decrypt — caught here so the row can say why instead.
+    expect(vm.batchProblem).toBe('A Secret must keep at least one key; this change would remove the last one.')
+
+    // A key added in the same batch keeps the Secret non-empty, so the delete is allowed — the test
+    // is the net count, not the presence of a delete.
+    await button(wrapper, 'Add a key')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('replacement')
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('v')
+    expect(vm.batchProblem).toBe('')
+  })
 })
 
 describe('adding a key', () => {

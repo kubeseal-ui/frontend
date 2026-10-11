@@ -147,12 +147,28 @@ const batch = computed<Mutation[]>(() => {
 // up rather than read back out of the store.
 watch(batch, (value) => emit('update:batch', value), { immediate: true, deep: true })
 
+// The server refuses a batch that would leave the Secret with no keys — a SealedSecret with an
+// empty encryptedData is meaningless — with a 400 after it has decrypted. Caught here so deleting
+// the only key is answered in the row instead. The test is the net count: a delete paired with an
+// add that keeps the Secret non-empty is fine, so it is not "any delete present".
+const emptiesSecret = computed(() => {
+  const current = (props.detail.keys || []).length
+  if (current === 0) return false
+  let deletes = 0
+  for (const key of props.detail.keys || []) {
+    if (editing[key] && operationOf(key) === 'delete') deletes++
+  }
+  const adds = added.value.filter((row) => row.key.trim() !== '').length
+  return current - deletes + adds < 1
+})
+
 // The server refuses all of these too, so this is not a second set of rules — it avoids a round
 // trip, and a decrypt's worth of audit trail, on a request already known to fail.
 const batchProblem = computed(() => {
   if (batch.value.length === 0) return ''
   if (batch.value.some((entry) => entry.key === '')) return 'Every key being added needs a name.'
   if (batch.value.some((entry) => entry.operation !== 'delete' && entry.value === '')) return 'Every key being changed needs a value.'
+  if (emptiesSecret.value) return 'A Secret must keep at least one key; this change would remove the last one.'
   const taken = new Set(props.detail.keys || [])
   const collisions = new Set<string>()
   for (const row of added.value) {
@@ -185,7 +201,12 @@ const addProblem = (row: { id: number; key: string; value: string }) => addNameP
 
 function existingProblem(key: string) {
   if (!shown[stagedRowId(key)]) return ''
-  return operationOf(key) !== 'delete' && !(replacements[key] || '') ? 'This change needs a value.' : ''
+  if (operationOf(key) === 'delete') {
+    // A delete that empties the Secret is the only problem a delete row can state: it has no value
+    // field to be short. The message points at the way out — add a key — rather than just refusing.
+    return emptiesSecret.value ? 'A Secret must keep at least one key. Add a key before removing the last one.' : ''
+  }
+  return !(replacements[key] || '') ? 'This change needs a value.' : ''
 }
 
 // Pressing review on an incomplete batch is the operator asking what is missing: every row says
