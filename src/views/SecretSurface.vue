@@ -272,7 +272,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
                  against the file. The paths are set with the sentence they explain, apart from the
                  paragraphs below, because they are one answer rather than two. -->
             <p v-if="driftReason" class="m-0 max-w-[62ch] text-[13px] text-muted">{{ driftReason }}</p>
-            <p v-if="driftFields" class="mt-[3px] mb-0 max-w-[62ch] font-mono text-xs text-muted">{{ driftFields }}</p>
+            <p v-if="driftFields" class="mt-[3px] mb-0 max-w-[62ch] break-words font-mono text-xs text-muted">{{ driftFields }}</p>
             <!-- Git-only is the one drift nothing here can act on: this page never writes to
                  the cluster. -->
             <p v-if="driftStatus() === 'git_only'" class="m-0 max-w-[62ch] text-[13px] text-muted">

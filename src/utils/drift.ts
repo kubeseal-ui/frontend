@@ -49,7 +49,8 @@ const REASONS: Record<string, string> = {
 /** The sentence for a diverged Secret's reason. Empty for a payload that carries none, which is
  *  every drift but `diverged` and every response from a server older than the field. */
 export function driftReasonSentence(reason?: string): string {
-  return reason ? REASONS[reason] ?? '' : ''
+  if (!reason) return ''
+  return REASONS[reason] ?? ''
 }
 
 // The paths are the answer, so they are named rather than counted; the cap only keeps a Secret with
