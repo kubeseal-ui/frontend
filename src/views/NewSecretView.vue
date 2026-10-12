@@ -39,7 +39,6 @@ const isWildcard = computed(() => mapping.value?.namespace === '*')
 // listing rides in the search index, which is one request for the whole fleet.
 const typedName = ref('')
 const existingNames = computed(() => secrets.index.filter((entry) => entry.namespace === props.namespace).map((entry) => entry.name))
-const takenNames = computed(() => new Set(existingNames.value))
 
 onMounted(() => {
   // The form reads the same listing; either may mount first.
