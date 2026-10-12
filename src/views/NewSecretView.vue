@@ -109,12 +109,16 @@ async function press() {
 // time the form above has reset and nothing else is competing for attention.
 const draftSection = ref<HTMLElement | null>(null)
 const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
+const pressErrorAlert = ref<{ $el?: HTMLElement } | null>(null)
 watch(() => Boolean(secrets.change?.encrypted), (encrypted) => {
   if (encrypted) revealRegion(() => draftSection.value)
 })
 watch(() => secrets.delivery, (delivered) => {
   if (delivered) revealRegion(() => deliveryAlert.value?.$el, { focus: true })
 })
+// A check or deliver that the server refused lands below the diff; it is carried into view and
+// focused so a failed press is never silent off the bottom of the page.
+watch(pressError, (next) => { if (next) revealRegion(() => pressErrorAlert.value?.$el, { focus: true }) })
 
 // A half-finished encrypted draft belongs to this page and would follow the user to the
 // next one, where it has no meaning.
@@ -200,7 +204,7 @@ onUnmounted(() => secrets.discardChange())
                    draft; pressing it brings a fresh form back and returns the rail to Compose. -->
               <AppButton class="mt-2.5 self-start" size="small" icon="lock" @click="startAnother">Encrypt another Secret</AppButton>
             </AppAlert>
-            <AppAlert v-if="pressError" type="error" closable title="Operation failed" @close="pressError = ''">
+            <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" closable title="Operation failed" @close="pressError = ''">
               <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
             </AppAlert>
             <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,

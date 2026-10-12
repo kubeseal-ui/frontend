@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { ApiError, describeError } from '@/api'
 import { refocusAfterCollapse } from '@/utils/refocus'
+import { revealRegion } from '@/utils/reveal'
 import { renderNamespace, renderPathTemplate, renderedIdentityTail, templateDirectory } from '@/utils/gitPath'
 import type { NamespaceGitPaths } from '@/types'
 
@@ -211,6 +212,12 @@ watch(() => store.delivery, (next) => {
 function reopen() { override.value = true }
 defineExpose({ reopen })
 
+// The encryption refusal lands below the manifest and the press, which is off the bottom of a long
+// form. It is carried into view and given focus when it appears, so the operator is not left on a
+// button that looks like it did nothing.
+const errorAlert = ref<{ $el?: HTMLElement } | null>(null)
+watch(error, (next) => { if (next) revealRegion(() => errorAlert.value?.$el, { focus: true }) })
+
 function seedTemplate() {
   renderedName.value = name.value
   yaml.value = pristineTemplate.value
@@ -394,7 +401,7 @@ onUnmounted(() => { yaml.value = '' })
         <AppButton variant="primary" icon="lock" :loading="loading" @click="encrypt">Encrypt for review</AppButton>
       </div>
 
-      <AppAlert v-if="error" type="error" title="Unable to encrypt">
+      <AppAlert v-if="error" ref="errorAlert" type="error" title="Unable to encrypt">
         <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ error }}</p>
       </AppAlert>
     </div>

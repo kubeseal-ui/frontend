@@ -149,9 +149,12 @@ function onRailNavigate(key: string) {
 const reviewFold = ref<HTMLElement | null>(null)
 const checkFold = ref<HTMLElement | null>(null)
 const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
+const pressErrorAlert = ref<{ $el?: HTMLElement } | null>(null)
 watch(() => Boolean(store.review) && !store.check, (open) => { if (open) revealRegion(() => reviewFold.value) })
 watch(() => Boolean(store.check), (open) => { if (open) revealRegion(() => checkFold.value) })
 watch(() => store.delivery, (delivered) => { if (delivered) revealRegion(() => deliveryAlert.value?.$el, { focus: true }) })
+// A refused press lands below the diff; carry it into view and focus it so it is never silent.
+watch(pressError, (next) => { if (next) revealRegion(() => pressErrorAlert.value?.$el, { focus: true }) })
 
 async function press() {
   if (!ready.value) return
@@ -414,7 +417,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             </div>
           </div>
 
-          <AppAlert v-if="pressError" type="error" title="Operation failed" class="mt-4">
+          <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" title="Operation failed" class="mt-4">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
           </AppAlert>
 
