@@ -3,6 +3,10 @@
 // so the one changing button at the foot of the page is not the only thing saying how far along
 // they are. A completed stop that the parent marks `back` is a link that steps there; the current
 // and future stops, and completed stops with no way back, are plain text.
+//
+// Both parts of a stop are state, so both morph on the base step rather than the pointer step: the
+// connector is a wiped-in overlay rather than a colour swap, and the mark's ring and fill move
+// together. Going back reverses both, so a rewind reads as the same move run backwards.
 defineProps<{ steps: { key: string; label: string; back?: boolean }[]; active: number }>()
 const emit = defineEmits<{ navigate: [key: string] }>()
 </script>
@@ -13,8 +17,8 @@ const emit = defineEmits<{ navigate: [key: string] }>()
       <span
         v-if="i"
         aria-hidden="true"
-        class="mx-2.5 h-px w-6 shrink-0"
-        :class="i <= active ? 'bg-accent' : 'bg-border-strong'"
+        class="rail-bar mx-2.5 h-px w-6 shrink-0"
+        :class="{ done: i <= active }"
       />
       <component
         :is="i < active && step.back ? 'button' : 'span'"
@@ -28,7 +32,7 @@ const emit = defineEmits<{ navigate: [key: string] }>()
         @click="i < active && step.back ? emit('navigate', step.key) : undefined"
       >
         <span
-          class="h-4 w-4 shrink-0 rounded-full border-[1.5px]"
+          class="rail-mark h-4 w-4 shrink-0 rounded-full border-[1.5px]"
           :class="i < active ? 'border-accent bg-accent' : i === active ? 'border-accent bg-bg ring-[3px] ring-accent/30' : 'border-border-strong bg-bg'"
         />
         {{ step.label }}

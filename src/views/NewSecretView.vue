@@ -159,7 +159,7 @@ onUnmounted(() => secrets.discardChange())
       </AppAlert>
 
       <div v-else class="flex flex-wrap items-start gap-x-12 gap-y-8">
-        <div class="flex min-w-[22rem] flex-1 flex-col gap-6">
+        <div class="flex min-w-[22rem] flex-1 flex-col">
           <!-- Where you are, pinned below the app header so it stays in view as the one changing
                button at the foot moves the flow on. -->
           <div class="sticky top-14 z-10 -mt-1 bg-bg pt-1 pb-3">
@@ -169,56 +169,86 @@ onUnmounted(() => secrets.discardChange())
           <!-- A delivered draft takes the editor off the screen: the confirmation below is the whole
                task now, and "Encrypt another" brings a fresh form back rather than leaving a spent
                one stacked above the result. -->
-          <div v-show="!secrets.delivery" ref="composeSection">
+          <div v-show="!secrets.delivery" ref="composeSection" class="mt-6">
             <SecretNameEditor ref="editorRef" :namespace="props.namespace" @update:name="typedName = $event" />
           </div>
 
-          <section v-if="secrets.change?.encrypted || secrets.delivery" ref="draftSection" class="flex max-w-[640px] flex-col gap-3" aria-label="Encrypted draft">
-            <!-- The ciphertext under review. Once delivered it is spent, so it comes off the screen
-                 and the confirmation stands alone. -->
-            <DiffBlocks
-              v-if="!secrets.delivery"
-              :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
-              :before="secrets.check?.result.before"
-              :after-label="secrets.check ? 'Checked against the branch' : undefined"
-            />
-            <!-- A new Secret has no file in Git to diff against, so a passing dry-run would otherwise
-                 be invisible. This is the check's result stated outright. -->
-            <p v-if="secrets.check && !secrets.delivery" class="flex items-center gap-1.5 text-[13px] text-success">
-              <AppIcon name="check" :size="14" />
-              <span>The sealed manifest applies cleanly<template v-if="checkedPath"> at <span class="font-mono">{{ checkedPath }}</span></template>. Deliver writes it to Git.</span>
-            </p>
-            <!-- The edit path reports a delivery; a create that delivered and said nothing left a
-                 spent draft on screen with no record of where it went. -->
-            <AppAlert v-if="secrets.delivery" ref="deliveryAlert" type="success" :title="deliveryHeading(secrets.delivery)">
-              <span class="block text-[13px] text-muted">{{ summarizeDelivery(secrets.delivery) }}</span>
-              <a
-                v-if="secrets.delivery.proposal_url"
-                :href="secrets.delivery.proposal_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="mt-1 block break-all text-[13px] text-accent no-underline hover:underline"
-              >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
-              <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">ArgoCD synchronization is not verified by this workflow.</span>
-              <!-- The next step rides with the confirmation rather than a workflow bar below a spent
-                   draft; pressing it brings a fresh form back and returns the rail to Compose. -->
-              <AppButton class="mt-2.5 self-start" size="small" icon="lock" @click="startAnother">Encrypt another Secret</AppButton>
-            </AppAlert>
-            <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" closable title="Operation failed" @close="pressError = ''">
-              <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
-            </AppAlert>
-            <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,
-                 and its confirmation above carries what comes next. -->
-            <PendingBar
-              v-if="!secrets.delivery"
-              :step="step"
-              :mode="deliveryMode"
-              :count="0"
-              :ready="ready"
-              :busy="busy"
-              @press="press"
-            />
+          <!-- Each result opens where it lands rather than replacing the last one, so the press bar
+               below moves down instead of jumping. The section itself is always here — a fold cannot
+               animate a region that arrives already open — and every region in it is shut until the
+               workflow needs it. The action bar is its sibling and not one of its regions: sticky
+               positioning is bounded by the containing block, so a bar folded in here would be
+               pinned to the bottom of the results instead of staying over the form it presses on. -->
+          <section
+            ref="draftSection"
+            class="fold-stack max-w-[640px]"
+            :aria-label="secrets.change?.encrypted || secrets.delivery ? 'Encrypted draft' : undefined"
+          >
+            <div class="fold" :class="{ open: Boolean(secrets.change?.encrypted) }">
+              <div>
+                <!-- The ciphertext under review. Once delivered it is spent, so it comes off the screen
+                     and the confirmation stands alone. -->
+                <DiffBlocks
+                  v-if="!secrets.delivery"
+                  :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
+                  :before="secrets.check?.result.before"
+                  :after-label="secrets.check ? 'Checked against the branch' : undefined"
+                />
+              </div>
+            </div>
+
+            <!-- The check adds this line and moves the heading above it; it does not touch the diff,
+                 which is the same ciphertext either way. The amount of motion is the amount of
+                 change, so Review to Check is one line opening and one heading rolling. -->
+            <div class="fold" :class="{ open: Boolean(secrets.check) && !secrets.delivery }">
+              <div>
+                <!-- A new Secret has no file in Git to diff against, so a passing dry-run would otherwise
+                     be invisible. This is the check's result stated outright. -->
+                <p v-if="secrets.check && !secrets.delivery" class="flex items-center gap-1.5 text-[13px] text-success">
+                  <AppIcon name="check" :size="14" />
+                  <span>The sealed manifest applies cleanly<template v-if="checkedPath"> at <span class="font-mono">{{ checkedPath }}</span></template>. Deliver writes it to Git.</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="fold" :class="{ open: Boolean(secrets.delivery) }">
+              <div>
+                <!-- The edit path reports a delivery; a create that delivered and said nothing left a
+                     spent draft on screen with no record of where it went. -->
+                <AppAlert v-if="secrets.delivery" ref="deliveryAlert" type="success" :title="deliveryHeading(secrets.delivery)">
+                  <span class="block text-[13px] text-muted">{{ summarizeDelivery(secrets.delivery) }}</span>
+                  <a
+                    v-if="secrets.delivery.proposal_url"
+                    :href="secrets.delivery.proposal_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-1 block break-all text-[13px] text-accent no-underline hover:underline"
+                  >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
+                  <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">ArgoCD synchronization is not verified by this workflow.</span>
+                  <!-- The next step rides with the confirmation rather than a workflow bar below a spent
+                       draft; pressing it brings a fresh form back and returns the rail to Compose. -->
+                  <AppButton class="mt-2.5 self-start" size="small" icon="lock" @click="startAnother">Encrypt another Secret</AppButton>
+                </AppAlert>
+              </div>
+            </div>
           </section>
+
+          <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" closable title="Operation failed" class="mt-4 max-w-[640px]" @close="pressError = ''">
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
+          </AppAlert>
+          <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,
+               and its confirmation above carries what comes next. The width is the form's, so the one
+               primary control on the screen lines up with the box it acts on. -->
+          <PendingBar
+            v-if="secrets.change?.encrypted && !secrets.delivery"
+            class="max-w-[640px]"
+            :step="step"
+            :mode="deliveryMode"
+            :count="0"
+            :ready="ready"
+            :busy="busy"
+            @press="press"
+          />
         </div>
 
         <!-- What the form is writing into, stated beside it: the namespace's own terms, the

@@ -16,14 +16,6 @@ const props = defineProps<{
 }>()
 const store = useSecretsStore()
 
-// A stage is done when the store holds what it produced. Nothing here is a gate on the presses —
-// the bar below owns that — so these read as history rather than as instructions.
-const stages = computed(() => [
-  { key: 'review', title: 'Review', done: Boolean(store.review) },
-  { key: 'check', title: 'Check against the branch', done: Boolean(store.check) },
-  { key: 'deliver', title: 'Deliver to Git', done: Boolean(store.delivery) },
-])
-
 // A change in flight has something to be against; with nothing staged the panel answers the other
 // question, which is what this screen will let you do at all.
 const inFlight = computed(() => props.staged > 0 || Boolean(store.review))
@@ -40,24 +32,10 @@ const abilities = computed(() => [
 
 <template>
   <!-- The change's own column, not a second card: the document beside it carries the content, and
-       this only states where the change stands. A rounded surface around that summary would read
-       as a second object on the page. -->
+       this only states where the change stands. The workflow stages themselves live in the rail
+       above the editor now, so this panel no longer repeats them — it answers what the change is
+       against, and what this screen is allowed to do. -->
   <aside aria-label="Change state" class="flex w-[258px] shrink-0 flex-col gap-[22px]">
-    <div>
-      <h2 class="mb-[9px] text-xs font-[650] text-muted">This change</h2>
-      <!-- Keyed on whether it is done, so the mark pops at the moment the press produced it
-           rather than sitting filled from the start. -->
-      <div
-        v-for="stage in stages"
-        :key="`${stage.key}-${stage.done}`"
-        class="flex items-center gap-2 py-[3px] text-[13px]"
-        :class="stage.done ? 'text-ink' : 'text-muted'"
-      >
-        <span class="size-[7px] shrink-0 rounded-full" :class="stage.done ? 'stage-mark bg-success' : 'bg-border-strong'" />
-        {{ stage.title }}
-      </div>
-    </div>
-
     <div v-if="inFlight">
       <h2 class="mb-[9px] text-xs font-[650] text-muted">Against</h2>
       <div class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]">

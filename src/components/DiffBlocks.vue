@@ -86,7 +86,15 @@ const TONES: Record<string, string> = { same: 'text-faint', add: 'text-success',
       class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]"
       :class="paired ? '' : 'col-span-2'"
     >
-      <span class="mb-[7px] block font-sans text-[11px] font-semibold text-faint">{{ afterHeading }}</span>
+      <!-- The heading names what this pane is, and it changes on the same press that moves the
+           workflow on. It is keyed inside the same roll the press bar's label uses, so the heading
+           and the label under the operator's finger advance together rather than one rolling while
+           the other snaps. -->
+      <span class="mb-[7px] block font-sans text-[11px] font-semibold text-faint">
+        <Transition mode="out-in" enter-active-class="roll-next" leave-active-class="roll-out">
+          <span :key="afterHeading" class="inline-block">{{ afterHeading }}</span>
+        </Transition>
+      </span>
       <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
     </div>
   </div>

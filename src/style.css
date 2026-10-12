@@ -134,10 +134,10 @@
 }
 
 /* Motion. The palette specs capture colour values only and reject a var() they did not
-   capture, so the durations are literals here rather than palette entries. Only four things
-   use the long steps — the tile draw, the reveal, the staged panel, and the press label —
-   and every one of them collapses under the reduced-motion switch below. Everything else
-   rides the pointer transition, which is the quick step. */
+   capture, so the durations are literals here rather than palette entries. Only five things
+   use the long steps — the tile draw, the reveal, the staged panel, the press label, and the
+   workflow rail — and every one of them collapses under the reduced-motion switch below.
+   Everything else rides the pointer transition, which is the quick step. */
 :root {
   /* What each drawn bar grows to. The tile publishes its own width here, because an animation
      cannot read the inline `width` it is replacing. */
@@ -183,7 +183,7 @@ button, a {
 :focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------------------------------
-   The four moves. Each answers something a person did, so nothing here runs on its own;
+   The five moves. Each answers something a person did, so nothing here runs on its own;
    the one exception is the spinner, which is a progress indicator and stops when the work
    does. The concealed dots never animate: a pulsing mask would say the value is doing
    something while it sits still in the cluster.
@@ -195,7 +195,6 @@ button, a {
 @keyframes mspin { to { transform: rotate(360deg) } }
 @keyframes mlblout { to { transform: translateY(-70%); opacity: 0 } }
 @keyframes mlblin { from { transform: translateY(70%); opacity: 0 } to { transform: none; opacity: 1 } }
-@keyframes mpop { from { transform: scale(0.2) } to { transform: none } }
 
 /* 1 — the draw, once per page load and only on the fleet. Size first, then health: the red
    segment of a drifted tile arrives after its grey one, so the motion leads the eye to the
@@ -224,7 +223,33 @@ button, a {
    behind goes up, and the next press arrives from below. */
 .roll-out { animation: mlblout var(--mo-quick) var(--mo-out) both; }
 .roll-next { animation: mlblin var(--mo-quick) var(--mo-out) both; }
-.stage-mark { animation: mpop 180ms var(--mo-out); }
+
+/* A column of folds carries its own spacing rather than a flex `gap`. A shut region still owns
+   its gap slot, so a stack with one region open would keep the air of every region that is
+   closed; the fold carries the gap above it instead, and gives it back when it shuts. */
+.fold-stack { display: flex; flex-direction: column; }
+.fold-stack > .fold {
+  margin-top: 16px;
+  transition: grid-template-rows var(--mo-base) var(--mo-out), margin-top var(--mo-base) var(--mo-out);
+}
+.fold-stack > .fold:not(.open) { margin-top: 0; }
+
+/* 5 — the fill. The workflow rail is a state indicator rather than a control, so both of its parts
+   move on the base step and not the pointer step, and both reverse — which is what makes stepping
+   back read as a rewind rather than as a second, different move. The connector is wiped in rather
+   than swapped to the accent colour, so progress advances along the rail. */
+.rail-bar { position: relative; background: var(--app-border-strong); }
+.rail-bar::after {
+  content: ""; position: absolute; inset: 0; background: var(--app-accent);
+  clip-path: inset(0 100% 0 0); transition: clip-path var(--mo-base) var(--mo-out);
+}
+.rail-bar.done::after { clip-path: inset(0 0 0 0); }
+.rail-mark {
+  transition:
+    border-color var(--mo-base) var(--mo-out),
+    background-color var(--mo-base) var(--mo-out),
+    box-shadow var(--mo-base) var(--mo-out);
+}
 
 /* Reduced motion is a switch honoured from two places, and both are needed: the media
    query serves the operating system, and the attribute serves the in-app preference.

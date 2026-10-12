@@ -367,6 +367,34 @@ describe('the create path', () => {
     expect(current().text()).toContain('Check')
     expect(wrapper.text()).toContain('applies cleanly')
   })
+
+  // Each result opens where it lands rather than replacing the last one, so the stage the rail
+  // marks is also the region that is open. The section itself is in the document from the first
+  // render — a fold cannot animate a region that arrives already open — and the press bar is not
+  // one of its regions: it is sticky, and `overflow: hidden` on an ancestor is what stops a sticky
+  // element sticking.
+  it('opens one result region per stage, and keeps the press bar out of the folds', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    const open = () => wrapper.findAll('.fold').map((fold) => fold.classes().includes('open'))
+    expect(wrapper.find('section.fold-stack').exists()).toBe(true)
+    expect(open()).toEqual([false, false, false])
+
+    const store = useSecretsStore(pinia)
+    store.change = { namespace: 'payments', name: 'api', mutations: [], baseCommit: 'c', targetPath: 'payments/api.yaml', scope: 'strict', encrypted: 'cipher' }
+    await flushPromises()
+    expect(open()).toEqual([true, false, false])
+
+    store.check = { yaml: 'cipher', checksum: '', result: CHECKED, idempotencyKey: 'k' }
+    await flushPromises()
+    expect(open()).toEqual([true, true, false])
+
+    // A delivery spends the draft it consumed and keeps the check, which is the state the store
+    // actually leaves behind; the report is the only region left open.
+    store.change = null
+    store.delivery = DELIVERED
+    await flushPromises()
+    expect(open()).toEqual([false, false, true])
+  })
 })
 
 describe('the surface', () => {
@@ -678,21 +706,23 @@ describe('the one button', () => {
 })
 
 describe('the spine', () => {
-  it('fills a stage mark at the press that produced it, and only then', () => {
-    useSecretsStore(pinia).review = DIFF as never
-    const wrapper = mount(StateSpine, {
+  it('answers what the change is against and what the screen can do, without repeating the rail', () => {
+    const store = useSecretsStore(pinia)
+    // Nothing staged: the panel offers what this screen can do, not a copy of the rail's stages.
+    const idle = mount(StateSpine, {
       props: { detail: detail(), staged: 0, baseCommit: 'abc123', canSeal: true, canReveal: true, canDeliver: true, canSync: false },
       global: { plugins: [pinia] },
     })
+    expect(idle.text()).not.toContain('This change')
+    expect(idle.text()).toContain('Here you can')
 
-    const marks = wrapper.findAll('span').filter((span) => span.classes().includes('rounded-full'))
-    // Review is done, the other two are not: the pop is what says a press landed, so it belongs
-    // to the mark that just filled and to no other.
-    expect(marks).toHaveLength(3)
-    expect(marks.map((mark) => mark.classes())).toEqual([
-      expect.arrayContaining(['stage-mark']),
-      expect.not.arrayContaining(['stage-mark']),
-      expect.not.arrayContaining(['stage-mark']),
-    ])
+    // A change in flight: the panel names what it is against instead.
+    store.review = DIFF as never
+    const live = mount(StateSpine, {
+      props: { detail: detail(), staged: 1, baseCommit: 'abc123', canSeal: true, canReveal: true, canDeliver: true, canSync: false },
+      global: { plugins: [pinia] },
+    })
+    expect(live.text()).toContain('Against')
+    expect(live.text()).toContain('abc123')
   })
 })

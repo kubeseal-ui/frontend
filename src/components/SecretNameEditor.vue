@@ -310,92 +310,103 @@ onUnmounted(() => { yaml.value = '' })
     </div>
 
     <div v-show="open" class="flex flex-col gap-5">
-      <div class="flex flex-col gap-[7px]">
-        <span class="text-[13px] font-semibold text-ink">Where it comes from</span>
-        <AppRadioGroup v-model="mode" name="secret-source" :options="sources" ariaLabel="Secret source" />
+      <!-- Settings beside the manifest, not stacked above it: the fields are short and the manifest
+           is the only thing here that wants height, so one column put Encrypt ~1,100px down a row
+           that was half empty. The breakpoint is 1000px and not the width at which two tracks first
+           fit, because this form does not own the width it is drawn at — it is `flex-1` beside a
+           258px aside and capped at 640px of its own, so a narrower viewport leaves it ~600px wide
+           and a 290px track would squeeze the manifest narrower than the lines in it. -->
+      <div class="grid grid-cols-1 items-start gap-x-[22px] gap-y-5 min-[1000px]:grid-cols-[290px_1fr]">
+        <div class="flex min-w-0 flex-col gap-[13px]">
+          <div class="flex flex-col gap-[7px]">
+            <span class="text-[13px] font-semibold text-ink">Where it comes from</span>
+            <AppRadioGroup v-model="mode" name="secret-source" :options="sources" ariaLabel="Secret source" />
+          </div>
+
+          <AppAlert v-if="adopting" type="info" title="Adopt a running Secret">
+            <p class="m-0 text-[13px] text-muted">
+              Read it with <code class="font-mono">{{ kubectlCommand }}</code> and paste the output below.
+              The live object's runtime metadata and apply annotations are stripped before sealing, so only
+              the Secret's content is versioned. Nothing is read from the cluster by this application.
+            </p>
+          </AppAlert>
+
+          <label class="flex flex-col gap-[7px]" @focusout="leave('name', $event)">
+            <span class="text-[13px] font-semibold text-ink">Name</span>
+            <input
+              ref="nameInput"
+              v-model="name"
+              type="text"
+              aria-label="New secret name"
+              :aria-invalid="nameProblem() ? 'true' : undefined"
+              :aria-describedby="nameProblem() ? 'name-problem' : undefined"
+              :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'"
+              autocomplete="off"
+              spellcheck="false"
+              class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
+            />
+            <!-- The file the name produces, before the file exists. It is the path the row will carry,
+                 not a summary of one — so a chosen directory moves it, rather than standing beside a
+                 default the Secret no longer lands on. A path is one unbroken token, so it breaks
+                 rather than widening the column it sits in. -->
+            <span class="font-mono text-[11.5px] text-faint break-all">{{ destination || defaultDestination || pathTemplate || 'the namespace default' }}</span>
+            <span v-if="nameProblem()" id="name-problem" class="text-[12.5px] text-danger">{{ nameProblem() }}</span>
+          </label>
+
+          <div class="flex flex-col gap-[7px]">
+            <span class="text-[13px] font-semibold text-ink">Scope</span>
+            <AppRadioGroup v-model="scope" name="secret-scope" :options="scopes" ariaLabel="Secret scope" />
+            <!-- The consequence is the label, so the choice can be made here rather than looked up. -->
+            <span class="text-[11.5px] text-faint">{{ scopeCost }}</span>
+          </div>
+
+          <AppSelect
+            v-if="currentNsPaths && directories.length > 0"
+            v-model="targetDir"
+            label="Target directory"
+            :options="pathOptions"
+            :hint="destinationHint"
+          />
+
+          <!-- Only under a chosen directory: a depth beneath that choice, which the mapping's own
+               template does not have. Empty is a depth of none, so the file lands where the path shown
+               above says it does. -->
+          <label v-if="targetDir" class="flex flex-col gap-[7px]" @focusout="leave('subdirectory', $event)">
+            <span class="text-[13px] font-semibold text-ink">Further subdirectory</span>
+            <input
+              ref="subdirectoryInput"
+              v-model="subdirectory"
+              type="text"
+              aria-label="Further subdirectory under the chosen directory"
+              :aria-invalid="subdirectoryProblem() ? 'true' : undefined"
+              :aria-describedby="subdirectoryProblem() ? 'subdirectory-problem' : undefined"
+              placeholder="e.g. prod"
+              autocomplete="off"
+              spellcheck="false"
+              class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
+            />
+            <span v-if="subdirectoryProblem()" id="subdirectory-problem" class="text-[12.5px] text-danger">{{ subdirectoryProblem() }}</span>
+          </label>
+        </div>
+
+        <label class="flex min-w-0 flex-col gap-[7px]" @focusout="leave('yaml', $event)">
+          <span class="text-[13px] font-semibold text-ink">Secret manifest</span>
+          <AppTextarea
+            ref="yamlInput"
+            v-model="yaml"
+            ariaLabel="New secret YAML"
+            :placeholder="adopting ? 'Output of the kubectl command above' : 'Complete Kubernetes Secret YAML'"
+            :rows="10"
+            :invalid="!!yamlProblem()"
+            :describedBy="yamlProblem() ? 'yaml-problem' : undefined"
+            class="w-full resize-y rounded-[10px] border border-border-strong bg-bg px-3.5 py-3 font-mono text-[12.5px] leading-[1.85] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
+          />
+          <span class="text-[11.5px] text-faint">
+            This box is the only place in the app holding a Secret in plaintext. It is cleared when you leave the page, and the encryption happens here, not on the server.
+          </span>
+          <span v-if="yamlProblem()" id="yaml-problem" class="text-[12.5px] text-danger">{{ yamlProblem() }}</span>
+        </label>
       </div>
-
-      <AppAlert v-if="adopting" type="info" title="Adopt a running Secret">
-        <p class="m-0 max-w-[62ch] text-[13px] text-muted">
-          Read it with <code class="font-mono">{{ kubectlCommand }}</code> and paste the output below.
-          The live object's runtime metadata and apply annotations are stripped before sealing, so only
-          the Secret's content is versioned. Nothing is read from the cluster by this application.
-        </p>
-      </AppAlert>
-
-      <label class="flex flex-col gap-[7px]" @focusout="leave('name', $event)">
-        <span class="text-[13px] font-semibold text-ink">Name</span>
-        <input
-          ref="nameInput"
-          v-model="name"
-          type="text"
-          aria-label="New secret name"
-          :aria-invalid="nameProblem() ? 'true' : undefined"
-          :aria-describedby="nameProblem() ? 'name-problem' : undefined"
-          :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'"
-          autocomplete="off"
-          spellcheck="false"
-          class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
-        />
-        <!-- The file the name produces, before the file exists. It is the path the row will carry,
-             not a summary of one — so a chosen directory moves it, rather than standing beside a
-             default the Secret no longer lands on. -->
-        <span class="font-mono text-[11.5px] text-faint">{{ destination || defaultDestination || pathTemplate || 'the namespace default' }}</span>
-        <span v-if="nameProblem()" id="name-problem" class="text-[12.5px] text-danger">{{ nameProblem() }}</span>
-      </label>
-
-      <div class="flex flex-col gap-[7px]">
-        <span class="text-[13px] font-semibold text-ink">Scope</span>
-        <AppRadioGroup v-model="scope" name="secret-scope" :options="scopes" ariaLabel="Secret scope" />
-        <!-- The consequence is the label, so the choice can be made here rather than looked up. -->
-        <span class="text-[11.5px] text-faint">{{ scopeCost }}</span>
-      </div>
-
-      <AppSelect
-        v-if="currentNsPaths && directories.length > 0"
-        v-model="targetDir"
-        label="Target directory"
-        :options="pathOptions"
-        :hint="destinationHint"
-      />
-
-      <!-- Only under a chosen directory: a depth beneath that choice, which the mapping's own
-           template does not have. Empty is a depth of none, so the file lands where the path shown
-           above says it does. -->
-      <label v-if="targetDir" class="flex flex-col gap-[7px]" @focusout="leave('subdirectory', $event)">
-        <span class="text-[13px] font-semibold text-ink">Further subdirectory</span>
-        <input
-          ref="subdirectoryInput"
-          v-model="subdirectory"
-          type="text"
-          aria-label="Further subdirectory under the chosen directory"
-          :aria-invalid="subdirectoryProblem() ? 'true' : undefined"
-          :aria-describedby="subdirectoryProblem() ? 'subdirectory-problem' : undefined"
-          placeholder="e.g. prod"
-          autocomplete="off"
-          spellcheck="false"
-          class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
-        />
-        <span v-if="subdirectoryProblem()" id="subdirectory-problem" class="text-[12.5px] text-danger">{{ subdirectoryProblem() }}</span>
-      </label>
-
-      <label class="flex flex-col gap-[7px]" @focusout="leave('yaml', $event)">
-        <span class="text-[13px] font-semibold text-ink">Secret manifest</span>
-        <AppTextarea
-          ref="yamlInput"
-          v-model="yaml"
-          ariaLabel="New secret YAML"
-          :placeholder="adopting ? 'Output of the kubectl command above' : 'Complete Kubernetes Secret YAML'"
-          :rows="10"
-          :invalid="!!yamlProblem()"
-          :describedBy="yamlProblem() ? 'yaml-problem' : undefined"
-          class="w-full resize-y rounded-[10px] border border-border-strong bg-bg px-3.5 py-3 font-mono text-[12.5px] leading-[1.85] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
-        />
-        <span class="text-[11.5px] text-faint">
-          This box is the only place in the app holding a Secret in plaintext. It is cleared when you leave the page, and the encryption happens here, not on the server.
-        </span>
-        <span v-if="yamlProblem()" id="yaml-problem" class="text-[12.5px] text-danger">{{ yamlProblem() }}</span>
-      </label>
 
       <div class="flex items-center justify-between gap-3 border-t border-border pt-3.5">
         <AppButton variant="primary" icon="lock" :loading="loading" @click="encrypt">Encrypt for review</AppButton>
