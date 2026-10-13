@@ -243,12 +243,13 @@ onUnmounted(() => secrets.discardChange())
           <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,
                and its confirmation above carries what comes next. It spans the form column rather
                than a measure of its own, so its one primary control sits on the right edge the
-               compose stage's own bar put the last press on. -->
+               compose stage's own bar put the last press on. Its tally is one because a create
+               writes exactly one file, from the first press to the last. -->
           <PendingBar
             v-if="secrets.change?.encrypted && !secrets.delivery"
             :step="step"
             :mode="deliveryMode"
-            :count="0"
+            :count="1"
             :ready="ready"
             :busy="busy"
             @press="press"

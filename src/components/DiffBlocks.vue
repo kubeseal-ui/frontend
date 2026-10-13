@@ -2,7 +2,9 @@
 import { computed } from 'vue'
 
 // One grid, two columns, the rule between them drawn by the 1px gap. The pane headings are what
-// tell before from after, so neither column carries a border of its own.
+// tell before from after, so neither column carries a border of its own. With no before to compare
+// against there is one column, and the heading moves out of the box to sit above it — where the
+// manifest field it replaces keeps its own label.
 const props = defineProps<{ before?: string; after: string; beforeLabel?: string; afterLabel?: string }>()
 
 const lines = (text?: string) => (text ? text.replace(/\n$/, '').split('\n') : [])
@@ -72,30 +74,36 @@ const TONES: Record<string, string> = { same: 'text-faint', add: 'text-success',
 </script>
 
 <template>
-  <div
-    class="grid overflow-hidden rounded-[10px] border border-border bg-border"
-    :class="paired ? 'grid-cols-2 gap-px' : ''"
-  >
-    <template v-if="paired">
-      <div class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
-        <span class="mb-[7px] block font-sans text-[11px] font-semibold text-faint">{{ beforeHeading }}</span>
-        <div v-for="(row, index) in rows" :key="`b${index}`" :class="TONES[row.lk]">{{ row.left }}</div>
-      </div>
-    </template>
+  <div class="flex flex-col">
+    <!-- Unpaired, the heading names the whole box rather than a pane in it: with one column there
+         is nothing inside the border for it to be the heading *of*, and the box it replaces — the
+         manifest field — is labelled above itself the same way. It is keyed inside the roll the
+         press bar's label uses, so the heading and the label under the operator's finger advance
+         together rather than one rolling while the other snaps. -->
+    <span v-if="!paired" class="mb-2 block font-sans text-[11px] font-semibold text-muted">
+      <Transition mode="out-in" enter-active-class="roll-next" leave-active-class="roll-out">
+        <span :key="afterHeading" class="inline-block">{{ afterHeading }}</span>
+      </Transition>
+    </span>
     <div
-      class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]"
-      :class="paired ? '' : 'col-span-2'"
+      class="grid overflow-hidden rounded-[10px] border border-border bg-border"
+      :class="paired ? 'grid-cols-2 gap-px' : ''"
     >
-      <!-- The heading names what this pane is, and it changes on the same press that moves the
-           workflow on. It is keyed inside the same roll the press bar's label uses, so the heading
-           and the label under the operator's finger advance together rather than one rolling while
-           the other snaps. -->
-      <span class="mb-[7px] block font-sans text-[11px] font-semibold text-faint">
-        <Transition mode="out-in" enter-active-class="roll-next" leave-active-class="roll-out">
-          <span :key="afterHeading" class="inline-block">{{ afterHeading }}</span>
-        </Transition>
-      </span>
-      <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
+      <template v-if="paired">
+        <div class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+          <span class="mb-[7px] block font-sans text-[11px] font-semibold text-muted">{{ beforeHeading }}</span>
+          <div v-for="(row, index) in rows" :key="`b${index}`" :class="TONES[row.lk]">{{ row.left }}</div>
+        </div>
+        <!-- Paired, each pane needs its own heading and neither of them ever changes: the edit path
+             passes no after-label, so there is no roll to play here. -->
+        <div class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+          <span class="mb-[7px] block font-sans text-[11px] font-semibold text-muted">{{ afterHeading }}</span>
+          <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
+        </div>
+      </template>
+      <div v-else class="col-span-2 bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+        <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
+      </div>
     </div>
   </div>
 </template>

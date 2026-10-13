@@ -28,23 +28,13 @@ const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:sea
 // A sealed draft is a change with no mutations: /secrets/encrypt produced its ciphertext
 // outright, so there is nothing to diff it against and the review stage never runs.
 const draft = computed(() => (store.change?.encrypted ? store.change : null))
-// The chip labels are the mockup's, and they are short because a segment is: the phrases they
-// stand for set the Source pill wider than the 290px track it lives in, and a pill that wrapped
-// would not be a pill. What a short label drops, the sentence under the control says — the scope
-// cost names the tie, and adopting explains itself in the alert that appears when it is chosen.
+// The chip labels are the mockup's, and they are short because a segment is: the words they stand
+// for set the Source pill wider than the 290px track it lives in. Adopting explains itself in the
+// alert that appears when it is chosen.
 const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace', value: 'namespace-wide' }, { label: 'Cluster', value: 'cluster-wide' }]
 const sources = [{ label: 'Write new', value: 'create' }, { label: 'Adopt running', value: 'adopt' }]
 const adopting = computed(() => mode.value === 'adopt')
 const kubectlCommand = computed(() => `kubectl get secret <name> -n ${props.namespace} -o yaml`)
-
-// The scope caption is the option's cost, not a repetition of its name: the three choices are
-// not three words, they are three different ties between this ciphertext and this Secret.
-const SCOPE_COSTS: Record<string, string> = {
-  strict: 'Strict ties the ciphertext to this name and this namespace, so a renamed or moved copy stops decrypting.',
-  'namespace-wide': 'Namespace-wide lets the ciphertext be copied to any name in this namespace, at the cost of the tie to this one.',
-  'cluster-wide': 'Cluster-wide lets the ciphertext be copied to any name in any namespace, and is the loosest tie the product offers.',
-}
-const scopeCost = computed(() => SCOPE_COSTS[scope.value] || '')
 
 // A mapping with no allowed directories leaves the picker unrendered and the request carrying no
 // target_path, which is what leaves the server rendering its own path template.
@@ -180,15 +170,19 @@ function leave(field: 'name' | 'yaml' | 'subdirectory', event: FocusEvent) {
 // contents behind the toggle and the review below becomes what the page is about.
 const override = ref<boolean | null>(null)
 const open = computed(() => override.value ?? !draft.value)
-const toggle = ref<{ $el?: HTMLElement } | null>(null)
+// A native button rather than a wrapper, so the ref is the element itself — `refocusAfterCollapse`
+// takes an element, and a wrapper's ref would be a component instance.
+const toggle = ref<HTMLElement | null>(null)
 const nameInput = ref<{ $el?: HTMLElement } | null>(null)
 const yamlInput = ref<{ $el?: HTMLElement } | null>(null)
 const subdirectoryInput = ref<{ $el?: HTMLElement } | null>(null)
-const summary = computed(() => [
-  draft.value ? `Encrypted draft for ${draft.value.name}` : name.value,
-  scope.value,
-  destination.value || defaultDestination.value,
-].filter(Boolean).join(' · '))
+// What the folded row spells out. The draft's own name rather than the field's, because the row
+// reports what was sealed and the field is free to be retyped underneath it.
+const summary = computed(() => ({
+  name: draft.value?.name || name.value,
+  scope: scope.value,
+  path: destination.value || defaultDestination.value,
+}))
 
 // The page's spine names what is already in this namespace, so the typed name is mirrored up
 // rather than read back out of the form.
@@ -198,7 +192,7 @@ watch(draft, async () => {
   override.value = null
   // The control that folded the stage goes with it, so focus has to be carried to the toggle
   // rather than left on `<body>`.
-  await refocusAfterCollapse(() => toggle.value?.$el)
+  await refocusAfterCollapse(() => toggle.value)
 }, { flush: 'post' })
 
 // A delivered draft has been sealed and committed, so the plaintext it was built from is spent:
@@ -304,12 +298,34 @@ onUnmounted(() => { yaml.value = '' })
 <template>
   <div v-if="canCreate" class="flex flex-col gap-4">
     <!-- The folded stage keeps saying what it holds, and stays the way back into it: a draft
-         never sits in a state the page offers no way out of. -->
-    <div v-if="!open" class="flex flex-wrap items-center gap-2">
-      <span class="font-mono text-xs text-muted">{{ summary }}</span>
-      <span class="ml-auto flex flex-wrap items-center gap-2">
-        <AppButton v-if="draft" size="small" @click="discard">Discard encrypted draft</AppButton>
-        <AppButton ref="toggle" size="small" variant="ghost" @click="override = true">Edit</AppButton>
+         never sits in a state the page offers no way out of. The row is keylined like the manifest
+         box it stands in for, and the two identifiers in it are set the way that box sets them, so
+         the fold reads as the same object one line tall rather than as a caption over nothing.
+         Both controls are bare text: the work of this row is the line, and a bordered button in it
+         would be the only boxed thing on a line of prose. -->
+    <div
+      v-if="!open"
+      class="flex flex-wrap items-center gap-2.5 rounded-control border border-border bg-surface px-3 py-[9px] text-xs text-muted"
+    >
+      <span class="font-mono font-semibold text-ink">{{ summary.name }}</span>
+      <span v-if="summary.scope">· {{ summary.scope }}</span>
+      <span v-if="summary.path" class="font-mono font-semibold text-ink">· {{ summary.path }}</span>
+      <span class="ml-auto flex flex-wrap items-center gap-3">
+        <!-- Clearing is the one destructive control in the flow, so it stays spelled out rather
+             than borrowing the bar's "Start over": that label reads as stepping back off a press,
+             and what this drops is the operator's only copy of what they wrote. -->
+        <button
+          v-if="draft"
+          type="button"
+          class="cursor-pointer font-semibold text-muted hover:text-ink"
+          @click="discard"
+        >Discard encrypted draft</button>
+        <button
+          ref="toggle"
+          type="button"
+          class="cursor-pointer font-semibold text-accent hover:underline"
+          @click="override = true"
+        >Edit</button>
       </span>
     </div>
 
@@ -361,8 +377,6 @@ onUnmounted(() => { yaml.value = '' })
           <div class="flex flex-col gap-[6px]">
             <span class="text-[12px] font-[650] text-ink">Scope</span>
             <AppRadioGroup v-model="scope" name="secret-scope" :options="scopes" ariaLabel="Secret scope" variant="segmented" />
-            <!-- The consequence is the label, so the choice can be made here rather than looked up. -->
-            <span class="text-[11.5px] text-faint">{{ scopeCost }}</span>
           </div>
 
           <AppSelect
@@ -405,9 +419,6 @@ onUnmounted(() => { yaml.value = '' })
             :invalid="!!yamlProblem()"
             :describedBy="yamlProblem() ? 'yaml-problem' : undefined"
           />
-          <span class="text-[11px] text-faint">
-            This box is the only place in the app holding a Secret in plaintext. It is cleared when you leave the page, and the encryption happens here, not on the server.
-          </span>
           <span v-if="yamlProblem()" id="yaml-problem" class="text-[12.5px] text-danger">{{ yamlProblem() }}</span>
         </label>
       </div>

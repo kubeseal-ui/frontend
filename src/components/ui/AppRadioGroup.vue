@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// Real radios inside `<label>`s rather than styled divs, so the browser supplies
-// arrow-key movement, the single tab stop, and the checked-state announcement. The two
-// variants draw the same control differently and nothing else: `list` shows each option's
-// dot beside its name, `segmented` is the pill where the name *is* the segment. The radio is
-// still the control in both — `sr-only` hides the dot without taking it out of the tab order
-// or off the arrow keys, and the ring moves to the segment with `has-[:focus-visible]`, so a
-// keyboard user sees the focus the browser put on the input.
+// Real radios inside `<label>`s rather than styled divs, so the browser supplies the arrow keys,
+// the single tab stop, and the checked announcement. `w-fit` is load-bearing on the segmented
+// variant: both call sites put the group in a `flex-col`, whose `align-items: stretch` would
+// otherwise override `inline-flex` and draw the pill across the whole track rather than around its
+// segments. The dot is `sr-only` rather than removed — the input stays the control, and
+// `has-[:focus-visible]` moves the ring out to the segment, since a clipped input's outline goes
+// with it.
 withDefaults(
   defineProps<{
     modelValue: string
@@ -28,7 +28,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
     :aria-label="ariaLabel || label || undefined"
     :class="
       variant === 'segmented'
-        ? 'inline-flex shrink-0 items-center gap-[3px] rounded-[9px] border border-border-strong bg-bg p-[3px]'
+        ? 'inline-flex w-fit shrink-0 items-center gap-[3px] rounded-[9px] border border-border-strong bg-bg p-[3px]'
         : 'flex flex-wrap gap-x-4 gap-y-1'
     "
   >
@@ -42,7 +42,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
         variant === 'segmented'
           ? [
               'whitespace-nowrap rounded-[6px] px-2.5 py-[3px] text-xs font-semibold',
-              modelValue === option.value ? 'bg-surface text-accent' : 'text-muted',
+              modelValue === option.value ? 'bg-surface-raised text-accent' : 'text-muted',
               disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:text-ink',
               'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent',
             ]
