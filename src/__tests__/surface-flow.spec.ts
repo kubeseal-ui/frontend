@@ -502,7 +502,7 @@ describe('the surface', () => {
     expect(wrapper.text()).toContain('1 change staged')
   })
 
-  it('steps back from a review with Start over, keeping the staged row', async () => {
+  it('steps back from a review through the rail, keeping the staged row', async () => {
     posts(DIFF)
     const { wrapper } = await mountSurface(detail())
     await flushPromises()
@@ -517,7 +517,10 @@ describe('the surface', () => {
     const store = useSecretsStore(pinia)
     expect(store.review).not.toBeNull()
 
-    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Start over')!.trigger('click')
+    // The rail's Edit stop is the only way back now that the bar carries nothing but the next
+    // press, so it is the one the operator reaches the rows through.
+    await wrapper.find('nav[aria-label="Workflow progress"]')
+      .findAll('button').find((candidate) => candidate.text() === 'Edit')!.trigger('click')
     await flushPromises()
 
     // The review is dropped and the forward press returns to the first step, with the row still staged.
@@ -684,6 +687,12 @@ describe('the one button', () => {
   it('counts the batch in words that agree with it', () => {
     expect(bar({ count: 1 }).text()).toContain('1 change')
     expect(bar({ count: 3 }).text()).toContain('3 changes')
+  })
+
+  it('carries the next press and nothing beside it', () => {
+    // Stepping back is the rail's Edit stop. A second control on the bar would have to be read and
+    // ruled out before every press, and the bar exists to state the workflow's one direction.
+    expect(bar().findAll('button')).toHaveLength(1)
   })
 
   it('is disabled until the press would be allowed', () => {

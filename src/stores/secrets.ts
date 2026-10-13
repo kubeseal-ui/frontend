@@ -168,8 +168,9 @@ export const useSecretsStore = defineStore('secrets', {
 
     /** Drops the review and the check but keeps the staged change, returning the workflow to its
      *  first step. Used when the operator edits a row after reviewing — the diff they saw no longer
-     *  matches the rows — and by the explicit "Start over" control. The delivery is left alone: a
-     *  landed delivery is a result to keep showing, not progress to unwind. */
+     *  matches the rows — and by the surface's rail, whose Edit stop is the deliberate form of the
+     *  same move. The delivery is left alone: a landed delivery is a result to keep showing, not
+     *  progress to unwind. */
     discardReview() { this.review = null; this.check = null },
 
     // The push has already happened by the time the re-read runs, so a refresh that fails

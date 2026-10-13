@@ -129,9 +129,11 @@ const idle = computed(() => {
 // here; once a diff or confirmation is up, that one block is the task instead.
 const composing = computed(() => !store.review && !store.check && !store.delivery)
 
-// The four stops this flow passes through. Edit is home base — the only stop with a way back,
-// which is the existing "Start over" — and it is a back target only while the delivery has not
-// landed. The rail shows only while the Secret is editable; drift takes the screen otherwise.
+// The four stops this flow passes through. Edit is home base, and the only stop with a way back — the
+// press bar carries the next press and nothing else — and it is a back target only while the delivery
+// has not landed. The rail shows only while the Secret is editable; drift takes the screen otherwise,
+// and a review can only have landed while the Secret was in sync, so the stop is on screen whenever it
+// is needed.
 const railSteps = computed(() => [
   { key: 'edit', label: 'Edit', back: !store.delivery },
   { key: 'review', label: 'Review' },
@@ -185,13 +187,15 @@ watch(() => store.delivery, (outcome) => { if (outcome) { editor.value?.clear();
 // Editing a row after a review was taken makes that review stale — it diffed a batch the rows no
 // longer match — so the review and check are dropped and the workflow returns to its first step,
 // reflecting the new edits. Skipped while a delivery is on screen: that batch-clear is the delivery
-// landing, not an edit, and its success must not be wiped. The explicit control is startOver below.
+// landing, not an edit, and its success must not be wiped. `startOver` below asks for the same move
+// deliberately, from the rail.
 watch(batch, () => {
   if ((store.review || store.check) && !store.delivery) store.discardReview()
 })
 
-// "Start over" from a review or check: drop the derived steps and return to editing the rows,
-// which are still holding the staged change.
+// The rail's Edit stop, from a review or a check: drop the derived steps and return to editing the
+// rows, which are still holding the staged change. It is the same move the row edit above makes
+// automatically, asked for deliberately rather than by touching a row.
 function startOver() { store.discardReview() }
 
 // --- Sync ------------------------------------------------------------------
@@ -362,7 +366,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <!-- The document region. It is hidden while a diff is under review or the change has
                landed, so that one block — the diff, or the confirmation — is the task rather than a
                panel stacked below the whole key list. Both editors stay mounted (v-show, never
-               v-if) so a staged batch survives the trip through review and back via Start over. -->
+               v-if) so a staged batch survives the trip through review and back via the rail. -->
           <div v-show="composing">
             <!-- The mode switch: pressed buttons, so the state is announced, keyboard reachable,
                  and never colour alone. -->
@@ -453,9 +457,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             :ready="ready"
             :busy="busy"
             :idle="idle"
-            :can-back="Boolean((store.review || store.check) && !store.delivery)"
             @press="press"
-            @back="startOver"
           />
         </div>
 

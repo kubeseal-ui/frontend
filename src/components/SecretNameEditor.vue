@@ -318,8 +318,8 @@ onUnmounted(() => { yaml.value = '' })
       <span v-if="summary.path" class="font-mono font-semibold text-ink">· {{ summary.path }}</span>
       <span class="ml-auto flex flex-wrap items-center gap-3">
         <!-- Clearing is the one destructive control in the flow, so it stays spelled out rather
-             than borrowing the bar's "Start over": that label reads as stepping back off a press,
-             and what this drops is the operator's only copy of what they wrote. -->
+             than borrowing the surface's way back, whose Edit drop keeps what the operator staged.
+             What this drops is their only copy of what they wrote. -->
         <button
           v-if="draft"
           type="button"

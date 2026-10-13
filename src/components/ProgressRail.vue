@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// A compact progress rail for the workflow: it names the stages and marks where the operator is,
-// so the one changing button at the foot of the page is not the only thing saying how far along
-// they are. A completed stop that the parent marks `back` is a link that steps there; the current
-// and future stops, and completed stops with no way back, are plain text.
+// A compact progress rail for the workflow: it names the stages and marks where the operator is, so the
+// one changing button at the foot of the page is not the only thing saying how far along they are. The
+// one stop the parent marks `back` is also a link home, and it is dressed as the app's own way back —
+// accent text underlined on hover, not a rail label — because it is the only control on the rail and has
+// to read as one. Everything else here is state.
 //
 // Both parts of a stop are state, so both morph on the base step rather than the pointer step: the
 // connector is a wiped-in overlay rather than a colour swap, and the mark's ring and fill move
@@ -25,8 +26,8 @@ const emit = defineEmits<{ navigate: [key: string] }>()
         :type="i < active && step.back ? 'button' : undefined"
         class="inline-flex items-center gap-[7px] whitespace-nowrap text-[12px] font-semibold"
         :class="[
-          i < active ? 'text-muted' : i === active ? 'text-ink' : 'text-faint',
-          i < active && step.back ? 'cursor-pointer border-0 bg-transparent p-0 hover:text-ink hover:underline underline-offset-4' : '',
+          i < active ? (step.back ? 'text-accent' : 'text-muted') : i === active ? 'text-ink' : 'text-faint',
+          i < active && step.back ? 'cursor-pointer border-0 bg-transparent p-0 hover:underline underline-offset-4' : '',
         ]"
         :aria-current="i === active ? 'step' : undefined"
         @click="i < active && step.back ? emit('navigate', step.key) : undefined"
