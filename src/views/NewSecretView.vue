@@ -61,7 +61,7 @@ const ready = computed(() => (step.value === 'deliver' ? canDeliver.value : true
 // The four stops the create flow passes through. Compose is the home base — the only stop with a
 // way back — and the rail marks which one the operator is standing on, so pressing Check moves it
 // from Review to Check rather than only relabelling the button.
-const editorRef = ref<{ reopen?: () => void } | null>(null)
+const editorRef = ref<{ edit?: () => void } | null>(null)
 const composeSection = ref<HTMLElement | null>(null)
 const railSteps = [
   { key: 'compose', label: 'Compose', back: true },
@@ -76,10 +76,11 @@ const activeStep = computed(() => (secrets.delivery ? 3 : secrets.check ? 2 : se
 const checkedPath = computed(() => secrets.check?.result.path || '')
 function onRailNavigate(key: string) {
   // Only Compose steps back. From a landed delivery that means starting a fresh Secret; from an
-  // encrypted-but-undelivered draft it reopens the editor the way the fold's Edit button does.
+  // encrypted-but-undelivered draft it is the fold's own Edit — the draft goes and the form comes
+  // back — so the rail, the results below and the press bar all return to Compose with it.
   if (key !== 'compose') return
   if (secrets.delivery) { startAnother(); return }
-  editorRef.value?.reopen?.()
+  editorRef.value?.edit?.()
   revealRegion(() => composeSection.value)
 }
 

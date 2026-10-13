@@ -167,9 +167,11 @@ function leave(field: 'name' | 'yaml' | 'subdirectory', event: FocusEvent) {
 }
 
 // Encrypting is what moves the flow on, so that is what folds this stage: the form keeps its
-// contents behind the toggle and the review below becomes what the page is about.
-const override = ref<boolean | null>(null)
-const open = computed(() => override.value ?? !draft.value)
+// contents behind the toggle and the review below becomes what the page is about. The draft's
+// existence is the whole of the stage's state — going back to editing drops the draft rather than
+// flagging the form open — so the fold and the workflow behind it cannot disagree about where the
+// operator is standing.
+const open = computed(() => !draft.value)
 // A native button rather than a wrapper, so the ref is the element itself — `refocusAfterCollapse`
 // takes an element, and a wrapper's ref would be a component instance.
 const toggle = ref<HTMLElement | null>(null)
@@ -188,11 +190,11 @@ const summary = computed(() => ({
 // rather than read back out of the form.
 watch(name, (value) => emit('update:name', value), { immediate: true })
 
-watch(draft, async () => {
-  override.value = null
-  // The control that folded the stage goes with it, so focus has to be carried to the toggle
-  // rather than left on `<body>`.
-  await refocusAfterCollapse(() => toggle.value)
+watch(draft, async (next) => {
+  // Whichever control goes with the draft takes focus with it: the toggle that replaced the form
+  // when the draft landed, and the form's first field when the draft is dropped and the toggle is
+  // the thing that goes. `null` is a dropped draft, and it is the same target `discard` names.
+  await refocusAfterCollapse(() => (next ? toggle.value : nameInput.value?.$el))
 }, { flush: 'post' })
 
 // A delivered draft has been sealed and committed, so the plaintext it was built from is spent:
@@ -205,10 +207,14 @@ watch(() => store.delivery, (next) => {
   shown.name = false; shown.yaml = false; shown.manifest = false; shown.subdirectory = false
 })
 
-// Reopening from outside: the progress rail's "Compose" stop steps back to this form the same way
-// the fold's own Edit button does, keeping the encrypted draft rather than discarding it.
-function reopen() { override.value = true }
-defineExpose({ reopen })
+// Going back to Compose, from the rail's Compose stop or the fold's own Edit. The draft goes with
+// it: that ciphertext was produced from this box, so the moment the box is open for writing it is
+// describing something the operator has already changed — and so is any check run against it. That
+// is the same rule the surface follows when a row is edited after a review, and it is why a
+// correction is re-encrypted rather than carried forward. Nothing is lost: what the draft covers is
+// the plaintext, which is still in the box.
+function edit() { store.discardChange() }
+defineExpose({ edit })
 
 // The encryption refusal lands below the manifest and the press, which is off the bottom of a long
 // form. It is carried into view and given focus when it appears, so the operator is not left on a
@@ -324,7 +330,7 @@ onUnmounted(() => { yaml.value = '' })
           ref="toggle"
           type="button"
           class="cursor-pointer font-semibold text-accent hover:underline"
-          @click="override = true"
+          @click="edit"
         >Edit</button>
       </span>
     </div>
