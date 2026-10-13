@@ -28,8 +28,12 @@ const canCreate = computed(() => auth.hasCapability(props.namespace, 'secret:sea
 // A sealed draft is a change with no mutations: /secrets/encrypt produced its ciphertext
 // outright, so there is nothing to diff it against and the review stage never runs.
 const draft = computed(() => (store.change?.encrypted ? store.change : null))
-const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace-wide', value: 'namespace-wide' }, { label: 'Cluster-wide', value: 'cluster-wide' }]
-const sources = [{ label: 'Write a new Secret', value: 'create' }, { label: 'Adopt a running Secret', value: 'adopt' }]
+// The chip labels are the mockup's, and they are short because a segment is: the phrases they
+// stand for set the Source pill wider than the 290px track it lives in, and a pill that wrapped
+// would not be a pill. What a short label drops, the sentence under the control says — the scope
+// cost names the tie, and adopting explains itself in the alert that appears when it is chosen.
+const scopes = [{ label: 'Strict', value: 'strict' }, { label: 'Namespace', value: 'namespace-wide' }, { label: 'Cluster', value: 'cluster-wide' }]
+const sources = [{ label: 'Write new', value: 'create' }, { label: 'Adopt running', value: 'adopt' }]
 const adopting = computed(() => mode.value === 'adopt')
 const kubectlCommand = computed(() => `kubectl get secret <name> -n ${props.namespace} -o yaml`)
 
@@ -298,7 +302,7 @@ onUnmounted(() => { yaml.value = '' })
 </script>
 
 <template>
-  <div v-if="canCreate" class="flex max-w-[640px] flex-col gap-5">
+  <div v-if="canCreate" class="flex flex-col gap-4">
     <!-- The folded stage keeps saying what it holds, and stays the way back into it: a draft
          never sits in a state the page offers no way out of. -->
     <div v-if="!open" class="flex flex-wrap items-center gap-2">
@@ -309,18 +313,19 @@ onUnmounted(() => { yaml.value = '' })
       </span>
     </div>
 
-    <div v-show="open" class="flex flex-col gap-5">
-      <!-- Settings beside the manifest, not stacked above it: the fields are short and the manifest
-           is the only thing here that wants height, so one column put Encrypt ~1,100px down a row
-           that was half empty. The breakpoint is 1000px and not the width at which two tracks first
-           fit, because this form does not own the width it is drawn at — it is `flex-1` beside a
-           258px aside and capped at 640px of its own, so a narrower viewport leaves it ~600px wide
-           and a 290px track would squeeze the manifest narrower than the lines in it. -->
-      <div class="grid grid-cols-1 items-start gap-x-[22px] gap-y-5 min-[1000px]:grid-cols-[290px_1fr]">
+    <div v-show="open" class="flex flex-col gap-4">
+      <!-- Settings beside the manifest, not stacked above it: the fields are short and the
+           manifest is the only thing here that wants height, so one column put Encrypt ~1,100px
+           down a row that was half empty. The tracks, the gaps and the breakpoint are the
+           mockup's `290px 1fr` at `22px`, stacking under `932px` — the width at which this
+           column can still hold both: 52px of page padding, a 210px aside and its 30px gap, the
+           290px settings track, 22px of gap, and a manifest of 328px. Above it the manifest
+           takes everything left over, which is what makes the pane wide. -->
+      <div class="grid grid-cols-1 items-start gap-[22px] min-[932px]:grid-cols-[290px_1fr]">
         <div class="flex min-w-0 flex-col gap-[13px]">
-          <div class="flex flex-col gap-[7px]">
-            <span class="text-[13px] font-semibold text-ink">Where it comes from</span>
-            <AppRadioGroup v-model="mode" name="secret-source" :options="sources" ariaLabel="Secret source" />
+          <div class="flex flex-col gap-[6px]">
+            <span class="text-[12px] font-[650] text-ink">Source</span>
+            <AppRadioGroup v-model="mode" name="secret-source" :options="sources" ariaLabel="Secret source" variant="segmented" />
           </div>
 
           <AppAlert v-if="adopting" type="info" title="Adopt a running Secret">
@@ -331,8 +336,8 @@ onUnmounted(() => { yaml.value = '' })
             </p>
           </AppAlert>
 
-          <label class="flex flex-col gap-[7px]" @focusout="leave('name', $event)">
-            <span class="text-[13px] font-semibold text-ink">Name</span>
+          <label class="flex flex-col gap-[6px]" @focusout="leave('name', $event)">
+            <span class="text-[12px] font-[650] text-ink">Name</span>
             <input
               ref="nameInput"
               v-model="name"
@@ -349,13 +354,13 @@ onUnmounted(() => { yaml.value = '' })
                  not a summary of one — so a chosen directory moves it, rather than standing beside a
                  default the Secret no longer lands on. A path is one unbroken token, so it breaks
                  rather than widening the column it sits in. -->
-            <span class="font-mono text-[11.5px] text-faint break-all">{{ destination || defaultDestination || pathTemplate || 'the namespace default' }}</span>
+            <span class="font-mono text-[11px] text-faint break-all">{{ destination || defaultDestination || pathTemplate || 'the namespace default' }}</span>
             <span v-if="nameProblem()" id="name-problem" class="text-[12.5px] text-danger">{{ nameProblem() }}</span>
           </label>
 
-          <div class="flex flex-col gap-[7px]">
-            <span class="text-[13px] font-semibold text-ink">Scope</span>
-            <AppRadioGroup v-model="scope" name="secret-scope" :options="scopes" ariaLabel="Secret scope" />
+          <div class="flex flex-col gap-[6px]">
+            <span class="text-[12px] font-[650] text-ink">Scope</span>
+            <AppRadioGroup v-model="scope" name="secret-scope" :options="scopes" ariaLabel="Secret scope" variant="segmented" />
             <!-- The consequence is the label, so the choice can be made here rather than looked up. -->
             <span class="text-[11.5px] text-faint">{{ scopeCost }}</span>
           </div>
@@ -371,8 +376,8 @@ onUnmounted(() => { yaml.value = '' })
           <!-- Only under a chosen directory: a depth beneath that choice, which the mapping's own
                template does not have. Empty is a depth of none, so the file lands where the path shown
                above says it does. -->
-          <label v-if="targetDir" class="flex flex-col gap-[7px]" @focusout="leave('subdirectory', $event)">
-            <span class="text-[13px] font-semibold text-ink">Further subdirectory</span>
+          <label v-if="targetDir" class="flex flex-col gap-[6px]" @focusout="leave('subdirectory', $event)">
+            <span class="text-[12px] font-[650] text-ink">Further subdirectory</span>
             <input
               ref="subdirectoryInput"
               v-model="subdirectory"
@@ -389,8 +394,8 @@ onUnmounted(() => { yaml.value = '' })
           </label>
         </div>
 
-        <label class="flex min-w-0 flex-col gap-[7px]" @focusout="leave('yaml', $event)">
-          <span class="text-[13px] font-semibold text-ink">Secret manifest</span>
+        <label class="flex min-w-0 flex-col gap-[6px]" @focusout="leave('yaml', $event)">
+          <span class="text-[12px] font-[650] text-ink">Secret manifest</span>
           <AppTextarea
             ref="yamlInput"
             v-model="yaml"
@@ -399,16 +404,19 @@ onUnmounted(() => { yaml.value = '' })
             :rows="10"
             :invalid="!!yamlProblem()"
             :describedBy="yamlProblem() ? 'yaml-problem' : undefined"
-            class="w-full resize-y rounded-[10px] border border-border-strong bg-bg px-3.5 py-3 font-mono text-[12.5px] leading-[1.85] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
           />
-          <span class="text-[11.5px] text-faint">
+          <span class="text-[11px] text-faint">
             This box is the only place in the app holding a Secret in plaintext. It is cleared when you leave the page, and the encryption happens here, not on the server.
           </span>
           <span v-if="yamlProblem()" id="yaml-problem" class="text-[12.5px] text-danger">{{ yamlProblem() }}</span>
         </label>
       </div>
 
-      <div class="flex items-center justify-between gap-3 border-t border-border pt-3.5">
+      <!-- The one press the stage has, at the right edge of the form column the way the bar below
+           it puts its own: the primary control moves from this bar to that one on the press that
+           folds the stage, and a control that changed sides on the way would be the one thing on
+           the screen that moved without being asked to. -->
+      <div class="flex items-center justify-end gap-3 border-t border-border pt-3.5">
         <AppButton variant="primary" icon="lock" :loading="loading" @click="encrypt">Encrypt for review</AppButton>
       </div>
 

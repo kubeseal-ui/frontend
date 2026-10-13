@@ -16,7 +16,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <template>
-  <label class="flex flex-col gap-[7px] text-[13px] font-semibold text-ink">
+  <label class="flex flex-col gap-[6px] text-[12px] font-[650] text-ink">
     <span :class="hideLabel ? 'sr-only' : ''">{{ label }}</span>
     <select
       :value="modelValue"
@@ -25,6 +25,6 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
     >
       <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
     </select>
-    <span v-if="hint" class="font-mono text-[11.5px] font-normal text-faint">{{ hint }}</span>
+    <span v-if="hint" class="font-mono text-[11px] font-normal text-faint">{{ hint }}</span>
   </label>
 </template>

@@ -32,7 +32,9 @@ const VARIANTS: Record<string, string> = {
 
 const SIZES: Record<string, string> = {
   small: 'h-7 px-2.5 text-xs',
-  medium: 'h-[34px] px-3.5 text-[13px]',
+  // `h-9` and 13px are the app's control scale, and they are load-bearing: the bar that presses
+  // this button draws its own secondary control inline at exactly these and sits it alongside.
+  medium: 'h-9 px-3.5 text-[13px]',
 }
 
 const classes = computed(() => [

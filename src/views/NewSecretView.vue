@@ -126,16 +126,18 @@ onUnmounted(() => secrets.discardChange())
 
 <template>
   <section aria-labelledby="page-title">
-    <div class="flex flex-wrap items-end justify-between gap-6 px-[26px] pt-6 pb-5">
+    <!-- One padding block for the page body, the mockup's `24px 26px 30px`: the heading and the
+         grid below it are the same column, and a band between them would be a second one. -->
+    <div class="px-[26px] pt-6">
       <div class="min-w-0">
         <RouterLink
           :to="`/namespaces/${encodeURIComponent(props.namespace)}`"
-          class="inline-flex items-center gap-1 text-[12.5px] font-semibold text-muted no-underline hover:text-ink"
+          class="mb-2.5 inline-flex items-center gap-1 text-[12.5px] font-semibold text-muted no-underline hover:text-ink"
         >
           <AppIcon name="chevron-left" :size="12" />{{ props.namespace }}
         </RouterLink>
-        <h1 id="page-title" class="mt-1.5 mb-0 font-mono text-[30px] font-semibold tracking-[-0.025em] text-ink">New Secret</h1>
-        <p class="mt-2 mb-0 flex flex-wrap items-baseline gap-[7px] text-[13px] text-muted">
+        <h1 id="page-title" class="m-0 font-mono text-[30px] font-semibold tracking-[-0.025em] text-ink">New Secret</h1>
+        <p class="mt-2 mb-0.5 flex flex-wrap items-baseline gap-[7px] text-[13px] text-muted">
           in <span class="font-mono text-ink">{{ props.namespace }}</span>
           <template v-if="mapping">
             <span class="text-border-strong" aria-hidden="true">·</span>
@@ -145,7 +147,7 @@ onUnmounted(() => secrets.discardChange())
       </div>
     </div>
 
-    <div class="px-[26px] pb-11">
+    <div class="px-[26px] pb-[30px]">
       <AppAlert v-if="!canSeal" type="error" title="Access denied">
         <p class="m-0 max-w-[62ch] text-[13px] text-muted">
           Creating a SealedSecret in {{ props.namespace }} requires the
@@ -157,18 +159,21 @@ onUnmounted(() => secrets.discardChange())
         >Back to {{ props.namespace }}</RouterLink>
       </AppAlert>
 
-      <div v-else class="flex flex-wrap items-start gap-x-12 gap-y-8">
-        <div class="flex min-w-[22rem] flex-1 flex-col">
+      <!-- Form column and namespace card: the mockup's `1fr 210px` at a 30px gap, and the card
+           drops below the form at the width the mockup drops it at. -->
+      <div v-else class="grid grid-cols-1 items-start gap-x-[30px] gap-y-8 min-[820px]:grid-cols-[1fr_210px]">
+        <div class="flex min-w-0 flex-col">
           <!-- Where you are, pinned below the app header so it stays in view as the one changing
-               button at the foot moves the flow on. -->
-          <div class="sticky top-14 z-10 -mt-1 bg-bg pt-1 pb-3">
+               button at the foot moves the flow on. The rail's own `18px 0 20px` is the padding
+               here, so the air above and below it is the air the mockup draws. -->
+          <div class="sticky top-14 z-10 bg-bg pt-[18px] pb-5">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 
           <!-- A delivered draft takes the editor off the screen: the confirmation below is the whole
                task now, and "Encrypt another" brings a fresh form back rather than leaving a spent
                one stacked above the result. -->
-          <div v-show="!secrets.delivery" ref="composeSection" class="mt-6">
+          <div v-show="!secrets.delivery" ref="composeSection">
             <SecretNameEditor ref="editorRef" :namespace="props.namespace" @update:name="typedName = $event" />
           </div>
 
@@ -180,7 +185,7 @@ onUnmounted(() => secrets.discardChange())
                pinned to the bottom of the results instead of staying over the form it presses on. -->
           <section
             ref="draftSection"
-            class="fold-stack max-w-[640px]"
+            class="fold-stack"
             :aria-label="secrets.change?.encrypted || secrets.delivery ? 'Encrypted draft' : undefined"
           >
             <div class="fold" :class="{ open: Boolean(secrets.change?.encrypted) }">
@@ -232,15 +237,15 @@ onUnmounted(() => secrets.discardChange())
             </div>
           </section>
 
-          <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" closable title="Operation failed" class="mt-4 max-w-[640px]" @close="pressError = ''">
+          <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" closable title="Operation failed" class="mt-4" @close="pressError = ''">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
           </AppAlert>
           <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,
-               and its confirmation above carries what comes next. The width is the form's, so the one
-               primary control on the screen lines up with the box it acts on. -->
+               and its confirmation above carries what comes next. It spans the form column rather
+               than a measure of its own, so its one primary control sits on the right edge the
+               compose stage's own bar put the last press on. -->
           <PendingBar
             v-if="secrets.change?.encrypted && !secrets.delivery"
-            class="max-w-[640px]"
             :step="step"
             :mode="deliveryMode"
             :count="0"
@@ -252,7 +257,7 @@ onUnmounted(() => secrets.discardChange())
 
         <!-- What the form is writing into, stated beside it: the namespace's own terms, the
              directories it allows, and the names already spoken for. -->
-        <aside aria-label="Namespace context" class="flex w-[258px] shrink-0 flex-col gap-[22px]">
+        <aside aria-label="Namespace context" class="flex min-w-0 flex-col gap-5">
           <div>
             <h2 class="mb-[9px] text-xs font-[650] text-muted">This namespace</h2>
             <div class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]">
@@ -275,10 +280,10 @@ onUnmounted(() => secrets.discardChange())
               <span class="min-w-0 truncate font-mono text-xs text-ink" :title="path">{{ path }}</span>
               <span v-if="path === `${defaultDirectory}/`" class="shrink-0 text-[11.5px] text-faint">default</span>
             </div>
-            <p v-if="allowedPaths.length === 0 && isWildcard" class="m-0 py-[3px] text-[12.5px] text-muted">
+            <p v-if="allowedPaths.length === 0 && isWildcard" class="m-0 py-[3px] text-[13px] text-muted">
               Rendered per Secret from this namespace's mapping.
             </p>
-            <p v-else-if="allowedPaths.length === 0" class="m-0 py-[3px] text-[12.5px] text-muted">No directories mapped.</p>
+            <p v-else-if="allowedPaths.length === 0" class="m-0 py-[3px] text-[13px] text-muted">No directories mapped.</p>
           </div>
 
           <div v-if="secrets.indexLoaded">
@@ -287,7 +292,7 @@ onUnmounted(() => secrets.discardChange())
               <span class="min-w-0 truncate font-mono text-xs text-ink" :title="existing">{{ existing }}</span>
               <span v-if="existing === typedName.trim()" class="shrink-0 text-[11.5px] font-semibold text-danger">taken</span>
             </div>
-            <p v-if="existingNames.length === 0" class="m-0 py-[3px] text-[12.5px] text-muted">No SealedSecrets yet.</p>
+            <p v-if="existingNames.length === 0" class="m-0 py-[3px] text-[13px] text-muted">No SealedSecrets yet.</p>
           </div>
 
           <AppAlert v-if="!hasDeliveryPolicy" type="info" title="No Git delivery for this namespace">
