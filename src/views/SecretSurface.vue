@@ -398,12 +398,23 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <!-- One diff at a time. The review's predicted ciphertext and the check's dry-run against
                the branch are near-identical YAML, so showing both stacks two walls of text that
                say almost the same thing; once the check lands it supersedes the review, so the
-               review folds away and the check takes its place. -->
+               review folds away and the check takes its place. Because only one is ever open, the
+               open one carries the way back: an Edit in its heading, the same control — and the
+               same accent — as the create form's folded row. Each is rendered only while its own
+               fold is open, because a shut fold keeps its children mounted and a tab stop on a
+               panel nobody can see is a trap. -->
           <div class="fold" ref="reviewFold" :class="{ open: Boolean(store.review) && !store.check }">
             <div>
               <template v-if="store.review">
-                <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
-                  Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code>
+                <h3 class="mt-[26px] mb-[9px] flex items-center gap-3 text-xs font-[650] text-muted">
+                  <span class="min-w-0">Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code></span>
+                  <button
+                    v-if="!store.check"
+                    type="button"
+                    class="ml-auto shrink-0 cursor-pointer font-semibold text-accent hover:underline underline-offset-4"
+                    aria-label="Edit values"
+                    @click="startOver"
+                  >Edit</button>
                 </h3>
                 <DiffBlocks :before="store.review.before" :after="store.review.after" />
               </template>
@@ -413,8 +424,15 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <div class="fold" ref="checkFold" :class="{ open: Boolean(store.check) && !store.delivery }">
             <div>
               <template v-if="store.check">
-                <h3 class="mt-[26px] mb-[9px] text-xs font-[650] text-muted">
-                  Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code>
+                <h3 class="mt-[26px] mb-[9px] flex items-center gap-3 text-xs font-[650] text-muted">
+                  <span class="min-w-0">Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code></span>
+                  <button
+                    v-if="!store.delivery"
+                    type="button"
+                    class="ml-auto shrink-0 cursor-pointer font-semibold text-accent hover:underline underline-offset-4"
+                    aria-label="Edit values"
+                    @click="startOver"
+                  >Edit</button>
                 </h3>
                 <DiffBlocks :before="store.check.result.before" :after="store.check.result.after" />
               </template>

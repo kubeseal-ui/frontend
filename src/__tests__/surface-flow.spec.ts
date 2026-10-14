@@ -517,8 +517,8 @@ describe('the surface', () => {
     const store = useSecretsStore(pinia)
     expect(store.review).not.toBeNull()
 
-    // The rail's Edit stop is the only way back now that the bar carries nothing but the next
-    // press, so it is the one the operator reaches the rows through.
+    // The rail's Edit stop and the fold heading's Edit are both ways back now that the bar carries
+    // nothing but the next press. This is the rail's.
     await wrapper.find('nav[aria-label="Workflow progress"]')
       .findAll('button').find((candidate) => candidate.text() === 'Edit')!.trigger('click')
     await flushPromises()
@@ -527,6 +527,35 @@ describe('the surface', () => {
     expect(store.review).toBeNull()
     expect(wrapper.findAll('button').map((candidate) => candidate.text())).toContain('Review change')
     expect((wrapper.find('input[aria-label="Replacement value for password"]').element as HTMLInputElement).value).toBe('rotated')
+  })
+
+  it('puts the create form’s own Edit on the fold that would drop the review', async () => {
+    posts(DIFF, DIFF)
+    const { wrapper } = await mountSurface(detail())
+    await flushPromises()
+
+    const store = stageEdit(useSecretsStore(pinia))
+    await store.reviewChange()
+    await flushPromises()
+
+    // Beside the ciphertext it would drop, not only on the rail: the heading naming what the review
+    // holds carries the way back, in the same accent the create form's folded row gives its Edit, so
+    // both paths offer one control in the same place for the same move.
+    const review = wrapper.findAll('h3').find((candidate) => candidate.text().includes('Review ·'))!
+    await review.find('button').trigger('click')
+    await flushPromises()
+    expect(store.review).toBeNull()
+
+    // The check then supersedes the review and shuts its fold. A shut fold keeps its children
+    // mounted, so an Edit left in it would be a tab stop on a panel nobody can see. Exactly one
+    // carries the way back, and it is the one in the fold that is open.
+    await store.reviewChange()
+    store.check = { yaml: 'cipher-patched', checksum: '', result: CHECKED, idempotencyKey: 'k' }
+    await flushPromises()
+
+    const edits = wrapper.findAll('button[aria-label="Edit values"]')
+    expect(edits).toHaveLength(1)
+    expect(edits[0].element.closest('h3')!.textContent).toContain('Check')
   })
 
   it('drops a stale review when a row is edited after reviewing', async () => {

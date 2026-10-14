@@ -329,7 +329,7 @@ onUnmounted(() => { yaml.value = '' })
         <button
           ref="toggle"
           type="button"
-          class="cursor-pointer font-semibold text-accent hover:underline"
+          class="cursor-pointer font-semibold text-accent hover:underline underline-offset-4"
           @click="edit"
         >Edit</button>
       </span>
