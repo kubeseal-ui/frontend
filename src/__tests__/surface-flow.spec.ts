@@ -449,7 +449,7 @@ describe('the surface', () => {
     }))
   }
 
-  it('offers Sync anyway when Git moved past the cluster, and says what pressing it discards', async () => {
+  it('relabels the control Sync anyway when Git moved past the cluster', async () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'diverged', git_moved_ahead: true }) }))
     await flushPromises()
 
@@ -529,7 +529,7 @@ describe('the surface', () => {
     expect(dialog()).not.toBeNull()
     // Both sides, not a description of them: the file as Git holds it, and the manifest replacing it.
     expect(dialog()!.textContent).toContain('In Git now')
-    expect(dialog()!.textContent).toContain('From the cluster — what gets written')
+    expect(dialog()!.textContent).toContain('From the cluster: what gets written')
     expect(dialog()!.textContent).toContain('team: payments')
     expect(dialog()!.textContent).toContain('clusters/payments/api.yaml on main')
   })

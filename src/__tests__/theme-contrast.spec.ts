@@ -7,7 +7,9 @@
 // The redesign retired the glass material, and the composite sampling that used to live
 // at the foot of this file went with it: with no translucent fill and no ambient wash,
 // every text token sits on a solid palette colour, so the pairs below are the whole
-// guarantee rather than one half of one.
+// guarantee rather than one half of one. The one translucent surface since added — the
+// sync dialog's .glass-panel — composites toward --app-bg, and its worst text pair over the
+// three surfaces a page can be is 5.21:1, still above the 4.5:1 floor these pairs hold it to.
 //
 // --app-faint is deliberately NOT in textPairs. It is the decorative step — the concealed
 // dots, the keycap glyph, a keyline — and it is held below AA on purpose so it recedes.

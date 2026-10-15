@@ -189,7 +189,7 @@ async function refresh() {
 
       <AppEmpty
         v-else-if="!secrets.loading && secrets.namespaces.length === 0"
-        description="No authorized namespaces. Your account has authenticated, but no namespace grants it a capability yet — ask an administrator to map one."
+        description="No authorized namespaces. Your account has authenticated, but no namespace grants it a capability yet. Ask an administrator to map one."
       />
     </div>
 

@@ -540,7 +540,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">
               Writing to <span class="font-mono text-ink">{{ confirmWhere }}</span> replaces it with the
               manifest below.
-              <template v-if="gitMovedAhead">Git's version is not in the right column — it will be gone.</template>
+              <template v-if="gitMovedAhead">Git's version is not in the right column. It will be gone.</template>
             </p>
           </div>
 
@@ -549,7 +549,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
               :before="confirmGitCopy"
               :after="confirmManifest"
               before-label="In Git now"
-              after-label="From the cluster — what gets written"
+              after-label="From the cluster: what gets written"
             />
           </div>
 

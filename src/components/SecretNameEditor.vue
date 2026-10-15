@@ -73,7 +73,7 @@ const destination = computed(() => {
 // different thing from any allowed directory, since only it carries the namespace default.
 const defaultDirectory = computed(() => templateDirectory(pathTemplate.value, props.namespace))
 const pathOptions = computed(() => [
-  { label: defaultDirectory.value ? `${defaultDirectory.value}/ — the namespace default` : 'The namespace default', value: '' },
+  { label: defaultDirectory.value ? `${defaultDirectory.value}/ (the namespace default)` : 'The namespace default', value: '' },
   ...directories.value.filter((directory) => directory !== `${defaultDirectory.value}/`).map((directory) => ({ label: directory, value: directory })),
 ])
 
