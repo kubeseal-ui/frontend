@@ -13,6 +13,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8')
+const favicon = readFileSync(resolve(process.cwd(), 'public/favicon.svg'), 'utf8')
 
 /** The colour declarations in a block; hex and rgb() forms both count. */
 function tokens(block: string): Record<string, string> {
@@ -78,5 +79,32 @@ describe('palette parity', () => {
     const referenced = new Set([...css.matchAll(/var\((--[a-z-]+)\)/g)].map((match) => match[1]))
     expect(referenced.size).toBeGreaterThan(0)
     for (const token of referenced) expect([...declared]).toContain(token)
+  })
+})
+
+describe('the favicon mark', () => {
+  // The mark is a third copy of the accent pair. It cannot reference the tokens — a favicon is
+  // its own document, rendered against the browser chrome rather than the page — so the copies
+  // are literal and this file is what stops them drifting.
+  const markLight = tokens(favicon.slice(0, favicon.indexOf('@media')))
+  const markDark = tokens(
+    favicon.match(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([^}]*)\}/)?.[1] ?? '',
+  )
+
+  it('stays well-formed XML: an XML comment may not contain a double hyphen', () => {
+    // The mark is served as image/svg+xml, which the browser parses as strict XML. A stray `--`
+    // in a comment — the obvious way to name a custom property in prose — voids the whole
+    // document, and the failure is silent: the tab simply shows no icon.
+    const comments = [...favicon.matchAll(/<!--([\s\S]*?)-->/g)].map((match) => match[1])
+    expect(comments.length).toBeGreaterThan(0)
+    for (const body of comments) expect(body).not.toContain('--')
+  })
+
+  it('keeps the mark on the light accent pair', () => {
+    expect(markLight).toEqual({ '--mark-bg': light['--app-accent'], '--mark-fg': light['--app-accent-ink'] })
+  })
+
+  it('keeps the mark on the dark accent pair', () => {
+    expect(markDark).toEqual({ '--mark-bg': darkMedia['--app-accent'], '--mark-fg': darkMedia['--app-accent-ink'] })
   })
 })

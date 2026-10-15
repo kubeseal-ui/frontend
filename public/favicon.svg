@@ -1,11 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="kubeseal-ui">
   <title>kubeseal-ui</title>
-  <!-- The tab strip belongs to the browser, not the app, so the mark carries its own two themes
-       instead of inheriting --app-accent. The values are that token's light and dark forms. -->
+  <!-- The tab strip belongs to the browser, not the app, so this document cannot read the accent
+       custom properties. These are literal copies of the light and dark accent pair, pinned to the
+       palette by palette.spec.ts. An XML comment may not contain a double hyphen. -->
   <style>
-    :root { --mark-bg: #2f5fd0; --mark-fg: #ffffff; }
+    :root { --mark-bg: #3b4fd8; --mark-fg: #ffffff; }
     @media (prefers-color-scheme: dark) {
-      :root { --mark-bg: #9db9ff; --mark-fg: #11151e; }
+      :root { --mark-bg: #7f95ff; --mark-fg: #0b0e15; }
     }
   </style>
   <rect width="64" height="64" rx="14" fill="var(--mark-bg)"/>
