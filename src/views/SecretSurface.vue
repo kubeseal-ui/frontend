@@ -400,13 +400,18 @@ watch([() => route.params.namespace, () => route.params.name], load)
                say almost the same thing; once the check lands it supersedes the review, so the
                review folds away and the check takes its place. Because only one is ever open, the
                open one carries the way back: an Edit in its heading, the same control — and the
-               same accent — as the create form's folded row. Each is rendered only while its own
-               fold is open, because a shut fold keeps its children mounted and a tab stop on a
-               panel nobody can see is a trap. -->
+               same accent — as the create form's folded row.
+               The heading is keylined like that row too. The two stages are the same moment in the
+               same product, and the create flow puts its bar around the line bearing Edit rather
+               than leaving it as prose; a heading here would be the one place the way back is not
+               dressed the way the other flow dresses it. This is not the create bar's content —
+               that bar names the Secret, and the page header above already does here — only its
+               shape. Each is rendered only while its own fold is open, because a shut fold keeps
+               its children mounted and a tab stop on a panel nobody can see is a trap. -->
           <div class="fold" ref="reviewFold" :class="{ open: Boolean(store.review) && !store.check }">
             <div>
               <template v-if="store.review">
-                <h3 class="mt-[26px] mb-[9px] flex items-center gap-3 text-xs font-[650] text-muted">
+                <h3 class="mt-[26px] mb-4 flex flex-wrap items-center gap-3 rounded-control border border-border bg-surface px-3 py-[9px] text-xs font-[650] text-muted">
                   <span class="min-w-0">Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code></span>
                   <button
                     v-if="!store.check"
@@ -424,7 +429,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <div class="fold" ref="checkFold" :class="{ open: Boolean(store.check) && !store.delivery }">
             <div>
               <template v-if="store.check">
-                <h3 class="mt-[26px] mb-[9px] flex items-center gap-3 text-xs font-[650] text-muted">
+                <h3 class="mt-[26px] mb-4 flex flex-wrap items-center gap-3 rounded-control border border-border bg-surface px-3 py-[9px] text-xs font-[650] text-muted">
                   <span class="min-w-0">Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code></span>
                   <button
                     v-if="!store.delivery"
