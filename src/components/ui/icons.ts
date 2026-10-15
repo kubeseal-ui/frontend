@@ -37,6 +37,11 @@ export const ICONS = {
   // A block of text rather than a paragraph mark: at 13px a pilcrow's bowl fills in, and the
   // uneven rules are what make it read as many lines instead of a list.
   lines: ['M3.5 6.5h17', 'M3.5 12h11', 'M3.5 17.5h14'],
+  // Corners out and in: the pair behind the full-screen value field, `expand` on the row that
+  // opens it and `collapse` inside the overlay that closes it, so each control names the change
+  // it makes rather than both wearing an x.
+  expand: ['M15 3h6v6', 'M9 21H3v-6', 'M21 3l-7 7', 'M3 21l7-7'],
+  collapse: ['M4 14h6v6', 'M20 10h-6V4', 'M14 10l7 7', 'M3 21l7-7'],
   eye: ['M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
   'eye-off': [
     'M2.5 12S6 5.5 12 5.5a10 10 0 0 1 4.3 1',

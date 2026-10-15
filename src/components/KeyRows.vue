@@ -40,6 +40,48 @@ const canConceal = typeof CSS !== 'undefined' && typeof CSS.supports === 'functi
  *  than `!== ''` because a row that has just opened has no entry in `replacements` at all — the box
  *  renders empty, so the test has to be for a value rather than for the string that is not there. */
 const concealed = (id: string, value: string | undefined) => Boolean(multiline[id]) && canConceal && !peek[id] && Boolean(value)
+/** The value field opened to fill the screen, one at a time. The binding is a pair of closures
+ *  rather than a copy of the value, so the overlay edits the same string the row holds and
+ *  closing can never fork it. */
+const fullscreen = ref<{ id: string; label: string; get: () => string; set: (value: string) => void } | null>(null)
+const fullscreenValue = computed({
+  get: () => fullscreen.value?.get() ?? '',
+  set: (value: string) => { fullscreen.value?.set(value) },
+})
+const overlay = ref<HTMLElement | null>(null)
+const fullscreenInput = ref<HTMLTextAreaElement | null>(null)
+let fullscreenReturn: HTMLElement | null = null
+
+async function openFullscreen(id: string, label: string, get: () => string, set: (value: string) => void) {
+  fullscreenReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  fullscreen.value = { id, label, get, set }
+  await nextTick()
+  fullscreenInput.value?.focus()
+}
+
+// Focus returns to the control that opened the field, the way it returns to the row Change
+// opened; a row discarded while its field held the screen has no control left, and then nowhere.
+function closeFullscreen() {
+  fullscreen.value = null
+  fullscreenReturn?.focus()
+  fullscreenReturn = null
+}
+
+// Tab stays inside the overlay: the page behind it is not reachable while the field holds the
+// screen, so cycling off either end wraps instead of escaping.
+function trapTab(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || !overlay.value) return
+  const focusable = Array.from(overlay.value.querySelectorAll<HTMLElement>('button, textarea'))
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) { last.focus(); event.preventDefault() }
+  else if (!event.shiftKey && document.activeElement === last) { first.focus(); event.preventDefault() }
+}
+
+// The page behind the overlay is still there; only the field holds the screen.
+watch(fullscreen, (open) => { document.body.style.overflow = open ? 'hidden' : '' })
+
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const error = ref('')
@@ -129,7 +171,10 @@ async function addRow() {
 
 function removeAdded(index: number) {
   const [row] = added.value.splice(index, 1)
-  if (row) { delete shown[addedRowId(row)]; delete peek[addedRowId(row)]; delete multiline[addedRowId(row)] }
+  if (row) {
+    if (fullscreen.value?.id === addedRowId(row)) fullscreen.value = null
+    delete shown[addedRowId(row)]; delete peek[addedRowId(row)]; delete multiline[addedRowId(row)]
+  }
 }
 
 const setAddInput = (id: number, element: unknown) => { addInputs.value[id] = element instanceof HTMLInputElement ? element : null }
@@ -137,9 +182,11 @@ const setRow = (key: string, element: unknown) => { rows.value[key] = element in
 
 function clear(key?: string) {
   if (key) {
+    if (fullscreen.value?.id === stagedRowId(key)) fullscreen.value = null
     delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
     delete shown[stagedRowId(key)]; delete peek[stagedRowId(key)]; delete multiline[stagedRowId(key)]
   } else {
+    fullscreen.value = null
     for (const bag of [revealed, replacements, operation, editing, shown, peek, multiline]) {
       Object.keys(bag).forEach((item) => delete bag[item])
     }
@@ -374,7 +421,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   autocomplete="off"
                   spellcheck="false"
                   :class="concealed(stagedRowId(key), replacements[key]) ? 'conceal' : ''"
-                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[62px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
                 />
                 <input
                   v-else
@@ -389,13 +436,24 @@ defineExpose({ batchProblem, showProblems, clear })
                   spellcheck="false"
                   class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
                 />
+                <!-- In the opened box the three field controls line up along the top edge, where
+                     the eye already sat, instead of floating mid-text; the one-line input keeps
+                     its vertically centred pair. -->
                 <button
                   type="button"
                   :aria-label="multiline[stagedRowId(key)] ? `Use a one-line field for ${key}` : `Use a multi-line field for ${key}`"
                   :aria-pressed="!!multiline[stagedRowId(key)]"
-                  class="absolute top-1/2 right-[34px] inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  :class="multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
+                  class="absolute right-[34px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
                   @click="multiline[stagedRowId(key)] = !multiline[stagedRowId(key)]"
                 ><AppIcon name="lines" :size="13" /></button>
+                <button
+                  v-if="multiline[stagedRowId(key)]"
+                  type="button"
+                  :aria-label="`Open the replacement value for ${key} in a full-screen field`"
+                  class="absolute top-1.5 right-[62px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  @click="openFullscreen(stagedRowId(key), `Replacement value for ${key}`, () => replacements[key] ?? '', (value) => { replacements[key] = value })"
+                ><AppIcon name="expand" :size="13" /></button>
                 <button
                   v-if="!multiline[stagedRowId(key)] || canConceal"
                   type="button"
@@ -444,7 +502,7 @@ defineExpose({ batchProblem, showProblems, clear })
             autocomplete="off"
             spellcheck="false"
             :class="concealed(addedRowId(row), row.value) ? 'conceal' : ''"
-            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[62px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
           />
           <input
             v-else
@@ -462,9 +520,17 @@ defineExpose({ batchProblem, showProblems, clear })
             type="button"
             :aria-label="multiline[addedRowId(row)] ? `Use a one-line field for new key ${index + 1}` : `Use a multi-line field for new key ${index + 1}`"
             :aria-pressed="!!multiline[addedRowId(row)]"
-            class="absolute top-1/2 right-[34px] inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            :class="multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
+            class="absolute right-[34px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="multiline[addedRowId(row)] = !multiline[addedRowId(row)]"
           ><AppIcon name="lines" :size="13" /></button>
+          <button
+            v-if="multiline[addedRowId(row)]"
+            type="button"
+            :aria-label="`Open the new key value ${index + 1} in a full-screen field`"
+            class="absolute top-1.5 right-[62px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            @click="openFullscreen(addedRowId(row), `New key value ${index + 1}`, () => row.value, (value) => { row.value = value })"
+          ><AppIcon name="expand" :size="13" /></button>
           <button
             v-if="!multiline[addedRowId(row)] || canConceal"
             type="button"
@@ -497,5 +563,54 @@ defineExpose({ batchProblem, showProblems, clear })
       <AppIcon name="plus" :size="13" />
       Add a key
     </button>
+
+    <!-- The same field with the screen to itself: the value, its mask, and its eye travel with it
+         unchanged — the overlay edits the string the row holds through the closures it was opened
+         with — and closing hands focus back to the control that opened it. Solid backdrop, one
+         border, no lift: the design's rules do not loosen for taking up more room. -->
+    <Teleport to="body">
+      <div
+        v-if="fullscreen"
+        ref="overlay"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="fullscreen.label"
+        class="fixed inset-0 z-40 flex flex-col bg-bg p-4 sm:p-6"
+        @keydown.esc.prevent="closeFullscreen"
+        @keydown="trapTab"
+      >
+        <div class="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-2">
+          <div class="flex items-center justify-between gap-3">
+            <span class="font-mono text-[13px] text-muted">{{ fullscreen.label }}</span>
+            <div class="flex items-center gap-[3px]">
+              <button
+                v-if="canConceal"
+                type="button"
+                :aria-label="peek[fullscreen.id] ? 'Hide the value' : 'Show the value'"
+                :aria-pressed="!!peek[fullscreen.id]"
+                class="inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                @click="peek[fullscreen.id] = !peek[fullscreen.id]"
+              ><AppIcon :name="peek[fullscreen.id] ? 'eye-off' : 'eye'" :size="13" /></button>
+              <button
+                type="button"
+                aria-label="Close the full-screen field"
+                class="inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                @click="closeFullscreen"
+              ><AppIcon name="collapse" :size="13" /></button>
+            </div>
+          </div>
+          <textarea
+            ref="fullscreenInput"
+            v-model="fullscreenValue"
+            :aria-label="fullscreen.label"
+            placeholder="Value"
+            autocomplete="off"
+            spellcheck="false"
+            :class="concealed(fullscreen.id, fullscreenValue) ? 'conceal' : ''"
+            class="min-h-0 w-full flex-1 resize-none rounded-card border border-border-strong bg-surface p-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+          />
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
