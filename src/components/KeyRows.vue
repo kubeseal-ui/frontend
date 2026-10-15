@@ -42,17 +42,19 @@ const canConceal = typeof CSS !== 'undefined' && typeof CSS.supports === 'functi
 const concealed = (id: string, value: string | undefined) => Boolean(multiline[id]) && canConceal && !peek[id] && Boolean(value)
 /** The value field opened to fill the screen, one at a time. The binding is a pair of closures
  *  rather than a copy of the value, so the overlay edits the same string the row holds and
- *  closing can never fork it. */
-const fullscreen = ref<{ id: string; label: string; get: () => string; set: (value: string) => void } | null>(null)
+ *  closing can never fork it. A null `set` is a read-only overlay: a revealed value has no
+ *  string to write back to, so its expansion is a bigger look at the same plaintext, not a
+ *  second place to edit one. */
+const fullscreen = ref<{ id: string; label: string; get: () => string; set: ((value: string) => void) | null } | null>(null)
 const fullscreenValue = computed({
   get: () => fullscreen.value?.get() ?? '',
-  set: (value: string) => { fullscreen.value?.set(value) },
+  set: (value: string) => { fullscreen.value?.set?.(value) },
 })
 const overlay = ref<HTMLElement | null>(null)
 const fullscreenInput = ref<HTMLTextAreaElement | null>(null)
 let fullscreenReturn: HTMLElement | null = null
 
-async function openFullscreen(id: string, label: string, get: () => string, set: (value: string) => void) {
+async function openFullscreen(id: string, label: string, get: () => string, set: ((value: string) => void) | null) {
   fullscreenReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null
   fullscreen.value = { id, label, get, set }
   await nextTick()
@@ -116,6 +118,7 @@ let nextRowId = 0
 const shown = reactive<Record<string, boolean>>({})
 const stagedRowId = (key: string) => `key-${key}`
 const addedRowId = (row: { id: number }) => `add-${row.id}`
+const revealRowId = (key: string) => `reveal-${key}`
 
 // Leaving the row is what turns its problems on. Moving between the row's own fields is not
 // leaving it, so tabbing from the name to the value does not answer a value not yet typed.
@@ -140,7 +143,10 @@ async function reveal(key: string) {
 }
 
 /** Drops the plaintext this page is holding; the Secret itself is untouched. */
-function conceal(key: string) { delete revealed[key] }
+function conceal(key: string) {
+  if (fullscreen.value?.id === revealRowId(key)) fullscreen.value = null
+  delete revealed[key]
+}
 
 // Focus follows the row that was just opened. Change is the button that opened it and is gone
 // the moment it is pressed, so without this focus falls to the body and the keyboard user tabs
@@ -182,7 +188,7 @@ const setRow = (key: string, element: unknown) => { rows.value[key] = element in
 
 function clear(key?: string) {
   if (key) {
-    if (fullscreen.value?.id === stagedRowId(key)) fullscreen.value = null
+    if (fullscreen.value?.id === stagedRowId(key) || fullscreen.value?.id === revealRowId(key)) fullscreen.value = null
     delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
     delete shown[stagedRowId(key)]; delete peek[stagedRowId(key)]; delete multiline[stagedRowId(key)]
   } else {
@@ -315,8 +321,18 @@ defineExpose({ batchProblem, showProblems, clear })
             aria-readonly="true"
             tabindex="0"
             :aria-label="`Revealed value for ${key}`"
-            class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised px-2.5 py-1 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
+            class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised py-1 pr-9 pl-2.5 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
           >{{ revealed[key] }}</div>
+          <!-- A revealed value is the same plaintext the row already holds, so the same control
+               opens it to the screen; the overlay is read-only there, since a reveal is a look
+               and has no string to write back to. -->
+          <button
+            v-if="hasRevealed(key)"
+            type="button"
+            :aria-label="`Open the revealed value for ${key} in a full-screen field`"
+            class="absolute top-1 right-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            @click="openFullscreen(revealRowId(key), `Revealed value for ${key}`, () => revealed[key] ?? '', null)"
+          ><AppIcon name="expand" :size="13" /></button>
           <!-- A reveal is one decryption and one audit event, and the row says what it is waiting
                for rather than leaving the dots in place as if nothing had been asked. Announced,
                because the press that started it is disabled while it runs. -->
@@ -584,7 +600,7 @@ defineExpose({ batchProblem, showProblems, clear })
             <span class="font-mono text-[13px] text-muted">{{ fullscreen.label }}</span>
             <div class="flex items-center gap-[3px]">
               <button
-                v-if="canConceal"
+                v-if="canConceal && fullscreen.set"
                 type="button"
                 :aria-label="peek[fullscreen.id] ? 'Hide the value' : 'Show the value'"
                 :aria-pressed="!!peek[fullscreen.id]"
@@ -602,11 +618,12 @@ defineExpose({ batchProblem, showProblems, clear })
           <textarea
             ref="fullscreenInput"
             v-model="fullscreenValue"
+            :readonly="!fullscreen.set"
             :aria-label="fullscreen.label"
             placeholder="Value"
             autocomplete="off"
             spellcheck="false"
-            :class="concealed(fullscreen.id, fullscreenValue) ? 'conceal' : ''"
+            :class="[concealed(fullscreen.id, fullscreenValue) ? 'conceal' : '', fullscreen.set ? '' : 'cursor-default']"
             class="min-h-0 w-full flex-1 resize-none rounded-card border border-border-strong bg-surface p-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
           />
         </div>
