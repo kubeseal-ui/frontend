@@ -36,8 +36,10 @@ const multiline = reactive<Record<string, boolean>>({})
 // usable and simply does not offer the eye, rather than promising a concealment it cannot draw.
 const canConceal = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('-webkit-text-security', 'disc')
 /** The mask is for a value, not for the field: the property stipples the placeholder too, and an
- *  empty multi-line box rendered as dots reads as one that already holds something. */
-const concealed = (id: string, value: string) => Boolean(multiline[id]) && canConceal && !peek[id] && value !== ''
+ *  empty multi-line box rendered as dots reads as one that already holds something. `Boolean` rather
+ *  than `!== ''` because a row that has just opened has no entry in `replacements` at all — the box
+ *  renders empty, so the test has to be for a value rather than for the string that is not there. */
+const concealed = (id: string, value: string | undefined) => Boolean(multiline[id]) && canConceal && !peek[id] && Boolean(value)
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const error = ref('')
