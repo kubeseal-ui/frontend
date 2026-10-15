@@ -110,16 +110,41 @@ function nameLine(secretName: string): string {
   return secretName === '' ? '""' : secretName
 }
 
-// The name line is found after `metadata:`, so a key called `name` in stringData is never
-// the line that moves. A document that no longer reads as the value last rendered here
-// has been edited by hand and is left alone.
+// The line of `metadata.name`, or -1 when the document carries none. Scoped to the metadata block —
+// from `metadata:` to the first line that is not indented under it — so a key called `name` in
+// `stringData` is neither read nor moved, and located by line rather than by substring, so a name
+// that happens to prefix a longer one is never spliced into the middle of it.
+function nameLineIndex(doc: string): number {
+  const lines = doc.split('\n')
+  let index = lines.indexOf('metadata:')
+  if (index === -1) return -1
+  for (index += 1; index < lines.length; index++) {
+    const line = lines[index]
+    if (line.trim() === '') continue
+    if (!line.startsWith('  ')) return -1
+    if (line.startsWith('  name: ')) return index
+  }
+  return -1
+}
+
+/** What the manifest says the Secret is called, or null when it does not say. */
+function nameInManifest(doc: string): string | null {
+  const index = nameLineIndex(doc)
+  if (index === -1) return null
+  const value = doc.split('\n')[index].slice('  name: '.length).trim()
+  return value === '""' ? '' : value
+}
+
+// A line that no longer holds the name last rendered here was written by hand, and moving it is
+// not this function's to decide — the field is brought to the document instead, by the watcher
+// below. What it will never do is rewrite a line it only partly recognises.
 function rewriteTemplateName(doc: string, previous: string, next: string): string | null {
-  const anchor = doc.indexOf('\nmetadata:')
-  if (anchor === -1) return null
-  const from = `  name: ${nameLine(previous)}`
-  const at = doc.indexOf(from, anchor)
-  if (at === -1) return null
-  return `${doc.slice(0, at)}  name: ${nameLine(next)}${doc.slice(at + from.length)}`
+  const index = nameLineIndex(doc)
+  if (index === -1) return null
+  const lines = doc.split('\n')
+  if (lines[index] !== `  name: ${nameLine(previous)}`) return null
+  lines[index] = `  name: ${nameLine(next)}`
+  return lines.join('\n')
 }
 
 // `renderedName` is what lets a re-seed tell "still mine" from "taken over".
@@ -231,11 +256,28 @@ function seedTemplateIfUntouched() {
   if (yaml.value === '' || yaml.value === templateFor(renderedName.value, props.namespace)) seedTemplate()
 }
 
-// A document the operator wrote or pasted is never rewritten by a keystroke here.
+// The Name field and the manifest's own `name` line are one value seen twice, and the one the
+// operator wrote last is the one that holds. Both directions are load-bearing: the server refuses a
+// manifest whose `metadata.name` disagrees with the request carrying it, so two copies that have
+// drifted apart are not a warning but a refused press, answered with a sentence about the manifest
+// rather than about the field the operator is looking at.
+//
+// The reverse direction is also what makes adopt mode's instruction — paste the output, then give
+// the name it already contains — something the operator does once. It is read from the document
+// rather than remembered from the last keystroke here, so writing a name into the manifest by hand
+// is a normal way to name the Secret rather than the thing that quietly ends the synchronisation.
 watch(name, (next) => {
+  if (next === renderedName.value) return
   const rewritten = rewriteTemplateName(yaml.value, renderedName.value, next)
   renderedName.value = next
   if (rewritten !== null) yaml.value = rewritten
+})
+
+watch(yaml, (doc) => {
+  const found = nameInManifest(doc)
+  if (found === null || found === renderedName.value) return
+  renderedName.value = found
+  name.value = found
 })
 
 // The two sources want different boxes — a template to fill in, or an empty one to paste

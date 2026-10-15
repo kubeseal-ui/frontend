@@ -351,6 +351,44 @@ describe('the create path', () => {
     expect(wrapper.text()).not.toContain('Delivered. Encrypt another manifest')
   })
 
+  // The Name field and the manifest's own `name` line are one value in two places, and the server
+  // refuses a manifest whose name disagrees with the request carrying it. Both directions are pinned
+  // here, because a form that only ever wrote one of them left the operator holding two names and a
+  // refusal that talks about the manifest rather than about the field they were typing in.
+  it('takes the name from the manifest when it is written there', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    await wrapper.find('textarea').setValue('apiVersion: v1\nkind: Secret\nmetadata:\n  name: pasted-name\nstringData:\n  key: "v"\n')
+    await flushPromises()
+
+    expect((wrapper.find('input[aria-label="New secret name"]').element as HTMLInputElement).value).toBe('pasted-name')
+  })
+
+  it('writes the name back into a manifest that was edited by hand', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    await wrapper.find('textarea').setValue('apiVersion: v1\nkind: Secret\nmetadata:\n  name: asdasdgh\nstringData:\n  key: "v"\n')
+    await flushPromises()
+
+    // A name that is a prefix of the one in the box. A rewrite searching for the shorter string
+    // finds it at the head of the longer one and splices into it, leaving `asdasdq`.
+    await wrapper.find('input[aria-label="New secret name"]').setValue('asdasd')
+    await flushPromises()
+
+    const written = (wrapper.find('textarea').element as HTMLTextAreaElement).value
+    expect(written).toContain('\n  name: asdasd\n')
+    expect(written).not.toContain('asdasdgh')
+  })
+
+  it('does not read a key called name out of stringData', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    await wrapper.find('textarea').setValue('apiVersion: v1\nkind: Secret\nmetadata:\n  namespace: payments\nstringData:\n  name: "not-the-secret-name"\n')
+    await flushPromises()
+
+    // metadata carries no name, so there is nothing to take and nothing to move. The key below it
+    // is a value the operator is sealing, not the Secret's name in a second place.
+    expect((wrapper.find('input[aria-label="New secret name"]').element as HTMLInputElement).value).toBe('')
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toContain('  name: "not-the-secret-name"')
+  })
+
   // A new Secret has no file in Git to diff against, so a passing dry-run must say so rather than
   // only relabelling the button from Check to Deliver.
   it('confirms the dry-run passed, advancing the rail and stating the result', async () => {

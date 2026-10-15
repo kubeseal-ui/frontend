@@ -411,7 +411,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <div class="fold" ref="reviewFold" :class="{ open: Boolean(store.review) && !store.check }">
             <div>
               <template v-if="store.review">
-                <h3 class="mt-[26px] mb-4 flex flex-wrap items-center gap-3 rounded-control border border-border bg-surface px-3 py-[9px] text-xs font-[650] text-muted">
+                <h3 class="mt-[26px] mb-4 flex flex-wrap items-center gap-2.5 rounded-control border border-border bg-surface px-3 py-[9px] text-xs font-[650] text-muted">
                   <span class="min-w-0">Review · <code v-for="(m, i) in store.review.mutations" :key="m.key" class="font-mono font-medium text-ink">{{ i ? ', ' : '' }}{{ m.operation }} {{ m.key }}</code></span>
                   <button
                     v-if="!store.check"
@@ -429,7 +429,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <div class="fold" ref="checkFold" :class="{ open: Boolean(store.check) && !store.delivery }">
             <div>
               <template v-if="store.check">
-                <h3 class="mt-[26px] mb-4 flex flex-wrap items-center gap-3 rounded-control border border-border bg-surface px-3 py-[9px] text-xs font-[650] text-muted">
+                <h3 class="mt-[26px] mb-4 flex flex-wrap items-center gap-2.5 rounded-control border border-border bg-surface px-3 py-[9px] text-xs font-[650] text-muted">
                   <span class="min-w-0">Check · <code class="font-mono font-medium text-ink">{{ store.check.result.path }}</code></span>
                   <button
                     v-if="!store.delivery"
