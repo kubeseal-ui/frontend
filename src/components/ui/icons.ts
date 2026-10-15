@@ -34,6 +34,9 @@ export const ICONS = {
     'M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
   ],
   search: ['M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z', 'm16.2 16.2 4.3 4.3'],
+  // A block of text rather than a paragraph mark: at 13px a pilcrow's bowl fills in, and the
+  // uneven rules are what make it read as many lines instead of a list.
+  lines: ['M3.5 6.5h17', 'M3.5 12h11', 'M3.5 17.5h14'],
   eye: ['M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
   'eye-off': [
     'M2.5 12S6 5.5 12 5.5a10 10 0 0 1 4.3 1',

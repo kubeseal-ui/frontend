@@ -351,6 +351,90 @@ describe('the value being staged', () => {
     expect(wrapper.find('input[aria-label="New key value 1"]').attributes('type')).toBe('password')
     expect(button(wrapper, 'Show the new key value 1')).toBeDefined()
   })
+
+  // A private key, a kubeconfig, and a config file are staged here as often as a password is, and
+  // no `<input>` can hold one: HTML strips CR and LF from both `type=password` and `type=text`, so
+  // a pasted block arrives silently joined into a single line. These are the assertions that fail
+  // if either field is ever narrowed back to an input.
+  it('stages a multi-line value with its newlines intact', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
+
+    // The default is unchanged: the row opens on the native password field.
+    expect(wrapper.find('input[aria-label="Replacement value for password"]').exists()).toBe(true)
+    await button(wrapper, 'Use a multi-line field for password')!.trigger('click')
+    await flushPromises()
+
+    const pem = '-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEA\n-----END OPENSSH PRIVATE KEY-----\n'
+    await wrapper.find('textarea[aria-label="Replacement value for password"]').setValue(pem)
+
+    expect(batch(wrapper)).toEqual([{ key: 'password', operation: 'replace', value: pem }])
+  })
+
+  it('carries a multi-line new key through to the batch, and forgets the shape with the row', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Add a key')!.trigger('click')
+    await flushPromises()
+    await button(wrapper, 'Use a multi-line field for new key 1')!.trigger('click')
+    await flushPromises()
+
+    const cert = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n'
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('tls.crt')
+    await wrapper.find('textarea[aria-label="New key value 1"]').setValue(cert)
+
+    expect(batch(wrapper)).toEqual([{ key: 'tls.crt', operation: 'add', value: cert }])
+
+    // Discarded and added again, the row is a new one: the shape belongs to the row that is gone
+    // rather than to the position in the list.
+    await button(wrapper, 'Remove new key 1')!.trigger('click')
+    await button(wrapper, 'Add a key')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[aria-label="New key value 1"]').exists()).toBe(true)
+    expect(wrapper.find('textarea[aria-label="New key value 1"]').exists()).toBe(false)
+  })
+
+  // The opened box is masked with `-webkit-text-security`, which happy-dom reports as supported
+  // unconditionally, so this branch is live here — and where a browser really lacks it the eye is
+  // withheld instead, which is KeyRows' decision rather than the field's.
+  it('conceals the opened box only once it holds something', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
+    await button(wrapper, 'Use a multi-line field for password')!.trigger('click')
+    await flushPromises()
+
+    const box = () => wrapper.find('textarea[aria-label="Replacement value for password"]')
+    // The property stipples the placeholder too, and an empty box drawn as dots reads as one that
+    // already holds a value.
+    expect(box().classes()).not.toContain('conceal')
+
+    await box().setValue('hunter2')
+    expect(box().classes()).toContain('conceal')
+
+    // The eye is what shows it, and it is still one press both ways.
+    await button(wrapper, 'Show the replacement value for password')!.trigger('click')
+    expect(box().classes()).not.toContain('conceal')
+  })
+
+  it('returns the row to its one-line field when the change is discarded', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
+    await button(wrapper, 'Use a multi-line field for password')!.trigger('click')
+    await flushPromises()
+    await button(wrapper, 'Discard the staged change to password')!.trigger('click')
+    await flushPromises()
+
+    await button(wrapper, 'Change password')!.trigger('click')
+    await flushPromises()
+
+    // Reopening is a new staging, so the row comes back with the native password field and its
+    // built-in masking rather than inheriting the last one's shape.
+    expect(wrapper.find('input[aria-label="Replacement value for password"]').attributes('type')).toBe('password')
+    expect(wrapper.find('textarea[aria-label="Replacement value for password"]').exists()).toBe(false)
+  })
 })
 
 describe('Remove', () => {

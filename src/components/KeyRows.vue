@@ -25,6 +25,19 @@ const editing = reactive<Record<string, boolean>>({})
  *  that decrypts one key for the audit trail, while a field the operator is typing into holds a
  *  value nothing else on the page can check, so unmasking it costs nothing and asks no capability. */
 const peek = reactive<Record<string, boolean>>({})
+/** Value fields opened out into a multi-line box. A private key, a kubeconfig, or a config file
+ *  cannot be staged in a single-line field at all — HTML strips newlines from `type=text` and
+ *  `type=password`, so a pasted value would arrive silently joined into one line — and nothing
+ *  here inspects the value to guess: `password` and a base64 blob are both long and one line,
+ *  while a two-line value can be deliberate, so only the operator knows which kind they hold. */
+const multiline = reactive<Record<string, boolean>>({})
+// `-webkit-text-security` is the only mask for a field that is not `type=password`, and it is
+// WebKit/Blink-only. Checked once at module scope: where it is missing the multi-line box stays
+// usable and simply does not offer the eye, rather than promising a concealment it cannot draw.
+const canConceal = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('-webkit-text-security', 'disc')
+/** The mask is for a value, not for the field: the property stipples the placeholder too, and an
+ *  empty multi-line box rendered as dots reads as one that already holds something. */
+const concealed = (id: string, value: string) => Boolean(multiline[id]) && canConceal && !peek[id] && value !== ''
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const error = ref('')
@@ -114,7 +127,7 @@ async function addRow() {
 
 function removeAdded(index: number) {
   const [row] = added.value.splice(index, 1)
-  if (row) { delete shown[addedRowId(row)]; delete peek[addedRowId(row)] }
+  if (row) { delete shown[addedRowId(row)]; delete peek[addedRowId(row)]; delete multiline[addedRowId(row)] }
 }
 
 const setAddInput = (id: number, element: unknown) => { addInputs.value[id] = element instanceof HTMLInputElement ? element : null }
@@ -123,9 +136,9 @@ const setRow = (key: string, element: unknown) => { rows.value[key] = element in
 function clear(key?: string) {
   if (key) {
     delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
-    delete shown[stagedRowId(key)]; delete peek[stagedRowId(key)]
+    delete shown[stagedRowId(key)]; delete peek[stagedRowId(key)]; delete multiline[stagedRowId(key)]
   } else {
-    for (const bag of [revealed, replacements, operation, editing, shown, peek]) {
+    for (const bag of [revealed, replacements, operation, editing, shown, peek, multiline]) {
       Object.keys(bag).forEach((item) => delete bag[item])
     }
     added.value = []
@@ -344,7 +357,25 @@ defineExpose({ batchProblem, showProblems, clear })
               />
 
               <span v-if="operationOf(key) !== 'delete'" class="relative block">
+                <!-- The same field, opened out: an operator staging a private key or a config file
+                     presses the lines control, and the value arrives with its newlines intact. The
+                     mask is CSS here because a textarea has no `type=password`. -->
+                <textarea
+                  v-if="multiline[stagedRowId(key)]"
+                  :id="`staged-input-${key}`"
+                  v-model="replacements[key]"
+                  rows="4"
+                  :aria-label="`Replacement value for ${key}`"
+                  :aria-invalid="existingProblem(key) ? 'true' : undefined"
+                  :aria-describedby="existingProblem(key) ? `staged-problem-${key}` : undefined"
+                  placeholder="New value"
+                  autocomplete="off"
+                  spellcheck="false"
+                  :class="concealed(stagedRowId(key), replacements[key]) ? 'conceal' : ''"
+                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[62px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+                />
                 <input
+                  v-else
                   :id="`staged-input-${key}`"
                   v-model="replacements[key]"
                   :type="peek[stagedRowId(key)] ? 'text' : 'password'"
@@ -354,13 +385,22 @@ defineExpose({ batchProblem, showProblems, clear })
                   placeholder="New value"
                   autocomplete="off"
                   spellcheck="false"
-                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-9 pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
                 />
                 <button
                   type="button"
+                  :aria-label="multiline[stagedRowId(key)] ? `Use a one-line field for ${key}` : `Use a multi-line field for ${key}`"
+                  :aria-pressed="!!multiline[stagedRowId(key)]"
+                  class="absolute top-1/2 right-[34px] inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  @click="multiline[stagedRowId(key)] = !multiline[stagedRowId(key)]"
+                ><AppIcon name="lines" :size="13" /></button>
+                <button
+                  v-if="!multiline[stagedRowId(key)] || canConceal"
+                  type="button"
                   :aria-label="peek[stagedRowId(key)] ? `Hide the replacement value for ${key}` : `Show the replacement value for ${key}`"
                   :aria-pressed="!!peek[stagedRowId(key)]"
-                  class="absolute top-1/2 right-1.5 inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  :class="multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
+                  class="absolute right-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
                   @click="peek[stagedRowId(key)] = !peek[stagedRowId(key)]"
                 ><AppIcon :name="peek[stagedRowId(key)] ? 'eye-off' : 'eye'" :size="13" /></button>
               </span>
@@ -391,7 +431,21 @@ defineExpose({ batchProblem, showProblems, clear })
           class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] text-ink placeholder:font-sans placeholder:text-faint"
         />
         <span class="relative block">
+          <textarea
+            v-if="multiline[addedRowId(row)]"
+            v-model="row.value"
+            rows="4"
+            :aria-label="`New key value ${index + 1}`"
+            :aria-invalid="addValueProblem(row) ? 'true' : undefined"
+            :aria-describedby="addValueProblem(row) ? `new-problem-${row.id}` : undefined"
+            placeholder="Value"
+            autocomplete="off"
+            spellcheck="false"
+            :class="concealed(addedRowId(row), row.value) ? 'conceal' : ''"
+            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[62px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+          />
           <input
+            v-else
             v-model="row.value"
             :type="peek[addedRowId(row)] ? 'text' : 'password'"
             :aria-label="`New key value ${index + 1}`"
@@ -400,13 +454,22 @@ defineExpose({ batchProblem, showProblems, clear })
             placeholder="Value"
             autocomplete="off"
             spellcheck="false"
-            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-9 pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
           />
           <button
             type="button"
+            :aria-label="multiline[addedRowId(row)] ? `Use a one-line field for new key ${index + 1}` : `Use a multi-line field for new key ${index + 1}`"
+            :aria-pressed="!!multiline[addedRowId(row)]"
+            class="absolute top-1/2 right-[34px] inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            @click="multiline[addedRowId(row)] = !multiline[addedRowId(row)]"
+          ><AppIcon name="lines" :size="13" /></button>
+          <button
+            v-if="!multiline[addedRowId(row)] || canConceal"
+            type="button"
             :aria-label="peek[addedRowId(row)] ? `Hide the new key value ${index + 1}` : `Show the new key value ${index + 1}`"
             :aria-pressed="!!peek[addedRowId(row)]"
-            class="absolute top-1/2 right-1.5 inline-flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            :class="multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
+            class="absolute right-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="peek[addedRowId(row)] = !peek[addedRowId(row)]"
           ><AppIcon :name="peek[addedRowId(row)] ? 'eye-off' : 'eye'" :size="13" /></button>
         </span>

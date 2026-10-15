@@ -207,6 +207,12 @@ button, a {
    document in the frame the operator asks for it to, plaintext not being something to animate. */
 .reveal-in { animation: mwipe var(--mo-reveal) var(--mo-out); }
 .sweep { animation: msweep var(--mo-reveal) var(--mo-out); }
+
+/* The multi-line value field's mask. `-webkit-text-security` is the only way to conceal a field
+   that is not `type=password`, and it is WebKit/Blink-only, so KeyRows offers the eye only where
+   `CSS.supports` confirms it: a mask that silently does nothing is worse than no mask, and the
+   plain input keeps the native password field everywhere. */
+.conceal { -webkit-text-security: disc; }
 .spin {
   display: inline-block; width: 11px; height: 11px; border-radius: 50%;
   border: 2px solid var(--app-border-strong); border-top-color: var(--app-accent);
