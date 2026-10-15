@@ -109,7 +109,7 @@ const idle = computed(() => {
   // A batch staged before drift arrived keeps its button, disabled: the alert above is what says
   // why, and a sentence here would hide that anything is staged at all.
   const withheldByDrift = !inSync.value && !(step.value === 'review' && batch.value.length > 0)
-  if (withheldByDrift) return 'Reveal and editing are disabled while the Git source is not confirmed in sync.'
+  if (withheldByDrift) return 'Reveal and editing are disabled while this Secret differs from Git.'
   if (step.value === 'review' && batch.value.length === 0) {
     // "Change, remove, or add a key" is only true when this page is offering those controls. Over
     // a Secret whose grants have withheld all three, it sends the operator looking for a button
@@ -351,8 +351,8 @@ watch([() => route.params.namespace, () => route.params.name], load)
               rel="noopener noreferrer"
               class="font-mono text-xs break-all text-accent no-underline hover:underline"
             >{{ syncOutcome?.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
-            <p v-if="!syncOutcome?.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
-              ArgoCD synchronization is not verified by this workflow.
+            <p v-if="!syncOutcome?.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-muted">
+              A GitOps controller has not confirmed this reached the cluster.
             </p>
           </AppAlert>
 
@@ -360,11 +360,10 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncError }}</p>
           </AppAlert>
 
-          <!-- Drift gates revealing and editing, so it is stated before the content it disables. -->
-          <AppAlert v-if="!inSync" type="error" title="Git source is not confirmed in sync" class="mb-5">
-            <p class="m-0 max-w-[62ch] text-[13px] text-muted">
-              Status: <strong class="font-semibold text-ink">{{ driftLabel }}</strong>. Reveal, editing, and delivery are disabled.
-            </p>
+          <!-- Drift gates revealing and editing, so it is stated before the content it disables.
+               Three facts only: which state, what differs, and the one control that can act. The
+               consequence of pressing it is the dialog's, where both documents are on screen. -->
+          <AppAlert v-if="!inSync" type="error" :title="`Not in sync: ${driftLabel}`" class="mb-5">
             <!-- What differs, named here rather than left to a manual diff of the live resource
                  against the file. The paths are set with the sentence they explain, apart from the
                  paragraphs below, because they are one answer rather than two. -->
@@ -376,13 +375,6 @@ watch([() => route.params.namespace, () => route.params.name], load)
               The manifest is in Git and there is no Secret for it in the cluster. Nothing on this page writes to the
               cluster — a GitOps controller managing this namespace is what would apply it.
             </p>
-            <!-- Git moved past the cluster, so a sync would overwrite a change this Secret
-                 predates. Withheld rather than removed, and the sentence says what pressing it
-                 would discard. -->
-            <p v-if="canSync && syncBaseCommit && gitMovedAhead" class="m-0 max-w-[62ch] text-[13px] text-muted">
-              Git holds a change this Secret predates: the mapped file was rewritten after the version in the
-              cluster. Syncing would overwrite that change with this Secret's content.
-            </p>
             <div v-if="canSync && syncBaseCommit" class="mt-1 flex items-center gap-2.5">
               <AppButton
                 :variant="gitMovedAhead ? 'secondary' : 'primary'"
@@ -390,12 +382,8 @@ watch([() => route.params.namespace, () => route.params.name], load)
                 :loading="syncing"
                 @click="openSyncConfirm"
               >{{ gitMovedAhead ? 'Sync anyway' : 'Sync Live Secret to Git' }}</AppButton>
-              <span class="text-xs text-faint">writes what is in the cluster to the mapped file</span>
             </div>
             <p v-else class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncUnavailable }}</p>
-            <p class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
-              ArgoCD synchronization is not verified by this workflow.
-            </p>
           </AppAlert>
 
           <!-- The document region. It is hidden while a diff is under review or the change has
@@ -496,8 +484,8 @@ watch([() => route.params.namespace, () => route.params.name], load)
                 >{{ store.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
                 <!-- False for every delivery: this workflow writes to Git and never watches the
                      cluster afterwards. -->
-                <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-faint">
-                  ArgoCD synchronization is not verified by this workflow.
+                <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-muted">
+                  A GitOps controller has not confirmed this reached the cluster.
                 </p>
                 <!-- The next step rides with the confirmation rather than a spent workflow bar.
                      Editing again reloads the Secret so the next change is staged against the commit
@@ -540,11 +528,11 @@ watch([() => route.params.namespace, () => route.params.name], load)
         role="dialog"
         aria-modal="true"
         aria-label="Confirm syncing the live Secret to Git"
-        class="fixed inset-0 z-40 flex items-center justify-center bg-bg p-4 sm:p-6"
+        class="glass-scrim fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6"
         @keydown.esc.prevent="closeSyncConfirm"
         @keydown="trapConfirmTab"
       >
-        <div class="flex max-h-full w-full max-w-4xl flex-col gap-3">
+        <div class="glass-panel flex max-h-full w-full max-w-4xl flex-col gap-3 rounded-card p-4 sm:p-5">
           <div class="flex flex-col gap-1">
             <h2 class="m-0 text-[15px] font-semibold text-ink">
               {{ gitMovedAhead ? 'Overwrite the newer Git copy?' : 'Sync this Secret to Git?' }}
@@ -552,7 +540,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">
               Writing to <span class="font-mono text-ink">{{ confirmWhere }}</span> replaces it with the
               manifest below.
-              <template v-if="gitMovedAhead">Git holds a change this Secret predates, and it is not in the right column — it will be gone.</template>
+              <template v-if="gitMovedAhead">Git's version is not in the right column — it will be gone.</template>
             </p>
           </div>
 

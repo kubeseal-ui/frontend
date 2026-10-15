@@ -229,7 +229,7 @@ onUnmounted(() => secrets.discardChange())
                     rel="noopener noreferrer"
                     class="mt-1 block break-all text-[13px] text-accent no-underline hover:underline"
                   >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
-                  <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">ArgoCD synchronization is not verified by this workflow.</span>
+                  <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">A GitOps controller has not confirmed this reached the cluster.</span>
                   <!-- The next step rides with the confirmation rather than a workflow bar below a spent
                        draft; pressing it brings a fresh form back and returns the rail to Compose. -->
                   <AppButton class="mt-2.5 self-start" size="small" icon="lock" @click="startAnother">Encrypt another Secret</AppButton>

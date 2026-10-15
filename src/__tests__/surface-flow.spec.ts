@@ -453,11 +453,16 @@ describe('the surface', () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'diverged', git_moved_ahead: true }) }))
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Git holds a change this Secret predates')
-    expect(wrapper.text()).toContain('Syncing would overwrite that change')
+    // The alert states the state and the control; what the press discards is the dialog's to say,
+    // where both documents are on screen.
+    expect(wrapper.text()).toContain('Not in sync: Diverged')
+    expect(wrapper.text()).not.toContain('ArgoCD')
     const labels = wrapper.findAll('button').map((button) => button.text())
     expect(labels).toContain('Sync anyway')
     expect(labels).not.toContain('Sync Live Secret to Git')
+
+    await press(wrapper, 'Sync anyway')
+    expect(dialog()!.textContent).toContain('not in the right column')
   })
 
   it('names what differs, so the operator is not left diffing both sides by hand', async () => {
@@ -488,7 +493,7 @@ describe('the surface', () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'diverged', in_sync_with_live: false }) }))
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Status: Diverged')
+    expect(wrapper.text()).toContain('Not in sync: Diverged')
     expect(wrapper.text()).not.toContain('Sealing is not deterministic')
   })
 
@@ -681,7 +686,7 @@ describe('the surface', () => {
   it('withholds editing and says so when the Git source is not in sync', async () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'unknown', in_sync_with_live: false }) }))
     await flushPromises()
-    expect(wrapper.text()).toContain('Reveal, editing, and delivery are disabled')
+    expect(wrapper.text()).toContain('Reveal and editing are disabled while this Secret differs from Git.')
   })
 
   it('withholds the press over a batch staged before drift arrived', async () => {
