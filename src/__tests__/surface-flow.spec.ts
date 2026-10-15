@@ -498,6 +498,66 @@ describe('the surface', () => {
     expect(wrapper.findAll('button').map((button) => button.text())).toContain('Sync Live Secret to Git')
   })
 
+  // The dialog is teleported to the body, so it is read from there rather than from the wrapper;
+  // the control that opens it is on the page, and is pressed through the wrapper like any other.
+  const dialog = () => document.body.querySelector('[role="dialog"]')
+  const dialogButton = (label: string) =>
+    Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent?.trim() === label)
+  const press = async (wrapper: VueWrapper, label: string) => {
+    await wrapper.findAll('button').find((button) => button.text() === label)!.trigger('click')
+    await flushPromises()
+  }
+
+  it('shows both documents before a sync overwrites the file', async () => {
+    const { wrapper } = await mountSurface(detail({
+      sealed_secret_yaml: 'kind: SealedSecret\nmetadata:\n  name: api\n',
+      git: git({
+        drift: 'diverged', in_sync_with_live: false, git_moved_ahead: true,
+        git_file_yaml: 'kind: SealedSecret\nmetadata:\n  name: api\n  labels:\n    team: payments\n',
+      }),
+    }))
+    await flushPromises()
+    expect(dialog()).toBeNull()
+
+    await press(wrapper, 'Sync anyway')
+
+    expect(dialog()).not.toBeNull()
+    // Both sides, not a description of them: the file as Git holds it, and the manifest replacing it.
+    expect(dialog()!.textContent).toContain('In Git now')
+    expect(dialog()!.textContent).toContain('From the cluster — what gets written')
+    expect(dialog()!.textContent).toContain('team: payments')
+    expect(dialog()!.textContent).toContain('clusters/payments/api.yaml on main')
+  })
+
+  it('writes nothing until the dialog is confirmed', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: DELIVERED } as never)
+    const { wrapper } = await mountSurface(detail({ git: git({ drift: 'live_only' }) }))
+    await flushPromises()
+
+    await press(wrapper, 'Sync Live Secret to Git')
+    expect(dialog()).not.toBeNull()
+    expect(post).not.toHaveBeenCalled()
+
+    dialogButton('Cancel')!.click()
+    await flushPromises()
+    expect(dialog()).toBeNull()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('sends the sync on the confirmation and closes the dialog when it returns', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: DELIVERED } as never)
+    const { wrapper } = await mountSurface(detail({ git: git({ drift: 'live_only' }) }))
+    await flushPromises()
+
+    await press(wrapper, 'Sync Live Secret to Git')
+    dialogButton('Sync Live Secret to Git')!.click()
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/api/v1/gitops/sync', { namespace: 'payments', name: 'api', base_commit: 'abc123' }, IDEMPOTENT)
+    expect(dialog()).toBeNull()
+    expect(wrapper.text()).toContain('Synced sha-1 to main')
+  })
+
   it('switches the document between rows and YAML without refetching the Secret', async () => {
     const { wrapper, get } = await mountSurface(detail())
     await flushPromises()

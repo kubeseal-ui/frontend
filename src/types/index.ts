@@ -45,6 +45,9 @@ export interface GitState {
   // ciphertext match — only which part of the documents is not the same.
   drift_reason?: DriftReason
   drift_fields?: string[]
+  // Set with `diverged` only: the mapped file's own text as Git holds it now, so the sync dialog
+  // can show what it replaces rather than naming the file. Absent on a listing.
+  git_file_yaml?: string
 }
 
 /** Which part of the live SealedSecret and the Git manifest disagrees. */

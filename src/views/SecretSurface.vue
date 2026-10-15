@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -240,8 +240,43 @@ async function onSync() {
     syncOutcome.value = await store.syncToGit(namespace(), name(), syncBaseCommit.value)
   } catch (e) {
     syncError.value = describeError(e, 'The live Secret could not be synced to Git')
-  } finally { syncing.value = false }
+  } finally { syncing.value = false; confirming.value = false }
 }
+
+// A sync overwrites the mapped file, so it is confirmed first, and the dialog carries both
+// documents: the file as Git holds it and the cluster's manifest that would replace it.
+const confirming = ref(false)
+const confirmOverlay = ref<HTMLElement | null>(null)
+let confirmReturn: HTMLElement | null = null
+const confirmManifest = computed(() => detail.value?.sealed_secret_yaml || '')
+const confirmGitCopy = computed(() => detail.value?.git.git_file_yaml || '')
+const confirmWhere = computed(() => {
+  const file = detail.value?.git.file_path || ''
+  const branch = detail.value?.git.branch || ''
+  return branch && file ? `${file} on ${branch}` : file || 'the mapped file'
+})
+
+async function openSyncConfirm() {
+  confirmReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  confirming.value = true
+  await nextTick()
+  confirmOverlay.value?.querySelector<HTMLElement>('button')?.focus()
+}
+function closeSyncConfirm() {
+  confirming.value = false
+  confirmReturn?.focus()
+  confirmReturn = null
+}
+function trapConfirmTab(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || !confirmOverlay.value) return
+  const focusable = Array.from(confirmOverlay.value.querySelectorAll<HTMLElement>('button'))
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
+watch(confirming, (open) => { document.body.style.overflow = open ? 'hidden' : '' })
 
 // --- Load ------------------------------------------------------------------
 async function load() {
@@ -353,7 +388,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
                 :variant="gitMovedAhead ? 'secondary' : 'primary'"
                 icon="file"
                 :loading="syncing"
-                @click="onSync"
+                @click="openSyncConfirm"
               >{{ gitMovedAhead ? 'Sync anyway' : 'Sync Live Secret to Git' }}</AppButton>
               <span class="text-xs text-faint">writes what is in the cluster to the mapped file</span>
             </div>
@@ -495,5 +530,51 @@ watch([() => route.params.namespace, () => route.params.name], load)
         />
       </div>
     </template>
+
+    <!-- The two documents travel with the confirmation: "overwrite" is not a fact the operator can
+         check from the page that offers it. -->
+    <Teleport to="body">
+      <div
+        v-if="confirming"
+        ref="confirmOverlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirm syncing the live Secret to Git"
+        class="fixed inset-0 z-40 flex items-center justify-center bg-bg p-4 sm:p-6"
+        @keydown.esc.prevent="closeSyncConfirm"
+        @keydown="trapConfirmTab"
+      >
+        <div class="flex max-h-full w-full max-w-4xl flex-col gap-3">
+          <div class="flex flex-col gap-1">
+            <h2 class="m-0 text-[15px] font-semibold text-ink">
+              {{ gitMovedAhead ? 'Overwrite the newer Git copy?' : 'Sync this Secret to Git?' }}
+            </h2>
+            <p class="m-0 max-w-[62ch] text-[13px] text-muted">
+              Writing to <span class="font-mono text-ink">{{ confirmWhere }}</span> replaces it with the
+              manifest below.
+              <template v-if="gitMovedAhead">Git holds a change this Secret predates, and it is not in the right column — it will be gone.</template>
+            </p>
+          </div>
+
+          <div class="min-h-0 flex-1 overflow-auto">
+            <DiffBlocks
+              :before="confirmGitCopy"
+              :after="confirmManifest"
+              before-label="In Git now"
+              after-label="From the cluster — what gets written"
+            />
+          </div>
+
+          <div class="flex items-center justify-end gap-2">
+            <AppButton variant="ghost" @click="closeSyncConfirm">Cancel</AppButton>
+            <AppButton
+              :variant="gitMovedAhead ? 'secondary' : 'primary'"
+              :loading="syncing"
+              @click="onSync"
+            >{{ gitMovedAhead ? 'Sync anyway' : 'Sync Live Secret to Git' }}</AppButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
