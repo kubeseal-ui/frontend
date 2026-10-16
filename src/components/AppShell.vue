@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import { type IconName } from '@/components/ui/icons'
 import SearchResults from '@/components/SearchResults.vue'
@@ -23,6 +23,7 @@ const searching = computed(() => query.value.trim() !== '')
 // link just loaded (the route changes and the fetch runs, but `v-if="searching"` keeps covering it).
 // The query lives here, not in the URL, so no navigation clears it on its own; any route change does.
 const route = useRoute()
+const router = useRouter()
 watch(() => route.fullPath, () => { query.value = '' })
 
 const displayName = computed(() => auth.user?.name || auth.user?.username || '')
@@ -74,6 +75,9 @@ const themes: { value: ThemePreference; label: string; icon: IconName }[] = [
 
 async function logout() {
   await auth.logout()
+  // Replace, not push: back from the signed-out page should not land on the sessionless view the
+  // operator just left. The store's signedOut flag holds off the 401 redirect while this resolves.
+  await router.replace('/signed-out')
 }
 </script>
 

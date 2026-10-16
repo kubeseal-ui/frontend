@@ -29,6 +29,9 @@ export const router = createRouter({
       props: true,
       meta: { requiresAuth: true },
     },
+    // No requiresAuth: this is where sign-out lands, and a session check here would send the
+    // browser straight back into the OIDC flow the operator just left.
+    { path: '/signed-out', name: 'signed-out', component: () => import('./views/SignedOutView.vue') },
   ],
 })
 

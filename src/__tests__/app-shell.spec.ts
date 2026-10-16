@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
@@ -15,9 +15,15 @@ let pinia: Pinia
 let shell: VueWrapper | undefined
 
 // The shell reads the current route to close the search strip on navigation, so it needs a router
-// installed. These tests never navigate, so a one-route memory router is enough.
+// installed. These tests never navigate, except sign-out, which lands on /signed-out.
 function testRouter() {
-  return createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] })
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div />' } },
+      { path: '/signed-out', component: { template: '<div />' } },
+    ],
+  })
 }
 
 function mountShell() {
@@ -66,7 +72,15 @@ describe('app shell', () => {
   it('keeps sign out inside the account disclosure rather than beside it', async () => {
     const auth = useAuthStore(pinia)
     const logout = vi.spyOn(auth, 'logout').mockResolvedValue(undefined)
-    const wrapper = mountShell()
+    const router = testRouter()
+    const wrapper = mount(AppShell, {
+      attachTo: document.body,
+      slots: { default: '<p id="route-content">route content</p>' },
+      global: {
+        plugins: [pinia, router],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
     const signOut = () => wrapper.findAll('button').find((button) => button.text() === 'Sign out')!
 
     // Closed until asked for, and the press belongs to the account rather than standing beside it
@@ -79,6 +93,10 @@ describe('app shell', () => {
 
     await signOut().trigger('click')
     expect(logout).toHaveBeenCalled()
+    // Sign-out ends on the signed-out page, not left on a sessionless view for a stray 401 to
+    // bounce back into the OIDC flow.
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/signed-out')
   })
 
   it('closes on Escape and hands focus back to the name', () => {

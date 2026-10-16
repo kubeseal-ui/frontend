@@ -18,6 +18,10 @@ export const useAuthStore = defineStore('auth', {
     // Set once the browser is being sent into the OIDC flow, so concurrent 401s share the one
     // redirect rather than each calling location.assign.
     reauthenticating: false,
+    // Set by an explicit sign-out, so a 401 from a request still in flight cannot drag the browser
+    // straight back into the OIDC flow — the provider's SSO session would log them in again, and
+    // sign-out would look like a no-op.
+    signedOut: false,
   }),
   getters: {
     isAuthenticated: (state) => state.user !== null,
@@ -30,6 +34,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     setSession(user: User) {
       this.user = user
+      this.signedOut = false
       if (!this.activeNamespace || !user.namespaces[this.activeNamespace]) {
         this.activeNamespace = Object.keys(user.namespaces)[0] ?? null
       }
@@ -44,7 +49,7 @@ export const useAuthStore = defineStore('auth', {
     // router guard. One-shot, so concurrent 401s share the redirect, and skipped when the
     // deployment disables it (VITE_DISABLE_LOGOUT_ON_401, for local and test runs).
     redirectToLogin() {
-      if (this.reauthenticating || import.meta.env.VITE_DISABLE_LOGOUT_ON_401 === 'true') return
+      if (this.signedOut || this.reauthenticating || import.meta.env.VITE_DISABLE_LOGOUT_ON_401 === 'true') return
       this.reauthenticating = true
       // Remember where they were so the callback returns them here, not to the app root.
       rememberReturnPath(window.location.pathname + window.location.search)
@@ -70,6 +75,9 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async logout() {
+      // Before the request, not after: the cleared cookie can make this very call 401, and the
+      // flag has to be in place before that response lands.
+      this.signedOut = true
       try {
         await api.post('/api/v1/auth/logout', {})
       } finally {

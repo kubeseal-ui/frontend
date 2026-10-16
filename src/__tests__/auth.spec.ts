@@ -52,4 +52,21 @@ describe('phase 2 auth integration', () => {
     store.redirectToLogin()
     expect(assign).not.toHaveBeenCalled()
   })
+
+  it('does not redirect on a 401 after an explicit sign-out', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { status: 'logged_out' } } as never)
+    const store = useAuthStore()
+    store.setSession({ email: 'test', name: 'Test', username: 'test', namespaces: {} })
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+
+    await store.logout()
+    // The session is gone, so any request still in flight 401s — and that must not re-enter the
+    // OIDC flow, where the provider's SSO session would log the operator straight back in.
+    store.redirectToLogin()
+    expect(assign).not.toHaveBeenCalled()
+
+    store.setSession({ email: 'test', name: 'Test', username: 'test', namespaces: {} })
+    store.redirectToLogin()
+    expect(assign).toHaveBeenCalledTimes(1)
+  })
 })
