@@ -78,7 +78,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       placeholder="Search any Secret or key in the cluster"
       autocomplete="off"
       spellcheck="false"
-      class="min-w-0 flex-1 border-0 bg-transparent text-ink outline-none placeholder:text-faint max-sm:text-[16px]"
+      class="min-w-0 flex-1 border-0 bg-transparent text-ink outline-none placeholder:text-faint max-sm:text-[14px]"
       :class="modelValue ? 'font-mono text-sm' : 'text-[13px]'"
       @focus="focused = true; ensureIndex()"
       @blur="focused = false"

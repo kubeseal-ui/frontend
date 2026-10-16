@@ -463,7 +463,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   autocomplete="off"
                   spellcheck="false"
                   :class="concealed(stagedRowId(key), replacements[key]) ? 'conceal' : ''"
-                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 max-sm:pr-[98px] font-mono text-[13px] max-sm:text-[16px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 max-sm:pr-[98px] font-mono text-[13px] max-sm:text-[14px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
                 />
                 <input
                   v-else
@@ -476,7 +476,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   placeholder="New value"
                   autocomplete="off"
                   spellcheck="false"
-                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint"
+                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[14px] text-ink placeholder:font-sans placeholder:text-faint"
                 />
                 <!-- In the opened box the three field controls line up along the top edge, where
                      the eye already sat, instead of floating mid-text; the one-line input keeps
@@ -530,7 +530,7 @@ defineExpose({ batchProblem, showProblems, clear })
           placeholder="Key name"
           autocomplete="off"
           spellcheck="false"
-          class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint"
+          class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] max-sm:text-[14px] text-ink placeholder:font-sans placeholder:text-faint"
         />
         <span class="relative block">
           <textarea
@@ -544,7 +544,7 @@ defineExpose({ batchProblem, showProblems, clear })
             autocomplete="off"
             spellcheck="false"
             :class="concealed(addedRowId(row), row.value) ? 'conceal' : ''"
-            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 max-sm:pr-[98px] font-mono text-[13px] max-sm:text-[16px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 max-sm:pr-[98px] font-mono text-[13px] max-sm:text-[14px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
           />
           <input
             v-else
@@ -556,7 +556,7 @@ defineExpose({ batchProblem, showProblems, clear })
             placeholder="Value"
             autocomplete="off"
             spellcheck="false"
-            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint"
+            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[14px] text-ink placeholder:font-sans placeholder:text-faint"
           />
           <button
             type="button"
@@ -651,7 +651,7 @@ defineExpose({ batchProblem, showProblems, clear })
             autocomplete="off"
             spellcheck="false"
             :class="[concealed(fullscreen.id, fullscreenValue) ? 'conceal' : '', fullscreen.set ? '' : 'cursor-default']"
-            class="min-h-0 w-full flex-1 resize-none rounded-card border border-border-strong bg-surface p-2.5 font-mono text-[13px] max-sm:text-[16px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+            class="min-h-0 w-full flex-1 resize-none rounded-card border border-border-strong bg-surface p-2.5 font-mono text-[13px] max-sm:text-[14px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
           />
         </div>
       </div>
