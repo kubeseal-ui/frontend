@@ -377,8 +377,10 @@ defineExpose({ batchProblem, showProblems, clear })
         </span>
 
         <!-- The value's own controls, in the row they act on. Under drift the row keeps its dots
-             and loses every button: a control that cannot act is worse than no control. -->
-        <span class="flex items-center gap-[3px]">
+             and loses every button: a control that cannot act is worse than no control.
+             `-mr-2.5` cancels the last button's own inline padding, so the label's right edge lines
+             up with the key's left edge rather than sitting 10px inside it. -->
+        <span class="flex items-center gap-[3px] -mr-2.5">
           <button
             v-if="canRevealValue && !hasRevealed(key)"
             :ref="(el) => setRevealButton(key, el)"
@@ -580,7 +582,7 @@ defineExpose({ batchProblem, showProblems, clear })
             @click="peek[addedRowId(row)] = !peek[addedRowId(row)]"
           ><AppIcon :name="peek[addedRowId(row)] ? 'eye-off' : 'eye'" :size="13" /></button>
         </span>
-        <span class="flex items-center gap-[3px]">
+        <span class="flex items-center gap-[3px] -mr-2.5">
           <button
             type="button"
             :aria-label="`Remove new key ${index + 1}`"
