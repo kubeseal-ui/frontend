@@ -16,7 +16,9 @@ const ui = useUiStore()
 // over it. Nothing else reads it, which is what lets the route below stay mounted — `v-show`, not
 // `v-if` — so a Secret with a half-staged change is still there when the search is cleared.
 const query = ref('')
-const searching = computed(() => query.value.trim() !== '')
+// Searching is a session-bound action: the strip is the one control that reads the whole cluster,
+// so it is not offered — and its results are not rendered — once the session is gone.
+const searching = computed(() => Boolean(auth.user) && query.value.trim() !== '')
 
 // A result in the strip is a link, and the strip replaces the page rather than floating over it, so
 // following a hit has to clear the query — otherwise the results stay mounted over the Secret the
@@ -104,7 +106,7 @@ async function logout() {
       <!-- The strip is what the query is typed into even when it is answering, so it is never an
            overlay. On a phone it drops to its own full-width row (order-last + basis-full), which
            is the second row of the pinned 115px header above. -->
-      <SecretSearch v-model="query" class="max-sm:order-last max-sm:basis-full" />
+      <SecretSearch v-if="auth.user" v-model="query" class="max-sm:order-last max-sm:basis-full" />
 
       <span class="flex-1" aria-hidden="true" />
 

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { api } from '@/api'
+import { useSecretsStore } from '@/stores/secrets'
 import { rememberReturnPath } from '@/utils/returnPath'
 import type { Capability, Namespace, User } from '@/types'
 
@@ -42,6 +43,10 @@ export const useAuthStore = defineStore('auth', {
     clearSession() {
       this.user = null
       this.activeNamespace = null
+      // The session's data does not outlive it. Without this the cached listing still answers the
+      // search strip on the signed-out page — cluster contents readable by someone whose session
+      // just ended, from a box that should not be there at all.
+      useSecretsStore().$reset()
     },
     // A 401 anywhere means the session is gone, so send the browser into the OIDC flow rather than
     // leaving a cleared SPA sitting on a page whose data just vanished — the bug being that a

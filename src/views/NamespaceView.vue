@@ -140,11 +140,13 @@ watch(() => props.namespace, load)
 
       <template #actions>
         <!-- A link, not a button: AppButton renders a bare <button>, and navigating is what this
-             does. The classes restate its primary variant. -->
+             does. The classes restate its primary variant — including the size, because the two
+             sit in the same cluster and a restatement that drifts 2px reads as a mistake, and
+             including the phone floor, or this one stays 34px while Refresh beside it rises. -->
         <RouterLink
           v-if="canSeal"
           :to="`/namespaces/${encodeURIComponent(props.namespace)}/new`"
-          class="inline-flex h-[34px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-control border border-transparent bg-accent px-3.5 text-[13px] font-semibold text-accent-ink no-underline transition hover:brightness-110"
+          class="inline-flex h-9 max-sm:h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-control border border-transparent bg-accent px-3.5 text-[13px] font-semibold text-accent-ink no-underline transition hover:brightness-110"
         >
           <AppIcon name="plus" :size="16" />
           New Secret

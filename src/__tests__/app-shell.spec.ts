@@ -204,6 +204,16 @@ describe('app shell', () => {
     expect(wrapper.findAll('[aria-expanded]')).toHaveLength(0)
   })
 
+  it('offers no search once the session is gone', () => {
+    // The strip is the one control that reads the whole cluster, so a signed-out operator gets no
+    // box — and no results panel either, however a query was left behind.
+    useAuthStore(pinia).clearSession()
+    const wrapper = mountShell()
+
+    expect(wrapper.find('#secret-search').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('match in 1 namespace')
+  })
+
   it('replaces the page with the results without unmounting it', async () => {
     // The route holds whatever the operator has staged, so a search must hide it rather than tear
     // it down — otherwise typing in the strip would discard a half-finished change.
