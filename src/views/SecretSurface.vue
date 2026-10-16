@@ -345,7 +345,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
       </div>
 
       <!-- Spine stacks under the document on a phone and sits beside it from 820px. -->
-      <div v-if="detail" class="flex min-[820px]:flex-row flex-col items-start gap-7 page-x pb-10">
+      <div v-if="detail" class="flex min-[820px]:flex-row flex-col items-start max-sm:items-stretch gap-7 page-x pb-10">
         <div class="min-w-0 flex-1">
           <!-- Where you are in the workflow, pinned above the editor. It shows only while the
                Secret is editable; when the Git source has drifted the alert below takes the screen
