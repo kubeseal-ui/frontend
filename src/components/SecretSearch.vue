@@ -61,11 +61,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
        the halo — and a query set without focus keeps it, because a strip that is answering is not
        an idle one. -->
   <div
-    class="flex h-[34px] max-sm:h-11 min-w-0 flex-1 items-center gap-2 rounded-control border pr-[9px] pl-[10px]"
+    class="flex h-[34px] max-sm:h-11 min-w-0 flex-1 items-center gap-2 rounded-control border border-border pr-[9px] pl-[10px]"
     :class="
       focused || modelValue
-        ? 'border-accent bg-surface-raised shadow-[0_0_0_3px_color-mix(in_srgb,var(--app-accent)_16%,transparent)]'
-        : 'border-border bg-bg'
+        ? 'bg-surface-raised shadow-[0_0_0_3px_color-mix(in_srgb,var(--app-accent)_16%,transparent)]'
+        : 'bg-bg'
     "
   >
     <label for="secret-search" class="sr-only">Search Secrets and key names</label>
