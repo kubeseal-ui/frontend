@@ -48,26 +48,26 @@ const retry = () => secrets.fetchIndex().catch(() => {
   <section aria-labelledby="search-results-title">
     <h1 id="search-results-title" class="sr-only">Search results</h1>
 
-    <p v-if="status === 'loading'" role="status" class="m-0 px-[26px] pt-[18px] text-[12.5px] text-muted">Searching…</p>
+    <p v-if="status === 'loading'" role="status" class="m-0 page-x pt-[18px] text-[12.5px] text-muted">Searching…</p>
 
     <!-- The label names the failure and the server's detail follows it. The store only ever holds
          an Error, so a fallback alone would never render and the operator would read a bare
          message like "gateway" with nothing saying what failed. -->
-    <div v-else-if="status === 'error'" class="flex flex-col items-start gap-2 px-[26px] pt-[18px]">
+    <div v-else-if="status === 'error'" class="flex flex-col items-start gap-2 page-x pt-[18px]">
       <p class="m-0 text-[12.5px] text-danger">
         The search index could not be loaded. {{ describeError(secrets.indexError, 'No detail was reported.') }}
       </p>
       <AppButton icon="refresh" @click="retry">Try again</AppButton>
     </div>
 
-    <p v-else-if="status === 'empty'" role="status" class="m-0 px-[26px] pt-[18px] text-[12.5px] text-muted">
+    <p v-else-if="status === 'empty'" role="status" class="m-0 page-x pt-[18px] text-[12.5px] text-muted">
       No Secret or key matches “{{ props.query.trim() }}”.
     </p>
 
     <template v-else>
       <!-- What was searched, because the answer spans namespaces and the strip gives no sign of
            that on its own. -->
-      <p role="status" class="m-0 flex items-baseline gap-[7px] px-[26px] pt-[18px] text-[12.5px] text-muted">
+      <p role="status" class="m-0 flex items-baseline gap-[7px] page-x pt-[18px] text-[12.5px] text-muted">
         <em class="font-mono font-[650] not-italic text-ink">{{ hits.length }}</em>
         {{ hits.length === 1 ? 'match' : 'matches' }} in
         <em class="font-mono font-[650] not-italic text-ink">{{ namespaceCount }}</em>
@@ -75,7 +75,7 @@ const retry = () => secrets.fetchIndex().catch(() => {
       </p>
 
       <div v-for="group in groups" :key="group.namespace">
-        <div class="flex items-baseline gap-2.5 px-[26px] pt-[22px] pb-[7px]">
+        <div class="flex items-baseline gap-2.5 page-x pt-[22px] pb-[7px]">
           <h2 class="m-0 font-mono text-[13.5px] font-[650] text-ink">{{ group.namespace }}</h2>
           <span class="text-[11.5px] text-faint">{{ countLabel(group.rows.length, 'match', 'matches') }}</span>
         </div>
@@ -84,11 +84,11 @@ const retry = () => secrets.fetchIndex().catch(() => {
           v-for="hit in group.rows"
           :key="hit.name"
           :to="`/secrets/${encodeURIComponent(hit.namespace)}/${encodeURIComponent(hit.name)}`"
-          class="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] items-center gap-x-[22px] border-b border-border px-[26px] py-[9px] text-inherit no-underline hover:bg-surface focus-visible:bg-surface"
+          class="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] max-sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-x-[22px] border-b border-border page-x py-[9px] text-inherit no-underline hover:bg-surface focus-visible:bg-surface"
         >
           <span class="min-w-0">
             <!-- The query is already in the strip, so a name that matched says which part of it did. -->
-            <span class="block truncate font-mono text-[14.5px] font-[550] text-ink">
+            <span class="block truncate font-mono text-[14.5px] font-[550] text-ink max-sm:whitespace-normal max-sm:break-all">
               <template v-for="(segment, index) in highlightSegments(hit.name, props.query)" :key="index">
                 <mark v-if="segment.hit" class="bg-transparent text-accent">{{ segment.text }}</mark>
                 <template v-else>{{ segment.text }}</template>
@@ -99,7 +99,7 @@ const retry = () => secrets.fetchIndex().catch(() => {
 
           <!-- The key names are here and nowhere else on a list: a search is a question the
                operator asked, not an inventory they were handed. -->
-          <span class="min-w-0 truncate font-mono text-xs text-accent">
+          <span class="min-w-0 truncate font-mono text-xs text-accent max-sm:col-span-full max-sm:whitespace-normal max-sm:break-all">
             <template v-for="(key, index) in hit.matchedKeys.slice(0, 3)" :key="key">
               <span v-if="index > 0">, </span>{{ key }}
             </template>

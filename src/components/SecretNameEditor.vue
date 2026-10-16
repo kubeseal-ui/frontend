@@ -369,13 +369,13 @@ onUnmounted(() => { yaml.value = '' })
         <button
           v-if="draft"
           type="button"
-          class="cursor-pointer font-semibold text-muted hover:text-ink"
+          class="max-sm:inline-flex max-sm:min-h-11 cursor-pointer font-semibold text-muted hover:text-ink"
           @click="discard"
         >Discard encrypted draft</button>
         <button
           ref="toggle"
           type="button"
-          class="cursor-pointer font-semibold text-accent hover:underline underline-offset-4"
+          class="max-sm:inline-flex max-sm:min-h-11 cursor-pointer font-semibold text-accent hover:underline underline-offset-4"
           @click="edit"
         >Edit</button>
       </span>
@@ -416,7 +416,7 @@ onUnmounted(() => { yaml.value = '' })
               :placeholder="adopting ? 'Name, exactly as metadata.name' : 'Secret name'"
               autocomplete="off"
               spellcheck="false"
-              class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
+              class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
             />
             <!-- The file the name produces, before the file exists. It is the path the row will carry,
                  not a summary of one — so a chosen directory moves it, rather than standing beside a
@@ -454,7 +454,7 @@ onUnmounted(() => { yaml.value = '' })
               placeholder="e.g. prod"
               autocomplete="off"
               spellcheck="false"
-              class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
+              class="h-8 w-full rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none"
             />
             <span v-if="subdirectoryProblem()" id="subdirectory-problem" class="text-[12.5px] text-danger">{{ subdirectoryProblem() }}</span>
           </label>

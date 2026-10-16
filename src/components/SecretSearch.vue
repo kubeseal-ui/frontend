@@ -61,7 +61,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
        the halo — and a query set without focus keeps it, because a strip that is answering is not
        an idle one. -->
   <div
-    class="flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-control border pr-[9px] pl-[10px]"
+    class="flex h-[34px] max-sm:h-11 min-w-0 flex-1 items-center gap-2 rounded-control border pr-[9px] pl-[10px]"
     :class="
       focused || modelValue
         ? 'border-accent bg-surface-raised shadow-[0_0_0_3px_color-mix(in_srgb,var(--app-accent)_16%,transparent)]'
@@ -78,7 +78,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       placeholder="Search any Secret or key in the cluster"
       autocomplete="off"
       spellcheck="false"
-      class="min-w-0 flex-1 border-0 bg-transparent text-ink outline-none placeholder:text-faint"
+      class="min-w-0 flex-1 border-0 bg-transparent text-ink outline-none placeholder:text-faint max-sm:text-[16px]"
       :class="modelValue ? 'font-mono text-sm' : 'text-[13px]'"
       @focus="focused = true; ensureIndex()"
       @blur="focused = false"
@@ -96,7 +96,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <kbd
       v-else
       aria-hidden="true"
-      class="pointer-events-none shrink-0 select-none rounded-[5px] border border-border-strong px-[5px] py-px font-mono text-[11px] text-faint"
+      class="pointer-events-none max-sm:hidden shrink-0 select-none rounded-[5px] border border-border-strong px-[5px] py-px font-mono text-[11px] text-faint"
     >⌘K</kbd>
   </div>
 </template>

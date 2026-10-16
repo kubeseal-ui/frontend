@@ -129,7 +129,7 @@ onUnmounted(() => secrets.discardChange())
   <section aria-labelledby="page-title">
     <!-- One padding block for the page body, the mockup's `24px 26px 30px`: the heading and the
          grid below it are the same column, and a band between them would be a second one. -->
-    <div class="px-[26px] pt-6">
+    <div class="page-x pt-6">
       <div class="min-w-0">
         <RouterLink
           :to="`/namespaces/${encodeURIComponent(props.namespace)}`"
@@ -148,7 +148,7 @@ onUnmounted(() => secrets.discardChange())
       </div>
     </div>
 
-    <div class="px-[26px] pb-[30px]">
+    <div class="page-x pb-[30px]">
       <AppAlert v-if="!canSeal" type="error" title="Access denied">
         <p class="m-0 max-w-[62ch] text-[13px] text-muted">
           Creating a SealedSecret in {{ props.namespace }} requires the
@@ -165,9 +165,11 @@ onUnmounted(() => secrets.discardChange())
       <div v-else class="grid grid-cols-1 items-start gap-x-[30px] gap-y-8 min-[820px]:grid-cols-[1fr_210px]">
         <div class="flex min-w-0 flex-col">
           <!-- Where you are, pinned below the app header so it stays in view as the one changing
-               button at the foot moves the flow on. The rail's own `18px 0 20px` is the padding
-               here, so the air above and below it is the air the mockup draws. -->
-          <div class="sticky top-14 z-10 bg-bg pt-[18px] pb-5">
+               button at the foot moves the flow on. The offset is the header's own pinned height
+               (59px desktop, 115px on a phone's two-row header — see AppShell), so the rail is
+               never carried under it. The rail's own `18px 0 20px` is the padding here, so the air
+               above and below it is the air the mockup draws. -->
+          <div class="sticky top-[59px] max-sm:top-[115px] z-10 bg-bg pt-[18px] pb-5">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 

@@ -327,7 +327,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
       <template v-if="detail" #context><span v-if="detail.git.file_path">{{ detail.git.file_path }} · </span><span v-if="destination" class="font-mono text-muted">{{ destination }}</span><template v-if="destination"> · </template>{{ deliveryMode }}</template>
     </AppPageHeader>
 
-    <p v-if="loading" role="status" class="flex items-center gap-2 px-[26px] pt-4 text-sm text-muted">
+    <p v-if="loading" role="status" class="flex items-center gap-2 page-x pt-4 text-sm text-muted">
       <AppSpinner :size="15" />
       Loading SealedSecret…
     </p>
@@ -335,7 +335,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
     <!-- The detail is cleared before every load, so an empty result and a failed one are told
          apart rather than both reading as "not found". -->
     <template v-else>
-      <div class="px-[26px]">
+      <div class="page-x">
         <AppAlert v-if="error" type="error" title="Could not load SealedSecret">
           <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ error }}</p>
           <AppButton class="mt-1 self-start" icon="refresh" @click="load">Retry</AppButton>
@@ -344,12 +344,13 @@ watch([() => route.params.namespace, () => route.params.name], load)
         <AppEmpty v-else-if="!detail" icon="lock" description="SealedSecret not found" />
       </div>
 
-      <div v-if="detail" class="flex items-start gap-7 px-[26px] pb-10">
+      <!-- Spine stacks under the document on a phone and sits beside it from 820px. -->
+      <div v-if="detail" class="flex min-[820px]:flex-row flex-col items-start gap-7 page-x pb-10">
         <div class="min-w-0 flex-1">
           <!-- Where you are in the workflow, pinned above the editor. It shows only while the
                Secret is editable; when the Git source has drifted the alert below takes the screen
                and there is no workflow to be partway through. -->
-          <div v-if="inSync" class="sticky top-0 z-10 mb-4 bg-bg py-1">
+          <div v-if="inSync" class="sticky top-[59px] max-sm:top-[115px] z-10 mb-4 bg-bg py-1">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 
@@ -406,12 +407,12 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <!-- The mode switch: pressed buttons, so the state is announced, keyboard reachable,
                  and never colour alone. -->
             <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Document mode">
-              <span class="flex gap-[3px] rounded-control border border-border bg-surface p-[3px]">
+              <span class="flex max-sm:gap-2 gap-[3px] rounded-control border border-border bg-surface p-[3px]">
                 <button
                   v-for="option in (['rows', 'yaml'] as const)"
                   :key="option"
                   type="button"
-                  class="h-[26px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
+                  class="h-[26px] max-sm:h-10 cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
                   :class="mode === option ? 'bg-surface-raised text-accent' : 'text-muted hover:text-ink'"
                   :aria-pressed="mode === option"
                   @click="setMode(option)"

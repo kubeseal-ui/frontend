@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useSecretsStore } from '@/stores/secrets'
 
@@ -31,12 +31,22 @@ const drifted = computed(() => {
   }
   return out
 })
+
+const strip = ref<HTMLElement | null>(null)
+// The names arrive after the strip mounts, so a deep link can land with the active chip
+// offscreen in the scroll line; bring it into view once the listing lands.
+watch(names, async (list) => {
+  if (!list.length) return
+  await nextTick()
+  strip.value?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' })
+}, { immediate: true })
 </script>
 
 <template>
   <nav
     v-if="names.length > 1"
-    class="flex gap-1 overflow-x-auto border-b border-border px-[26px] pb-3"
+    ref="strip"
+    class="page-x flex gap-1 overflow-x-auto border-b border-border pb-3"
     aria-label="Namespaces"
   >
     <RouterLink
@@ -44,7 +54,7 @@ const drifted = computed(() => {
       :key="name"
       :to="`/namespaces/${name}`"
       :aria-current="name === namespace ? 'page' : undefined"
-      class="shrink-0 rounded-mini border px-[11px] py-[5px] font-mono text-xs no-underline"
+      class="shrink-0 rounded-mini border px-[11px] py-[5px] max-sm:inline-flex max-sm:items-center max-sm:h-10 font-mono text-xs no-underline"
       :class="
         name === namespace
           ? 'border-border-strong bg-surface-raised font-semibold text-accent'

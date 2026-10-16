@@ -86,22 +86,22 @@ const TONES: Record<string, string> = { same: 'text-faint', add: 'text-success',
       </Transition>
     </span>
     <div
-      class="grid overflow-hidden rounded-[10px] border border-border bg-border"
+      class="grid max-sm:grid-cols-1 overflow-hidden rounded-[10px] border border-border bg-border"
       :class="paired ? 'grid-cols-2 gap-px' : ''"
     >
       <template v-if="paired">
-        <div class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+        <div class="max-sm:break-all bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
           <span class="mb-[7px] block font-sans text-[11px] font-semibold text-muted">{{ beforeHeading }}</span>
           <div v-for="(row, index) in rows" :key="`b${index}`" :class="TONES[row.lk]">{{ row.left }}</div>
         </div>
         <!-- Paired, each pane needs its own heading and neither of them ever changes: the edit path
              passes no after-label, so there is no roll to play here. -->
-        <div class="bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+        <div class="max-sm:break-all bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
           <span class="mb-[7px] block font-sans text-[11px] font-semibold text-muted">{{ afterHeading }}</span>
           <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
         </div>
       </template>
-      <div v-else class="col-span-2 bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+      <div v-else class="col-span-2 max-sm:col-span-1 max-sm:break-all bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
         <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
       </div>
     </div>

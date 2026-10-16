@@ -320,7 +320,7 @@ defineExpose({ batchProblem, showProblems, clear })
         v-for="key in props.detail.keys || []"
         :key="key"
         :ref="(element: unknown) => setRow(key, element)"
-        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px] transition-colors duration-[110ms] hover:bg-surface"
+        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] max-sm:grid-cols-1 max-sm:gap-y-2 items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px] transition-colors duration-[110ms] hover:bg-surface"
         :class="editing[key] ? 'border-l-accent bg-surface' : 'border-l-transparent'"
         @focusout="leave(stagedRowId(key), $event)"
       >
@@ -337,7 +337,7 @@ defineExpose({ batchProblem, showProblems, clear })
             aria-readonly="true"
             tabindex="0"
             :aria-label="`Revealed value for ${key}`"
-            class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised py-1 pr-9 pl-2.5 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
+            class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised py-1 pr-9 max-sm:pr-10 pl-2.5 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
           >{{ revealed[key] }}</div>
           <!-- A revealed value is the same plaintext the row already holds, so the same control
                opens it to the screen; the overlay is read-only there, since a reveal is a look
@@ -346,7 +346,7 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="hasRevealed(key)"
             type="button"
             :aria-label="`Open the revealed value for ${key} in a full-screen field`"
-            class="absolute top-1 right-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            class="absolute top-1 right-1 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="openFullscreen(revealRowId(key), `Revealed value for ${key}`, () => revealed[key] ?? '', null)"
           ><AppIcon name="expand" :size="13" /></button>
           <!-- A reveal is one decryption and one audit event, and the row says what it is waiting
@@ -379,7 +379,7 @@ defineExpose({ batchProblem, showProblems, clear })
             type="button"
             :disabled="!!activeKey"
             :aria-label="`Reveal ${key}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
             @click="reveal(key)"
           >
             <AppIcon name="eye" :size="13" />Reveal
@@ -388,7 +388,7 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="hasRevealed(key)"
             type="button"
             :aria-label="`Conceal ${key}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised"
+            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised"
             @click="conceal(key)"
           >
             <AppIcon name="eye-off" :size="13" />Conceal
@@ -404,7 +404,7 @@ defineExpose({ batchProblem, showProblems, clear })
             :aria-label="editing[key] ? `Discard the staged change to ${key}` : `Change ${key}`"
             :aria-expanded="editing[key]"
             :aria-controls="`staged-${key}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="editing[key] ? clear(key) : startEdit(key)"
           ><AppIcon :name="editing[key] ? 'x' : 'pencil'" :size="13" />{{ editing[key] ? 'Discard' : 'Change' }}</button>
           <!-- The one action here that pressing it again does not undo, so it is the one that
@@ -413,7 +413,7 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="canPatch && !editing[key]"
             type="button"
             :aria-label="`Remove ${key}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-danger hover:border-danger/40 hover:bg-danger/10"
+            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-danger hover:border-danger/40 hover:bg-danger/10"
             @click="removeKey(key)"
           ><AppIcon name="trash" :size="13" />Remove</button>
         </span>
@@ -454,7 +454,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   autocomplete="off"
                   spellcheck="false"
                   :class="concealed(stagedRowId(key), replacements[key]) ? 'conceal' : ''"
-                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+                  class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 max-sm:pr-[98px] font-mono text-[13px] max-sm:text-[16px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
                 />
                 <input
                   v-else
@@ -467,7 +467,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   placeholder="New value"
                   autocomplete="off"
                   spellcheck="false"
-                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+                  class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint"
                 />
                 <!-- In the opened box the three field controls line up along the top edge, where
                      the eye already sat, instead of floating mid-text; the one-line input keeps
@@ -477,14 +477,14 @@ defineExpose({ batchProblem, showProblems, clear })
                   :aria-label="multiline[stagedRowId(key)] ? `Use a one-line field for ${key}` : `Use a multi-line field for ${key}`"
                   :aria-pressed="!!multiline[stagedRowId(key)]"
                   :class="multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-                  class="absolute right-[34px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  class="absolute right-[34px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
                   @click="multiline[stagedRowId(key)] = !multiline[stagedRowId(key)]"
                 ><AppIcon name="lines" :size="13" /></button>
                 <button
                   v-if="multiline[stagedRowId(key)]"
                   type="button"
                   :aria-label="`Open the replacement value for ${key} in a full-screen field`"
-                  class="absolute top-1.5 right-[62px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  class="absolute top-1.5 right-[62px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
                   @click="openFullscreen(stagedRowId(key), `Replacement value for ${key}`, () => replacements[key] ?? '', (value) => { replacements[key] = value })"
                 ><AppIcon name="expand" :size="13" /></button>
                 <button
@@ -493,7 +493,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   :aria-label="peek[stagedRowId(key)] ? `Hide the replacement value for ${key}` : `Show the replacement value for ${key}`"
                   :aria-pressed="!!peek[stagedRowId(key)]"
                   :class="multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-                  class="absolute right-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  class="absolute right-1.5 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
                   @click="peek[stagedRowId(key)] = !peek[stagedRowId(key)]"
                 ><AppIcon :name="peek[stagedRowId(key)] ? 'eye-off' : 'eye'" :size="13" /></button>
               </span>
@@ -507,7 +507,7 @@ defineExpose({ batchProblem, showProblems, clear })
       <li
         v-for="(row, index) in added"
         :key="row.id"
-        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px]"
+        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] max-sm:grid-cols-1 max-sm:gap-y-2 items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px]"
         :class="'border-l-transparent'"
         @focusout="leave(addedRowId(row), $event)"
       >
@@ -521,7 +521,7 @@ defineExpose({ batchProblem, showProblems, clear })
           placeholder="Key name"
           autocomplete="off"
           spellcheck="false"
-          class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] text-ink placeholder:font-sans placeholder:text-faint"
+          class="w-full rounded-mini border border-border-strong bg-bg px-2.5 py-1 font-mono text-[13.5px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint"
         />
         <span class="relative block">
           <textarea
@@ -535,7 +535,7 @@ defineExpose({ batchProblem, showProblems, clear })
             autocomplete="off"
             spellcheck="false"
             :class="concealed(addedRowId(row), row.value) ? 'conceal' : ''"
-            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+            class="block max-h-40 w-full overflow-auto rounded-[8px] border border-border-strong bg-bg py-1 pr-[86px] pl-2.5 max-sm:pr-[98px] font-mono text-[13px] max-sm:text-[16px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
           />
           <input
             v-else
@@ -547,21 +547,21 @@ defineExpose({ batchProblem, showProblems, clear })
             placeholder="Value"
             autocomplete="off"
             spellcheck="false"
-            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 font-mono text-[13px] text-ink placeholder:font-sans placeholder:text-faint"
+            class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[16px] text-ink placeholder:font-sans placeholder:text-faint"
           />
           <button
             type="button"
             :aria-label="multiline[addedRowId(row)] ? `Use a one-line field for new key ${index + 1}` : `Use a multi-line field for new key ${index + 1}`"
             :aria-pressed="!!multiline[addedRowId(row)]"
             :class="multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-            class="absolute right-[34px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            class="absolute right-[34px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="multiline[addedRowId(row)] = !multiline[addedRowId(row)]"
           ><AppIcon name="lines" :size="13" /></button>
           <button
             v-if="multiline[addedRowId(row)]"
             type="button"
             :aria-label="`Open the new key value ${index + 1} in a full-screen field`"
-            class="absolute top-1.5 right-[62px] inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            class="absolute top-1.5 right-[62px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="openFullscreen(addedRowId(row), `New key value ${index + 1}`, () => row.value, (value) => { row.value = value })"
           ><AppIcon name="expand" :size="13" /></button>
           <button
@@ -570,7 +570,7 @@ defineExpose({ batchProblem, showProblems, clear })
             :aria-label="peek[addedRowId(row)] ? `Hide the new key value ${index + 1}` : `Show the new key value ${index + 1}`"
             :aria-pressed="!!peek[addedRowId(row)]"
             :class="multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-            class="absolute right-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            class="absolute right-1.5 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="peek[addedRowId(row)] = !peek[addedRowId(row)]"
           ><AppIcon :name="peek[addedRowId(row)] ? 'eye-off' : 'eye'" :size="13" /></button>
         </span>
@@ -578,7 +578,7 @@ defineExpose({ batchProblem, showProblems, clear })
           <button
             type="button"
             :aria-label="`Remove new key ${index + 1}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="removeAdded(index)"
           ><AppIcon name="x" :size="13" />Discard</button>
         </span>
@@ -642,7 +642,7 @@ defineExpose({ batchProblem, showProblems, clear })
             autocomplete="off"
             spellcheck="false"
             :class="[concealed(fullscreen.id, fullscreenValue) ? 'conceal' : '', fullscreen.set ? '' : 'cursor-default']"
-            class="min-h-0 w-full flex-1 resize-none rounded-card border border-border-strong bg-surface p-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
+            class="min-h-0 w-full flex-1 resize-none rounded-card border border-border-strong bg-surface p-2.5 font-mono text-[13px] max-sm:text-[16px] leading-relaxed text-ink placeholder:font-sans placeholder:text-faint"
           />
         </div>
       </div>

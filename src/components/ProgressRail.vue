@@ -13,12 +13,14 @@ const emit = defineEmits<{ navigate: [key: string] }>()
 </script>
 
 <template>
-  <nav aria-label="Workflow progress" class="flex items-center">
+  <!-- On a phone the four stops do not fit one width: the nav sizes to its content and scrolls
+       sideways, scrollbar hidden, rather than wrapping into two half-steps. -->
+  <nav aria-label="Workflow progress" class="flex w-max max-w-full items-center overflow-x-auto no-scrollbar">
     <template v-for="(step, i) in steps" :key="step.key">
       <span
         v-if="i"
         aria-hidden="true"
-        class="rail-bar mx-2 h-[1.5px] w-[30px] shrink-0"
+        class="rail-bar mx-1.5 h-[1.5px] w-5 shrink-0 sm:mx-2 sm:w-[30px]"
         :class="{ done: i <= active }"
       />
       <component

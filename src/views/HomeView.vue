@@ -176,12 +176,12 @@ async function refresh() {
       </template>
     </AppPageHeader>
 
-    <p v-if="secrets.loading" role="status" class="flex items-center gap-2 px-[26px] text-sm text-muted">
+    <p v-if="secrets.loading" role="status" class="flex items-center gap-2 page-x text-sm text-muted">
       <AppSpinner :size="15" />
       Loading namespaces…
     </p>
 
-    <div class="px-[26px]">
+    <div class="page-x">
       <AppAlert v-if="secrets.error" type="error" title="Unable to load namespaces">
         <p class="m-0">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
         <AppButton class="mt-2" icon="refresh" :loading="refreshing" @click="refresh">Try again</AppButton>
@@ -196,7 +196,7 @@ async function refresh() {
     <template v-if="secrets.namespaces.length">
       <!-- Two named sets rather than a text box: "the two that are sick" is a question the fleet
            can answer, and typing a namespace's name to find it is not. -->
-      <div v-if="secrets.indexLoaded && (outOfSyncTotal || emptyCount)" class="flex items-center gap-2.5 px-[26px] pt-[18px] pb-3.5">
+      <div v-if="secrets.indexLoaded && (outOfSyncTotal || emptyCount)" class="page-x flex max-sm:flex-wrap items-center gap-2.5 pt-[18px] pb-3.5">
         <button
           v-if="outOfSyncTotal"
           type="button"
@@ -241,7 +241,7 @@ async function refresh() {
            count and the chip above it say both in words.
            `draw` on the grid and `ok`/`bad` on the segments are the names `style.css` animates
            the bars in by; the tile publishes its own width as `--bar-ok`/`--bar-bad`. -->
-      <ul v-else class="tiles draw m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(232px,1fr))] gap-2.5 px-[26px] pb-10">
+      <ul v-else class="tiles draw m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(232px,1fr))] max-sm:grid-cols-1 gap-2.5 page-x pb-10">
         <li v-for="(row, index) in visibleRows" :key="row.name" :style="{ '--d': `${Math.min(index, 8) * 40}ms` }">
           <RouterLink
             :to="`/namespaces/${encodeURIComponent(row.name)}`"

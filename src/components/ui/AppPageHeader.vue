@@ -22,15 +22,17 @@ withDefaults(
 <template>
   <!-- Identity left, actions right. The context under the title answers "where does a change
        here land", which is a quieter question than what the buttons do. -->
-  <div class="flex items-start gap-6 px-[26px] pt-7 pb-[22px]">
+  <div class="page-x flex items-start gap-6 pt-7 pb-[22px] max-sm:flex-wrap max-sm:gap-y-2">
     <div class="min-w-0">
       <div v-if="$slots.back" class="mb-3.5">
         <slot name="back" />
       </div>
 
+      <!-- A cluster identifier can be one long token, so the phone keeps the wrap and drops the
+           forced break: at this width the full string matters more than the ragged edge. -->
       <h1
         :id="titleId || undefined"
-        class="m-0 break-all font-mono text-3xl leading-[1.15] font-semibold tracking-[-0.025em] text-ink"
+        class="m-0 break-all font-mono text-3xl leading-[1.15] font-semibold tracking-[-0.025em] text-ink max-sm:break-normal"
       >{{ title }}</h1>
 
       <slot name="facts">

@@ -157,12 +157,12 @@ watch(() => props.namespace, load)
 
     <!-- Gated on the request, not on `secretsLoaded`: that flag is only ever set by a fetch
          that succeeded, so `!secretsLoaded` keeps claiming to load after one that failed. -->
-    <p v-if="secrets.loading" role="status" class="flex items-center gap-2 px-[26px] pt-4 text-sm text-muted">
+    <p v-if="secrets.loading" role="status" class="flex items-center gap-2 page-x pt-4 text-sm text-muted">
       <AppSpinner :size="15" />
       Loading secrets…
     </p>
 
-    <div class="px-[26px] pt-4">
+    <div class="page-x pt-4">
       <AppAlert v-if="secrets.error" type="error" title="Unable to load secrets">
         <p class="m-0">{{ describeError(secrets.error, 'Unable to load secrets') }}</p>
         <AppButton class="mt-2" icon="refresh" :loading="refreshing" @click="refresh">Try again</AppButton>
@@ -177,12 +177,12 @@ watch(() => props.namespace, load)
 
     <template v-if="secrets.secrets.length">
       <!-- Real buttons with aria-pressed, so the state is announced and keyboard-reachable. -->
-      <div v-if="showFilter" class="flex flex-wrap items-center gap-1.5 px-[26px] pt-[15px] pb-[13px]" role="group" aria-label="Filter by drift">
+      <div v-if="showFilter" class="flex flex-wrap items-center gap-1.5 page-x pt-[15px] pb-[13px]" role="group" aria-label="Filter by drift">
         <button
           v-for="chip in filters"
           :key="chip.value"
           type="button"
-          class="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[8px] border border-border-strong bg-transparent px-3 text-[12.5px] font-semibold whitespace-nowrap text-muted hover:border-muted hover:text-ink"
+          class="inline-flex h-[30px] max-sm:h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border-strong bg-transparent px-3 text-[12.5px] font-semibold whitespace-nowrap text-muted hover:border-muted hover:text-ink"
           :class="
             filter === chip.value
               ? chip.tone === 'danger'
@@ -213,7 +213,7 @@ watch(() => props.namespace, load)
            who loads it. The keys stay on the Secret's own screen, behind opening it.
            The left edge is the state column — silent on a Secret that is in sync, so the eye finds
            the two that are not. -->
-      <div v-else class="px-[26px] pb-11">
+      <div v-else class="page-x pb-11">
         <ul class="m-0 list-none p-0" aria-label="SealedSecrets">
           <li v-for="secret in visibleSecrets" :key="secret.name" class="contents">
             <RouterLink
@@ -235,8 +235,8 @@ watch(() => props.namespace, load)
 
               <span class="font-mono text-xs whitespace-nowrap text-faint">{{ countLabel(secret.key_count, 'key') }}</span>
 
-              <span class="col-span-full flex min-w-0 items-baseline gap-[7px] font-mono text-[11.5px] text-muted">
-                <span v-if="secret.git.file_path" class="truncate" :title="secret.git.file_path">{{ secret.git.file_path }}</span>
+              <span class="col-span-full flex min-w-0 max-sm:flex-wrap items-baseline gap-x-[7px] gap-y-0.5 font-mono text-[11.5px] text-muted">
+                <span v-if="secret.git.file_path" class="min-w-0 break-all" :title="secret.git.file_path">{{ secret.git.file_path }}</span>
                 <span v-else class="text-warning">not in git</span>
                 <span class="shrink-0 text-border-strong" aria-hidden="true">·</span>
                 <span class="shrink-0 whitespace-nowrap text-faint">{{ formatCreatedDate(secret.created_at) }}</span>

@@ -78,15 +78,18 @@ async function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-dvh">
     <a
       class="skip-link absolute -left-[9999px] top-0 z-30 rounded-br-lg border border-border-strong bg-surface px-4 py-2.5 font-semibold text-ink no-underline focus:left-0"
       href="#main-content"
     >Skip to main content</a>
 
     <!-- A band, not a panel: every screen shares it, and a rounded surface here would read as a
-         second page. -->
-    <header class="sticky top-0 z-20 flex items-center gap-[18px] border-b border-border bg-surface px-[22px] py-3">
+         second page.
+         Pinned arithmetic: desktop header = 59px (py-3 + 34px search + border); phone header = 115px
+         (24px padding + 36px row 1 + 10px gap + 44px search + border). The sticky offsets in
+         SecretSurface and NewSecretView are derived from these — change them together. -->
+    <header class="sticky top-0 z-20 flex flex-wrap items-center gap-2.5 border-b border-border bg-surface px-4 py-3 sm:gap-[18px] sm:px-[22px]">
       <RouterLink to="/" class="flex shrink-0 items-center gap-2.5 no-underline">
         <span class="flex size-[30px] items-center justify-center rounded-control bg-accent text-accent-ink">
           <AppIcon name="lock" :size="16" />
@@ -95,8 +98,9 @@ async function logout() {
       </RouterLink>
 
       <!-- The strip is what the query is typed into even when it is answering, so it is never an
-           overlay. -->
-      <SecretSearch v-model="query" />
+           overlay. On a phone it drops to its own full-width row (order-last + basis-full), which
+           is the second row of the pinned 115px header above. -->
+      <SecretSearch v-model="query" class="max-sm:order-last max-sm:basis-full" />
 
       <span class="flex-1" aria-hidden="true" />
 
@@ -110,7 +114,7 @@ async function logout() {
             type="button"
             :aria-label="theme.label"
             :title="theme.label"
-            class="inline-flex h-6 w-[26px] cursor-pointer items-center justify-center rounded-chip border-0"
+            class="inline-flex h-6 w-[26px] max-sm:h-9 max-sm:w-9 cursor-pointer items-center justify-center rounded-chip border-0"
             :class="
               ui.themePreference === theme.value
                 ? 'bg-surface-raised text-accent'
@@ -130,7 +134,7 @@ async function logout() {
         <details v-if="auth.user" ref="account" class="relative shrink-0">
           <summary
             ref="summary"
-            class="flex cursor-pointer list-none items-center gap-2 rounded-control px-1.5 py-1 text-[13px] text-muted hover:bg-surface-raised hover:text-ink [&::-webkit-details-marker]:hidden"
+            class="flex max-sm:py-2 cursor-pointer list-none items-center gap-2 rounded-control px-1.5 py-1 text-[13px] text-muted hover:bg-surface-raised hover:text-ink [&::-webkit-details-marker]:hidden"
           >
             <!-- The initials are the standing mark and the photo only ever covers them, so a
                  missing image, an address the service has no record of, and avatars switched off
@@ -169,8 +173,9 @@ async function logout() {
       </div>
     </header>
 
-    <!-- No horizontal padding here: sections own their own `px-[26px]`, so a full-bleed row can
-         reach the edge its keyline is drawn at. -->
+    <!-- No horizontal padding here: sections own their own gutter through `page-x`, so a
+         full-bleed row can reach the edge its keyline is drawn at — and a phone viewport narrows
+         that gutter to 16px from the one place. -->
     <div class="mx-auto w-[min(1320px,100%)] pb-16">
       <main id="main-content" class="min-w-0">
         <SearchResults v-if="searching" :query="query" />

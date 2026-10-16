@@ -20,7 +20,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
     <span :class="hideLabel ? 'sr-only' : ''">{{ label }}</span>
     <select
       :value="modelValue"
-      class="h-8 w-full cursor-pointer rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] text-ink focus-visible:border-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+      class="h-8 w-full cursor-pointer rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] max-sm:text-[16px] text-ink focus-visible:border-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>

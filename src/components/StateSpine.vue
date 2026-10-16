@@ -35,16 +35,16 @@ const abilities = computed(() => [
        this only states where the change stands. The workflow stages themselves live in the rail
        above the editor now, so this panel no longer repeats them — it answers what the change is
        against, and what this screen is allowed to do. -->
-  <aside aria-label="Change state" class="flex w-[258px] shrink-0 flex-col gap-[22px]">
+  <aside aria-label="Change state" class="flex w-full min-[820px]:w-[258px] shrink-0 flex-col gap-[22px]">
     <div v-if="inFlight">
       <h2 class="mb-[9px] text-xs font-[650] text-muted">Against</h2>
       <div class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]">
         <span class="text-muted">Base commit</span>
-        <span class="font-mono text-xs text-ink">{{ baseCommit || 'Unavailable' }}</span>
+        <span class="min-w-0 break-all font-mono text-xs text-ink">{{ baseCommit || 'Unavailable' }}</span>
       </div>
       <div class="flex items-baseline justify-between gap-3 py-[3px] text-[13px]">
         <span class="text-muted">Branch head</span>
-        <span class="font-mono text-xs text-ink">{{ branchHead || 'Unavailable' }}</span>
+        <span class="min-w-0 break-all font-mono text-xs text-ink">{{ branchHead || 'Unavailable' }}</span>
       </div>
     </div>
 

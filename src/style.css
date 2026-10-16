@@ -184,7 +184,10 @@
 
 body {
   margin: 0;
+  /* dvh after vh: on phones the toolbars fold 100vh past the viewport and the page grows a
+     phantom scroll; the dvh line wins where it is supported and is dropped where it is not. */
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--app-bg);
   color: var(--app-ink);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, ui-sans-serif, system-ui, sans-serif;
@@ -308,3 +311,14 @@ html[data-motion="reduced"] *::after {
     transition-duration: 1ms !important;
   }
 }
+
+/* Phone gutter. Sections own their horizontal padding through this one class rather than a
+   literal, so a phone viewport can narrow the gutter from a single place; desktop keeps the
+   26px handoff a full-bleed keyline can be drawn against. */
+.page-x { padding-inline: 26px; }
+@media (max-width: 640px) { .page-x { padding-inline: 16px; } }
+
+/* Horizontal scroll bands without a scrollbar track (the phone workflow rail), where the
+   track would sit under the thumb and the overflow itself is the affordance. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
