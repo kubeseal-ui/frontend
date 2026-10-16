@@ -30,9 +30,11 @@ const interrupts = computed(() => props.type === 'error' || props.type === 'warn
 </script>
 
 <template>
+  <!-- The 3px left edge replaces the 1px base border there, so the left padding is 2px
+       lighter: both content insets land at 16px. -->
   <div
     :role="interrupts ? 'alert' : 'status'"
-    class="flex flex-col gap-[7px] rounded-[10px] border border-l-[3px] border-border bg-surface px-[15px] py-[14px]"
+    class="flex flex-col gap-[7px] rounded-[10px] border border-l-[3px] border-border bg-surface pr-[15px] pl-[13px] py-[14px]"
     :class="tone.frame"
   >
     <h3 v-if="title" class="m-0 text-[13.5px] font-[650]" :class="tone.text">{{ title }}</h3>

@@ -320,7 +320,7 @@ defineExpose({ batchProblem, showProblems, clear })
         v-for="key in props.detail.keys || []"
         :key="key"
         :ref="(element: unknown) => setRow(key, element)"
-        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] max-sm:grid-cols-1 max-sm:gap-y-2 items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px] transition-colors duration-[110ms] hover:bg-surface"
+        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] max-sm:grid-cols-1 max-sm:gap-y-2 items-center gap-x-5 border-b border-l-2 border-border py-2 pr-[15px] pl-[13px] transition-colors duration-[110ms] hover:bg-surface"
         :class="editing[key] ? 'border-l-accent bg-surface' : 'border-l-transparent'"
         @focusout="leave(stagedRowId(key), $event)"
       >
@@ -507,7 +507,7 @@ defineExpose({ batchProblem, showProblems, clear })
       <li
         v-for="(row, index) in added"
         :key="row.id"
-        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] max-sm:grid-cols-1 max-sm:gap-y-2 items-center gap-x-5 border-b border-l-2 border-border py-2 pr-3.5 pl-[15px]"
+        class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] max-sm:grid-cols-1 max-sm:gap-y-2 items-center gap-x-5 border-b border-l-2 border-border py-2 pr-[15px] pl-[13px]"
         :class="'border-l-transparent'"
         @focusout="leave(addedRowId(row), $event)"
       >
