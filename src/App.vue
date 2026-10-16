@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import { useColorScheme } from '@/composables/useColorScheme'
@@ -9,12 +10,15 @@ import { useColorScheme } from '@/composables/useColorScheme'
 useColorScheme()
 
 const route = useRoute()
+// Keyed on the name, not the path: a param change (namespace switcher, secret to secret)
+// must reuse the mounted view rather than tear the page down and replay the entrance.
+const enterKey = computed(() => route.matched[0]?.name ?? route.fullPath)
 </script>
 
 <template>
   <AppShell>
     <RouterView v-slot="{ Component }">
-      <component :is="Component" :key="route.fullPath" class="view-enter" />
+      <component :is="Component" :key="enterKey" class="view-enter" />
     </RouterView>
   </AppShell>
 </template>
