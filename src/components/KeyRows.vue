@@ -4,6 +4,7 @@ import AppAlert from '@/components/ui/AppAlert.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
 import { describeError } from '@/api'
+import { keyNameProblem } from '@/utils/validation'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { Mutation, MutationOperation, SealedSecretDetail } from '@/types'
@@ -262,6 +263,11 @@ const batchProblem = computed(() => {
     taken.add(key)
   }
   if (collisions.size > 0) return `Every new key needs a name the Secret does not already use: ${[...collisions].join(', ')}.`
+  const invalid = new Set<string>()
+  for (const row of added.value) {
+    if (keyNameProblem(row.key.trim()) !== '') invalid.add(row.key.trim())
+  }
+  if (invalid.size > 0) return `Some new key names Kubernetes refuses: ${[...invalid].join(', ')}.`
   return ''
 })
 
@@ -273,7 +279,7 @@ function addNameProblem(row: { id: number; key: string }) {
   if (key === '') return 'This new key needs a name.'
   if ((props.detail.keys || []).includes(key)) return `This Secret already has a key named ${key}.`
   if (added.value.filter((other) => other.key.trim() === key).length > 1) return 'Two new keys share this name.'
-  return ''
+  return keyNameProblem(key)
 }
 
 function addValueProblem(row: { id: number; key: string; value: string }) {

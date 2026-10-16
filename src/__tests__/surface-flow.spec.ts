@@ -319,6 +319,20 @@ describe('the create path', () => {
     expect(post).not.toHaveBeenCalled()
   })
 
+  // A Secret name is a DNS1123 subdomain; the API server would refuse a space with a generic
+  // INVALID_REQUEST that reads as a broken integration, so the field says so instead.
+  it('refuses a Secret name a space breaks, at the field before anything is sent', async () => {
+    const post = posts({ yaml: 'cipher-sealed', base_commit: 'def456' })
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+
+    await wrapper.find('input[aria-label="New secret name"]').setValue('my secret')
+    await writeManifest(wrapper, 'my secret')
+    await pressEncrypt(wrapper)
+
+    expect(wrapper.text()).toContain('Names can use only lowercase letters, digits, dashes, and dots, and must start and end with a letter or digit.')
+    expect(post).not.toHaveBeenCalled()
+  })
+
   // The rail is the stage made legible: it names where the operator is standing while the one
   // button at the foot only ever names the next press.
   it('shows a progress rail that moves from Compose to Review once a draft exists', async () => {
@@ -376,6 +390,28 @@ describe('the create path', () => {
     const written = (wrapper.find('textarea').element as HTMLTextAreaElement).value
     expect(written).toContain('\n  name: asdasd\n')
     expect(written).not.toContain('asdasdgh')
+  })
+
+  // Typing is keystroke by keystroke: the field rewrites the manifest line mid-word, and the
+  // watcher reading it back must not strip the space the next keystroke still needs. setValue
+  // landing on the final string in one step skips the intermediate state where the space sits
+  // alone at the end of the line.
+  it('keeps a space typed into the name while the manifest line follows it', async () => {
+    const wrapper = await mountCreate({ path_template: '{namespace}/{name}.yaml', allowed_paths: ['{namespace}'] })
+    const input = wrapper.find('input[aria-label="New secret name"]')
+    for (const typed of ['m', 'my', 'my ', 'my s', 'my secret']) {
+      await input.setValue(typed)
+      await flushPromises()
+    }
+
+    expect((input.element as HTMLInputElement).value).toBe('my secret')
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toContain('\n  name: "my secret"\n')
+
+    // The quoting is not a state the field gets stuck in: once the space is gone the line
+    // returns to the plain spelling.
+    await input.setValue('mysecret')
+    await flushPromises()
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toContain('\n  name: mysecret\n')
   })
 
   it('does not read a key called name out of stringData', async () => {

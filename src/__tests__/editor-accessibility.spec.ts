@@ -300,6 +300,23 @@ describe('adding a key', () => {
     expect(vm.batchProblem).toBe('Every new key needs a name the Secret does not already use: password.')
   })
 
+  // Kubernetes refuses data keys outside the ConfigMap-key rule, so a space in a key name is
+  // caught at the row rather than surfacing as drift or a 400 after delivery.
+  it('refuses a key name with a space, at the row and in the batch', async () => {
+    const wrapper = mountRows()
+    await button(wrapper, 'Add a key')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="New key name 1"]').setValue('my key')
+    await wrapper.find('input[aria-label="New key value 1"]').setValue('v')
+
+    expect(wrapper.text()).not.toContain('Key names can use only letters, digits, dashes, underscores, and dots, and must start and end with a letter or digit.')
+    await wrapper.findAll('li').at(-1)!.trigger('focusout', { relatedTarget: null })
+    expect(wrapper.text()).toContain('Key names can use only letters, digits, dashes, underscores, and dots, and must start and end with a letter or digit.')
+
+    const vm = wrapper.vm as unknown as { batchProblem: string }
+    expect(vm.batchProblem).toBe('Some new key names Kubernetes refuses: my key.')
+  })
+
   it('carries a new key as an add alongside the rest of the batch', async () => {
     const wrapper = mountRows()
     await button(wrapper, 'Add a key')!.trigger('click')

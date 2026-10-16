@@ -10,6 +10,7 @@ import { useSecretsStore } from '@/stores/secrets'
 import { ApiError, describeError } from '@/api'
 import { refocusAfterCollapse } from '@/utils/refocus'
 import { revealRegion } from '@/utils/reveal'
+import { secretNameProblem } from '@/utils/validation'
 import { renderNamespace, renderPathTemplate, renderedIdentityTail, templateDirectory } from '@/utils/gitPath'
 import type { NamespaceGitPaths } from '@/types'
 
@@ -107,6 +108,9 @@ function templateFor(secretName: string, namespace: string): string {
 }
 
 function nameLine(secretName: string): string {
+  // A value YAML would misread — any whitespace, or a quote — travels double-quoted, so the
+  // manifest line reads back exactly what was typed, trailing spaces included.
+  if (/[\s"]/.test(secretName)) return JSON.stringify(secretName)
   return secretName === '' ? '""' : secretName
 }
 
@@ -131,8 +135,17 @@ function nameLineIndex(doc: string): number {
 function nameInManifest(doc: string): string | null {
   const index = nameLineIndex(doc)
   if (index === -1) return null
-  const value = doc.split('\n')[index].slice('  name: '.length).trim()
-  return value === '""' ? '' : value
+  const raw = doc.split('\n')[index].slice('  name: '.length)
+  // What this editor wrote is quoted when quoting was needed, so it reads back exactly; a plain
+  // scalar loses its surrounding whitespace to the YAML parser, so trim it to what it would yield.
+  if (raw.startsWith('"')) {
+    try {
+      return JSON.parse(raw) as string
+    } catch {
+      return null
+    }
+  }
+  return raw.trim()
 }
 
 // A line that no longer holds the name last rendered here was written by hand, and moving it is
@@ -160,7 +173,9 @@ const shown = reactive({ name: false, yaml: false, manifest: false, subdirectory
 
 function nameProblem() {
   if (!shown.name) return ''
-  return name.value.trim() === '' ? 'This Secret needs a name.' : ''
+  const trimmed = name.value.trim()
+  if (trimmed === '') return 'This Secret needs a name.'
+  return secretNameProblem(trimmed)
 }
 
 function subdirectoryProblem() {
@@ -325,7 +340,7 @@ async function createDraft() {
     if (e instanceof ApiError && e.code === 'PATH_OCCUPIED') {
       error.value = `${describeError(e, 'Encryption failed')} Use the existing Secret instead: open it from the namespace list and edit one value there.`
     } else if (e instanceof ApiError && e.code === 'INVALID_MANIFEST') {
-      error.value = `${describeError(e, 'Encryption failed')} Check that the name above matches metadata.name in the manifest, and that it is a Secret rather than a SealedSecret.`
+      error.value = `${describeError(e, 'Encryption failed')} Check that the name above matches metadata.name in the manifest, that it is a Secret rather than a SealedSecret, and that every key name uses only letters, digits, dashes, underscores, and dots.`
     } else {
       error.value = describeError(e, 'Encryption failed')
     }

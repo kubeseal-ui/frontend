@@ -41,8 +41,13 @@ const summary = computed(() => (props.count === 1 ? '1 change' : `${props.count}
 <template>
   <!-- The next press, and only ever one of them: no toolbar to work out the order of. Sticky and
        opaque, because a bar that let the ciphertext show through it would make the one primary
-       control on the screen the least legible thing on it. -->
-  <div class="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-bg pt-3.5 pb-[max(8px,env(safe-area-inset-bottom))]">
+       control on the screen the least legible thing on it. The stickiness exists so the press is
+       always in reach mid-scroll; an idle bar has no press, so it flows at the content's end
+       rather than gluing a sentence to the viewport's bottom edge. -->
+  <div
+    class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-bg pt-3.5 pb-[max(8px,env(safe-area-inset-bottom))]"
+    :class="idle ? '' : 'sticky bottom-0 z-10'"
+  >
     <span v-if="idle" class="text-[12.5px] text-muted">{{ idle }}</span>
     <template v-else>
       <span class="font-mono text-xs text-muted">{{ summary }}</span>
