@@ -84,11 +84,11 @@ const retry = () => secrets.fetchIndex().catch(() => {
           v-for="hit in group.rows"
           :key="hit.name"
           :to="`/secrets/${encodeURIComponent(hit.namespace)}/${encodeURIComponent(hit.name)}`"
-          class="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] max-sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-x-[22px] border-b border-border page-x py-[9px] text-inherit no-underline hover:bg-surface focus-visible:bg-surface"
+          class="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)_auto] max-sm:grid-cols-[minmax(0,1fr)_auto] items-center gap-x-[22px] border-b border-border page-x py-[9px] text-inherit no-underline hover:bg-surface focus-visible:bg-surface [&:hover_.name]:text-accent"
         >
           <span class="min-w-0">
             <!-- The query is already in the strip, so a name that matched says which part of it did. -->
-            <span class="block truncate font-mono text-[14.5px] font-[550] text-ink max-sm:whitespace-normal max-sm:break-all">
+            <span class="name block truncate font-mono text-[14.5px] font-[550] text-ink max-sm:whitespace-normal max-sm:break-all">
               <template v-for="(segment, index) in highlightSegments(hit.name, props.query)" :key="index">
                 <mark v-if="segment.hit" class="bg-transparent text-accent">{{ segment.text }}</mark>
                 <template v-else>{{ segment.text }}</template>

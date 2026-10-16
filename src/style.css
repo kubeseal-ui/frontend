@@ -224,6 +224,14 @@ select:hover:not(:focus):not(:disabled) {
   to { opacity: 1; transform: none; }
 }
 
+/* The press registers: a held pointer dims a button a step. */
+button:active:not(:disabled) { opacity: 0.82; }
+
+/* Panels and marks that answer a press: the account menu settles in, its chevron turns. */
+.pop-in { animation: menter var(--mo-quick) var(--mo-out) both; }
+details summary .chev { transition: rotate var(--mo-quick) var(--mo-out); }
+details[open] summary .chev { rotate: 180deg; }
+
 /* The focus ring is the one place the accent is allowed to be a hard outline, and it is
    the one thing in the product that must never animate: a keyboard user may not wait for
    their position to settle. */

@@ -157,12 +157,12 @@ async function logout() {
               />
             </span>
             <span class="sr-only md:not-sr-only">{{ displayName || 'Account' }}</span>
-            <AppIcon name="chevron-down" :size="12" class="text-faint" />
+            <AppIcon name="chevron-down" :size="12" class="chev text-faint" />
           </summary>
 
           <!-- A surface with a full border and no shadow: the app has no elevation layer to
                borrow, and a panel that floats above the header would be the only one. -->
-          <div class="absolute right-0 top-[calc(100%+6px)] z-10 min-w-[200px] rounded-control border border-border-strong bg-surface p-1.5">
+          <div class="pop-in absolute right-0 top-[calc(100%+6px)] z-10 min-w-[200px] rounded-control border border-border-strong bg-surface p-1.5">
             <p v-if="email" class="m-0 truncate border-b border-border px-2 pb-[7px] font-mono text-[11.5px] text-muted">
               {{ email }}
             </p>
