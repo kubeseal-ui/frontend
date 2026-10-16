@@ -33,7 +33,8 @@ async function copy() {
       <button
         v-if="yaml"
         type="button"
-        class="inline-flex cursor-pointer items-center gap-[5px] rounded-chip border border-border-strong bg-surface/70 px-2.5 py-1 text-xs font-medium text-ink"
+        class="inline-flex cursor-pointer items-center gap-[5px] rounded-chip border bg-surface/70 px-2.5 py-1 text-xs font-medium transition-colors"
+        :class="copied ? 'border-success/60 text-success' : 'border-border-strong text-ink hover:border-muted'"
         @click="copy"
       ><AppIcon :name="copied ? 'check' : 'copy'" :size="13" />{{ copied ? 'Copied' : 'Copy YAML' }}</button>
       <span role="status" class="text-xs text-muted">{{ copied ? 'The manifest is on the clipboard.' : '' }}</span>

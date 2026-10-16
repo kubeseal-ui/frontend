@@ -90,7 +90,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       v-if="modelValue"
       type="button"
       aria-label="Clear the search"
-      class="shrink-0 cursor-pointer rounded-[5px] border border-accent/40 bg-transparent px-[5px] py-px font-mono text-[11px] text-accent"
+      class="shrink-0 cursor-pointer rounded-[5px] border border-accent/40 bg-transparent px-[5px] py-px font-mono text-[11px] text-accent hover:border-accent hover:bg-accent/10"
       @click="emit('update:modelValue', ''); box?.focus()"
     >esc</button>
     <kbd

@@ -161,11 +161,7 @@
   }
 }
 
-/* Motion. The palette specs capture colour values only and reject a var() they did not
-   capture, so the durations are literals here rather than palette entries. Only five things
-   use the long steps — the tile draw, the reveal, the staged panel, the press label, and the
-   workflow rail — and every one of them collapses under the reduced-motion switch below.
-   Everything else rides the pointer transition, which is the quick step. */
+/* Motion. Durations stay literals: the palette specs reject a var() they did not capture. */
 :root {
   /* What each drawn bar grows to. The tile publishes its own width here, because an animation
      cannot read the inline `width` it is replacing. */
@@ -197,15 +193,35 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* One transition for the things that change on pointer, at the quick step. Only colours and
-   opacity are in the list on purpose: nothing in this design moves or lifts, and the only
-   shadow is the focus ring. */
+/* Pointer vocabulary: colours, opacity, one pixel of lift; transform stays out so tiles opt in. */
 button, a {
   transition:
     color var(--mo-quick) var(--mo-out),
     background-color var(--mo-quick) var(--mo-out),
     border-color var(--mo-quick) var(--mo-out),
     opacity var(--mo-quick) var(--mo-out);
+}
+
+/* The tile's lift — transform only, so it starts the instant the pointer lands. */
+a.tiles-lift { transition: transform 120ms var(--mo-out); }
+a.tiles-lift:hover { transform: translateY(-1px); }
+
+/* Fields answer hover a half-step quieter than the pointer step. */
+input[type="text"], input[type="search"], textarea, select {
+  transition: border-color var(--mo-base) var(--mo-out);
+}
+input[type="text"]:hover:not(:focus):not(:disabled),
+input[type="search"]:hover:not(:focus):not(:disabled),
+textarea:hover:not(:focus):not(:disabled),
+select:hover:not(:focus):not(:disabled) {
+  border-color: var(--app-border-strong);
+}
+
+/* One rise per navigation; applied by a keyed remount on <RouterView>. */
+.view-enter { animation: menter var(--mo-load) var(--mo-out) both; }
+@keyframes menter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* The focus ring is the one place the accent is allowed to be a hard outline, and it is

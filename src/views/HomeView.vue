@@ -245,7 +245,7 @@ async function refresh() {
         <li v-for="(row, index) in visibleRows" :key="row.name" :style="{ '--d': `${Math.min(index, 8) * 40}ms` }">
           <RouterLink
             :to="`/namespaces/${encodeURIComponent(row.name)}`"
-            class="relative block overflow-hidden rounded-card border bg-surface px-[15px] pt-[15px] pb-[19px] no-underline transition-[border-color,background,transform] duration-[120ms] hover:-translate-y-px hover:bg-surface-raised focus-visible:bg-surface-raised"
+            class="tiles-lift relative block overflow-hidden rounded-card border bg-surface px-[15px] pt-[15px] pb-[19px] no-underline hover:bg-surface-raised focus-visible:bg-surface-raised"
             :class="
               row.outOfSync
                 ? 'border-[color-mix(in_srgb,var(--app-danger)_45%,var(--app-border))] hover:border-danger'
