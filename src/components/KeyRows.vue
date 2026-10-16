@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppRadioGroup from '@/components/ui/AppRadioGroup.vue'
@@ -81,14 +81,18 @@ function trapTab(event: KeyboardEvent) {
   else if (!event.shiftKey && document.activeElement === last) { first.focus(); event.preventDefault() }
 }
 
-// The page behind the overlay is still there; only the field holds the screen.
+// The page behind the overlay is still there; only the field holds the screen. A route change
+// unmounts this component without the watcher firing again, so the lock is released here too.
 watch(fullscreen, (open) => { document.body.style.overflow = open ? 'hidden' : '' })
+onUnmounted(() => { document.body.style.overflow = '' })
 
 const added = ref<{ id: number; key: string; value: string }[]>([])
 const activeKey = ref('')
 const error = ref('')
 const addInputs = ref<Record<number, HTMLInputElement | null>>({})
+const addButton = ref<HTMLButtonElement | null>(null)
 const rows = ref<Record<string, HTMLLIElement | null>>({})
+const revealButtons = ref<Record<string, HTMLButtonElement | null>>({})
 
 const namespace = computed(() => props.detail.namespace)
 const canReveal = computed(() => auth.hasCapability(namespace.value, 'secret:decrypt'))
@@ -143,10 +147,15 @@ async function reveal(key: string) {
 }
 
 /** Drops the plaintext this page is holding; the Secret itself is untouched. */
-function conceal(key: string) {
+async function conceal(key: string) {
   if (fullscreen.value?.id === revealRowId(key)) fullscreen.value = null
   delete revealed[key]
+  // Conceal is unmounted by its own press, so focus moves to the Reveal that replaces it rather
+  // than falling to the body.
+  await nextTick()
+  revealButtons.value[key]?.focus()
 }
+const setRevealButton = (key: string, element: unknown) => { revealButtons.value[key] = element instanceof HTMLButtonElement ? element : null }
 
 // Focus follows the row that was just opened. Change is the button that opened it and is gone
 // the moment it is pressed, so without this focus falls to the body and the keyboard user tabs
@@ -175,12 +184,19 @@ async function addRow() {
   addInputs.value[id]?.focus()
 }
 
-function removeAdded(index: number) {
+// The Discard button is inside the row it removes, so focus has to be carried out of it: to the
+// row that takes its place, or to the Add button when that was the last one.
+async function removeAdded(index: number) {
   const [row] = added.value.splice(index, 1)
   if (row) {
     if (fullscreen.value?.id === addedRowId(row)) fullscreen.value = null
     delete shown[addedRowId(row)]; delete peek[addedRowId(row)]; delete multiline[addedRowId(row)]
   }
+  await nextTick()
+  const next = added.value[index] ?? added.value[added.value.length - 1]
+  const input = next ? addInputs.value[next.id] : null
+  if (input) input.focus()
+  else addButton.value?.focus()
 }
 
 const setAddInput = (id: number, element: unknown) => { addInputs.value[id] = element instanceof HTMLInputElement ? element : null }
@@ -359,6 +375,7 @@ defineExpose({ batchProblem, showProblems, clear })
         <span class="flex items-center gap-[3px]">
           <button
             v-if="canRevealValue && !hasRevealed(key)"
+            :ref="(el) => setRevealButton(key, el)"
             type="button"
             :disabled="!!activeKey"
             :aria-label="`Reveal ${key}`"
@@ -572,6 +589,7 @@ defineExpose({ batchProblem, showProblems, clear })
     <!-- The ledger's last line: a key that is not here yet is added where the others are. -->
     <button
       v-if="canPatch"
+      ref="addButton"
       type="button"
       class="flex w-full cursor-pointer items-center gap-[7px] border-0 border-b border-border bg-transparent px-[15px] py-[11px] text-left text-[12.5px] font-semibold text-muted hover:bg-surface hover:text-accent"
       @click="addRow"

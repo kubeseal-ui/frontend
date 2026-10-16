@@ -198,11 +198,12 @@ function leave(field: 'name' | 'yaml' | 'subdirectory', event: FocusEvent) {
 // operator is standing.
 const open = computed(() => !draft.value)
 // A native button rather than a wrapper, so the ref is the element itself — `refocusAfterCollapse`
-// takes an element, and a wrapper's ref would be a component instance.
+// takes an element, and a wrapper's ref would be a component instance. The two native inputs below
+// follow the same rule; only `yamlInput` is a component, so only it carries `$el`.
 const toggle = ref<HTMLElement | null>(null)
-const nameInput = ref<{ $el?: HTMLElement } | null>(null)
+const nameInput = ref<HTMLElement | null>(null)
 const yamlInput = ref<{ $el?: HTMLElement } | null>(null)
-const subdirectoryInput = ref<{ $el?: HTMLElement } | null>(null)
+const subdirectoryInput = ref<HTMLElement | null>(null)
 // What the folded row spells out. The draft's own name rather than the field's, because the row
 // reports what was sealed and the field is free to be retyped underneath it.
 const summary = computed(() => ({
@@ -219,7 +220,7 @@ watch(draft, async (next) => {
   // Whichever control goes with the draft takes focus with it: the toggle that replaced the form
   // when the draft landed, and the form's first field when the draft is dropped and the toggle is
   // the thing that goes. `null` is a dropped draft, and it is the same target `discard` names.
-  await refocusAfterCollapse(() => (next ? toggle.value : nameInput.value?.$el))
+  await refocusAfterCollapse(() => (next ? toggle.value : nameInput.value))
 }, { flush: 'post' })
 
 // A delivered draft has been sealed and committed, so the plaintext it was built from is spent:
@@ -301,8 +302,11 @@ async function encrypt() {
   await nextTick()
   // The first field that needs answering is the one focus lands on, so the name is asked before
   // the path it lands in and the path before the manifest that goes in it.
-  const focus = nameProblem() ? nameInput : subdirectoryProblem() ? subdirectoryInput : yamlProblem() ? yamlInput : null
-  if (focus) { focus.value?.$el?.focus(); return }
+  const focus = nameProblem() ? nameInput.value
+    : subdirectoryProblem() ? subdirectoryInput.value
+    : yamlProblem() ? yamlInput.value?.$el
+    : null
+  if (focus) { focus.focus(); return }
   await createDraft()
 }
 
@@ -336,7 +340,7 @@ function discard() {
   shown.name = false; shown.yaml = false; shown.manifest = false; shown.subdirectory = false
   // Discarding takes the button that was pressed with it, so focus is carried to the field
   // the emptied form starts at rather than dropped on `<body>`.
-  return refocusAfterCollapse(() => nameInput.value?.$el)
+  return refocusAfterCollapse(() => nameInput.value)
 }
 
 // A plaintext manifest must not outlive the page it was pasted on.

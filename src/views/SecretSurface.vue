@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -152,6 +152,8 @@ const reviewFold = ref<HTMLElement | null>(null)
 const checkFold = ref<HTMLElement | null>(null)
 const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
 const pressErrorAlert = ref<{ $el?: HTMLElement } | null>(null)
+const syncOutcomeAlert = ref<{ $el?: HTMLElement } | null>(null)
+const syncErrorAlert = ref<{ $el?: HTMLElement } | null>(null)
 watch(() => Boolean(store.review) && !store.check, (open) => { if (open) revealRegion(() => reviewFold.value) })
 watch(() => Boolean(store.check), (open) => { if (open) revealRegion(() => checkFold.value) })
 watch(() => store.delivery, (delivered) => { if (delivered) revealRegion(() => deliveryAlert.value?.$el, { focus: true }) })
@@ -240,7 +242,15 @@ async function onSync() {
     syncOutcome.value = await store.syncToGit(namespace(), name(), syncBaseCommit.value)
   } catch (e) {
     syncError.value = describeError(e, 'The live Secret could not be synced to Git')
-  } finally { syncing.value = false; confirming.value = false }
+  } finally {
+    syncing.value = false
+    // The dialog unmounts with the pressed button inside it, so focus is carried to the alert the
+    // press produced rather than left on `<body>`; the opener is the fallback when there is none.
+    const fallback = confirmReturn
+    confirmReturn = null
+    confirming.value = false
+    void revealRegion(() => syncOutcomeAlert.value?.$el ?? syncErrorAlert.value?.$el ?? fallback, { focus: true })
+  }
 }
 
 // A sync overwrites the mapped file, so it is confirmed first, and the dialog carries both
@@ -276,7 +286,9 @@ function trapConfirmTab(event: KeyboardEvent) {
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
 }
+// A route change unmounts this view without the watcher firing again, so the lock is released here.
 watch(confirming, (open) => { document.body.style.overflow = open ? 'hidden' : '' })
+onUnmounted(() => { document.body.style.overflow = '' })
 
 // --- Load ------------------------------------------------------------------
 async function load() {
@@ -342,7 +354,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
           </div>
 
           <!-- Reported like a delivery, because it is the same result shape. -->
-          <AppAlert v-if="syncOutcome" type="success" :title="syncTitle" class="mb-5">
+          <AppAlert v-if="syncOutcome" ref="syncOutcomeAlert" type="success" :title="syncTitle" class="mb-5">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncSummary }}</p>
             <a
               v-if="syncOutcome?.proposal_url"
@@ -356,7 +368,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             </p>
           </AppAlert>
 
-          <AppAlert v-if="syncError" type="error" title="The live Secret could not be synced to Git" class="mb-[3px]">
+          <AppAlert v-if="syncError" ref="syncErrorAlert" type="error" title="The live Secret could not be synced to Git" class="mb-[3px]">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncError }}</p>
           </AppAlert>
 
