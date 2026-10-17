@@ -719,6 +719,25 @@ describe('the surface', () => {
     expect(store.review).toBeNull()
   })
 
+  // Editing is a seal, not a decrypt: a namespace that grants secret:seal without secret:decrypt can
+  // stage, review, and apply a change. Only Reveal is withheld, because only Reveal reads a value.
+  it('stages and reviews a change with seal alone, withholding only reveal', async () => {
+    posts(DIFF)
+    const { wrapper } = await mountSurface(detail(), ['metadata:read', 'secret:seal'])
+    await flushPromises()
+
+    const reveal = wrapper.findAll('button').filter((button) => button.attributes('aria-label')?.startsWith('Reveal ') === true)
+    expect(reveal).toHaveLength(0)
+    expect(wrapper.findAll('button').map((button) => button.text())).toContain('Add a key')
+
+    await wrapper.findAll('button').find((candidate) => candidate.text() === 'Change')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[aria-label="Replacement value for password"]').setValue('rotated')
+    await flushPromises()
+
+    expect(wrapper.findAll('button').map((button) => button.text())).toContain('Review change')
+  })
+
   it('withholds editing and says so when the Git source is not in sync', async () => {
     const { wrapper } = await mountSurface(detail({ git: git({ drift: 'unknown', in_sync_with_live: false }) }))
     await flushPromises()
