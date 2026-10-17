@@ -12,18 +12,12 @@ import { avatarUrl } from '@/utils/avatar'
 const auth = useAuthStore()
 const ui = useUiStore()
 
-// The query lives here, above the route, because the strip replaces the page rather than floating
-// over it. Nothing else reads it, which is what lets the route below stay mounted — `v-show`, not
-// `v-if` — so a Secret with a half-staged change is still there when the search is cleared.
+// The query lives here so the strip can replace the page with `v-show`, keeping a Secret with a half-staged change mounted underneath.
 const query = ref('')
-// Searching is a session-bound action: the strip is the one control that reads the whole cluster,
-// so it is not offered — and its results are not rendered — once the session is gone.
+// Searching reads the whole cluster, so it is neither offered nor rendered once the session is gone.
 const searching = computed(() => Boolean(auth.user) && query.value.trim() !== '')
 
-// A result in the strip is a link, and the strip replaces the page rather than floating over it, so
-// following a hit has to clear the query — otherwise the results stay mounted over the Secret the
-// link just loaded (the route changes and the fetch runs, but `v-if="searching"` keeps covering it).
-// The query lives here, not in the URL, so no navigation clears it on its own; any route change does.
+// A followed hit must clear the query, or the results stay mounted over the Secret the link just loaded; no route change clears it on its own.
 const route = useRoute()
 const router = useRouter()
 watch(() => route.fullPath, () => { query.value = '' })
@@ -35,18 +29,14 @@ const initials = computed(() =>
 )
 const email = computed(() => auth.user?.email ?? '')
 
-// The account photo, empty unless the deployment names an endpoint — see utils/avatar.ts. A failed
-// load resets with the address it belongs to, so one account's miss cannot blank the next one's.
+// The account photo, empty unless the deployment names an endpoint — see utils/avatar.ts; a failed load resets with the address it belongs to.
 const photo = computed(() => avatarUrl(email.value))
 const photoFailed = ref(false)
 watch(photo, () => {
   photoFailed.value = false
 })
 
-// The account control is a native disclosure: the toggle, the keyboard operation and the
-// announcement are the element's own. What it does not have is a way out — Escape closes it and
-// hands focus back to the summary it came from, and a click anywhere else closes it, which is also
-// what every navigation in this app is.
+// The account control is a native disclosure; Escape closes it and returns focus to its summary, and a click elsewhere closes it, as every navigation does.
 const account = ref<HTMLDetailsElement | null>(null)
 const summary = ref<HTMLElement | null>(null)
 
@@ -77,8 +67,7 @@ const themes: { value: ThemePreference; label: string; icon: IconName }[] = [
 
 async function logout() {
   await auth.logout()
-  // Replace, not push: back from the signed-out page should not land on the sessionless view the
-  // operator just left. The store's signedOut flag holds off the 401 redirect while this resolves.
+  // Replace, not push: back from the signed-out page must not land on the sessionless view just left; the store's signedOut flag holds off the 401 redirect.
   await router.replace('/signed-out')
 }
 </script>
@@ -90,11 +79,7 @@ async function logout() {
       href="#main-content"
     >Skip to main content</a>
 
-    <!-- A band, not a panel: every screen shares it, and a rounded surface here would read as a
-         second page.
-         Pinned arithmetic: desktop header = 59px (py-3 + 34px search + border); phone header = 105px
-         (24px padding + 36px row 1 + 10px gap + 34px search + border). The sticky offsets in
-         SecretSurface and NewSecretView are derived from these — change them together. -->
+    <!-- Pinned arithmetic: desktop header 59px, phone 105px; the sticky offsets in SecretSurface and NewSecretView are derived from these — change together. -->
     <header class="sticky top-0 z-20 flex flex-wrap items-center gap-2.5 border-b border-border bg-surface px-4 py-3 sm:gap-[18px] sm:px-[22px]">
       <RouterLink to="/" class="flex shrink-0 items-center gap-2.5 no-underline">
         <span class="flex size-[30px] items-center justify-center rounded-control bg-accent text-accent-ink">
@@ -103,16 +88,13 @@ async function logout() {
         <span class="hidden text-[15px] font-bold tracking-[-0.03em] text-ink sm:inline">kubeseal</span>
       </RouterLink>
 
-      <!-- The strip is what the query is typed into even when it is answering, so it is never an
-           overlay. On a phone it drops to its own full-width row (order-last + basis-full), which
-           is the second row of the pinned 105px header above. -->
+      <!-- The strip is typed into even while answering, so it is never an overlay; on a phone it drops to its own row, the second of the pinned 105px. -->
       <SecretSearch v-if="auth.user" v-model="query" class="max-sm:order-last max-sm:basis-full" />
 
       <span class="flex-1" aria-hidden="true" />
 
       <div class="flex shrink-0 items-center gap-2.5">
-        <!-- Pressed buttons, not a radio group: each one is its glyph alone, so aria-label is its
-             name. -->
+        <!-- Pressed buttons, not a radio group: each is its glyph alone, so aria-label is its name. -->
         <div class="flex items-center gap-[2px] rounded-control border border-border bg-bg p-[3px]" role="group" aria-label="Colour theme">
           <button
             v-for="theme in themes"
@@ -133,18 +115,13 @@ async function logout() {
           </button>
         </div>
 
-        <!-- The account is one control: the photo, the name, and the way out are the same subject,
-             and a Sign out button standing beside them read as unrelated to the account it ends.
-             The name drops visually below md but stays in the accessibility tree, because an
-             avatar-only control would otherwise have no name at all. -->
+        <!-- The account is one control — photo, name, and way out — and the name stays in the accessibility tree below md so an avatar-only control still has a name. -->
         <details v-if="auth.user" ref="account" class="relative shrink-0">
           <summary
             ref="summary"
             class="flex max-sm:py-2 cursor-pointer list-none items-center gap-2 rounded-control px-1.5 py-1 text-[13px] text-muted hover:bg-surface-raised hover:text-ink [&::-webkit-details-marker]:hidden"
           >
-            <!-- The initials are the standing mark and the photo only ever covers them, so a
-                 missing image, an address the service has no record of, and avatars switched off
-                 are all the same rendering. -->
+            <!-- The initials are the standing mark and the photo only covers them, so a missing image, an unknown address, and avatars off render the same. -->
             <span class="relative flex size-[26px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-strong bg-surface-raised text-[10px] font-bold text-ink">
               <span aria-hidden="true">{{ initials }}</span>
               <img
@@ -160,8 +137,7 @@ async function logout() {
             <AppIcon name="chevron-down" :size="12" class="chev text-faint" />
           </summary>
 
-          <!-- A surface with a full border and no shadow: the app has no elevation layer to
-               borrow, and a panel that floats above the header would be the only one. -->
+          <!-- A surface with a full border and no shadow: the app has no elevation layer, and a floating panel would be the only one. -->
           <div class="pop-in absolute right-0 top-[calc(100%+6px)] z-10 min-w-[200px] rounded-control border border-border-strong bg-surface p-1.5">
             <p v-if="email" class="m-0 truncate border-b border-border px-2 pb-[7px] font-mono text-[11.5px] text-muted">
               {{ email }}
@@ -179,9 +155,7 @@ async function logout() {
       </div>
     </header>
 
-    <!-- No horizontal padding here: sections own their own gutter through `page-x`, so a
-         full-bleed row can reach the edge its keyline is drawn at — and a phone viewport narrows
-         that gutter to 16px from the one place. -->
+    <!-- No horizontal padding: sections own their gutter through `page-x`, so a full-bleed row can reach its keyline and a phone narrows the gutter in one place. -->
     <div class="mx-auto w-[min(1320px,100%)] pb-16">
       <main id="main-content" class="min-w-0">
         <SearchResults v-if="searching" :query="query" />

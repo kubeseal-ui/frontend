@@ -2,8 +2,7 @@
 import { computed } from 'vue'
 import AppIcon from './AppIcon.vue'
 
-// The role follows the tone: an error or warning interrupts (`role="alert"`), an
-// informational or success note does not (`role="status"`).
+// The role follows the tone: an error or warning interrupts (`alert`), informational and success notes do not (`status`).
 const props = withDefaults(
   defineProps<{
     type?: 'info' | 'success' | 'warning' | 'error'
@@ -15,9 +14,7 @@ const props = withDefaults(
 
 defineEmits<{ close: [] }>()
 
-// One box, four tones: a flat surface with the tone on its left edge and its heading. It is the
-// result of something the workflow did, so it sits in the column at the page's own weight rather
-// than floating above it.
+// One box, four tones: a flat surface with the tone on its left edge and its heading, at the page's own weight.
 const TONES: Record<string, { frame: string; text: string }> = {
   info: { frame: 'border-l-info', text: 'text-info' },
   success: { frame: 'border-l-success', text: 'text-success' },
@@ -30,8 +27,7 @@ const interrupts = computed(() => props.type === 'error' || props.type === 'warn
 </script>
 
 <template>
-  <!-- The 3px left edge replaces the 1px base border there, so the left padding is 2px
-       lighter: both content insets land at 16px. -->
+  <!-- The 3px left edge replaces the 1px base border there, so the left padding is 2px lighter: both content insets land at 16px. -->
   <div
     :role="interrupts ? 'alert' : 'status'"
     class="flex flex-col gap-[7px] rounded-[10px] border border-l-[3px] border-border bg-surface pr-[15px] pl-[13px] py-[14px]"

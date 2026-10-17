@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-// One grid, two columns, the rule between them drawn by the 1px gap. The pane headings are what
-// tell before from after, so neither column carries a border of its own. With no before to compare
-// against there is one column, and the heading moves out of the box to sit above it — where the
-// manifest field it replaces keeps its own label.
+// One grid, two columns, the rule between them drawn by the 1px gap; the pane headings tell before from after, so neither column carries a border.
 const props = defineProps<{ before?: string; after: string; beforeLabel?: string; afterLabel?: string }>()
 
 const lines = (text?: string) => (text ? text.replace(/\n$/, '').split('\n') : [])
 
 type Op = { type: 'same' | 'del' | 'add'; text: string }
 
-// Longest common subsequence, then adjacent deletes and adds are zipped into one row each so a
-// changed key reads across rather than as a deletion above an insertion.
+// Longest common subsequence, then adjacent deletes and adds are zipped so a changed key reads across rather than as a deletion above an insertion.
 function align(before: string[], after: string[]): Op[] {
   const n = before.length
   const m = after.length
@@ -35,8 +31,7 @@ function align(before: string[], after: string[]): Op[] {
   return ops
 }
 
-// A create has no before to compare against, so the one column names what is about to be written
-// rather than pairing with an empty one.
+// A create has no before, so the one column names what is about to be written rather than pairing with an empty one.
 const paired = computed(() => Boolean(props.before))
 const afterHeading = computed(() => props.afterLabel || (paired.value ? 'Git, after' : 'What will be written'))
 const beforeHeading = computed(() => props.beforeLabel || 'Git, before')
@@ -75,11 +70,7 @@ const TONES: Record<string, string> = { same: 'text-faint', add: 'text-success',
 
 <template>
   <div class="flex flex-col">
-    <!-- Unpaired, the heading names the whole box rather than a pane in it: with one column there
-         is nothing inside the border for it to be the heading *of*, and the box it replaces — the
-         manifest field — is labelled above itself the same way. It is keyed inside the roll the
-         press bar's label uses, so the heading and the label under the operator's finger advance
-         together rather than one rolling while the other snaps. -->
+    <!-- Unpaired, the heading names the whole box; it is keyed inside the same roll as the press bar's label so the two advance together. -->
     <span v-if="!paired" class="mb-2 block font-sans text-[11px] font-semibold text-muted">
       <Transition mode="out-in" enter-active-class="roll-next" leave-active-class="roll-out">
         <span :key="afterHeading" class="inline-block">{{ afterHeading }}</span>
@@ -94,8 +85,7 @@ const TONES: Record<string, string> = { same: 'text-faint', add: 'text-success',
           <span class="mb-[7px] block font-sans text-[11px] font-semibold text-muted">{{ beforeHeading }}</span>
           <div v-for="(row, index) in rows" :key="`b${index}`" :class="TONES[row.lk]">{{ row.left }}</div>
         </div>
-        <!-- Paired, each pane needs its own heading and neither of them ever changes: the edit path
-             passes no after-label, so there is no roll to play here. -->
+        <!-- Paired, each pane needs its own heading and neither ever changes: the edit path passes no after-label. -->
         <div class="max-sm:break-all bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
           <span class="mb-[7px] block font-sans text-[11px] font-semibold text-muted">{{ afterHeading }}</span>
           <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>

@@ -40,8 +40,7 @@ interface DriftFilterChip {
 
 const filter = ref<DriftFilter>('all')
 
-// "Out of sync" covers every non-in-sync state: they all want the same thing from the reader.
-const driftCounts = computed(() => {
+// "Out of sync" covers every non-in-sync state: they all want the same thing from the reader. = computed(() => {
   const total = secrets.secrets.length
   const inSync = secrets.secrets.filter((secret) => secret.git.drift === 'in-sync').length
   return { total, inSync, outOfSync: total - inSync }
@@ -53,8 +52,7 @@ const filters = computed<DriftFilterChip[]>(() => [
   { value: 'out-of-sync', label: 'Out of sync', icon: 'alert', tone: 'danger', count: driftCounts.value.outOfSync },
 ])
 
-// A filter earns its place only when it can exclude something: with everything in sync it is
-// three buttons offering a choice that does not exist.
+// A filter earns its place only when it can exclude something: with everything in sync it offers a choice that does not exist.
 const showFilter = computed(() => driftCounts.value.inSync > 0 && driftCounts.value.outOfSync > 0)
 
 // One predicate for both sides, so a Secret cannot fall under neither chip nor both.
@@ -67,8 +65,7 @@ const visibleSecrets = computed(() => {
 const emptyFilterDescription = computed(() =>
   filter.value === 'in-sync' ? 'No SealedSecrets are in sync' : 'No SealedSecrets are out of sync')
 
-// The constants of this namespace, lifted off the rows. Printed per row they were the same
-// sentence ten times, and a row that says what every other row says is a row nobody reads.
+// The constants of this namespace, lifted off the rows; a row that says what every other row says is a row nobody reads.
 const facts = computed<Fact[]>(() => {
   if (!secrets.secretsLoaded || secrets.secrets.length === 0) return []
   const keys = secrets.secrets.reduce((sum, secret) => sum + (secret.key_count || 0), 0)
@@ -102,9 +99,7 @@ const grantLine = computed(() =>
 // Joins a listing already in flight rather than asking twice: the store keys it by namespace.
 const load = () => secrets.ensureSecrets(props.namespace).catch(() => {})
 
-// Refresh forces a re-fetch, where load() would be a no-op: ensureSecrets returns the cached
-// listing once it has loaded, so wiring Refresh to it left the button doing nothing on an
-// already-loaded namespace — exactly when someone presses Refresh to see new drift.
+// Refresh forces a re-fetch, where load() is a no-op: ensureSecrets returns the cached listing, so Refresh looked dead on a loaded namespace.
 const refreshing = ref(false)
 async function refresh() {
   if (refreshing.value) return
@@ -117,9 +112,7 @@ async function refresh() {
 }
 
 load()
-// The route record is the same one for every namespace and <RouterView /> is unkeyed, so this
-// instance is reused when the parameter changes. Without the watch, going Back from one namespace
-// to another renders the listing that was already in the store under the new namespace's name.
+// This instance is reused when the parameter changes, so without the watch one namespace's listing renders under the next namespace's name.
 watch(() => props.namespace, load)
 </script>
 
@@ -139,9 +132,7 @@ watch(() => props.namespace, load)
       <template v-if="hasContext" #context><span v-if="destination">delivering to <span class="font-mono text-muted">{{ destination }}</span><template v-if="grantLine"> · </template></span><span v-if="grantLine">{{ grantLine }}</span></template>
 
       <template #actions>
-        <!-- A link, not a button: AppButton renders a bare <button>, and navigating is what this
-             does. The classes restate its primary variant — including the size, because the two
-             sit in the same cluster and a restatement that drifts 2px reads as a mistake. -->
+        <!-- A link, not a button: AppButton renders a bare <button>, and navigating is what this does; the classes restate its primary variant including the size. -->
         <RouterLink
           v-if="canSeal"
           :to="`/namespaces/${encodeURIComponent(props.namespace)}/new`"
@@ -156,8 +147,7 @@ watch(() => props.namespace, load)
 
     <AppNamespaceSwitcher :namespace="props.namespace" />
 
-    <!-- Gated on the request, not on `secretsLoaded`: that flag is only ever set by a fetch
-         that succeeded, so `!secretsLoaded` keeps claiming to load after one that failed. -->
+    <!-- Gated on the request, not `secretsLoaded`: that flag is only set by a successful fetch, so `!secretsLoaded` would keep claiming to load after a failure. -->
     <p v-if="secrets.loading" role="status" class="flex items-center gap-2 page-x pt-4 text-sm text-muted">
       <AppSpinner :size="15" />
       Loading secrets…
@@ -208,12 +198,7 @@ watch(() => props.namespace, load)
         :description="emptyFilterDescription"
       />
 
-      <!-- A ledger of what is where and how old it is — never what is inside. A SealedSecret's key
-           names are readable in the cluster, but this page lists every Secret the account can
-           reach, so printing them would publish the shape of the whole credential store to anyone
-           who loads it. The keys stay on the Secret's own screen, behind opening it.
-           The left edge is the state column — silent on a Secret that is in sync, so the eye finds
-           the two that are not. -->
+      <!-- A ledger of what is where and how old it is — never what is inside: key names stay on the Secret's own screen. The left edge is the state column. -->
       <div v-else class="page-x pb-11">
         <ul class="m-0 list-none p-0" aria-label="SealedSecrets">
           <li v-for="secret in visibleSecrets" :key="secret.name" class="contents">

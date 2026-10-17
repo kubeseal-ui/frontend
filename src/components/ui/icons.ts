@@ -1,6 +1,4 @@
-// Path data only, on a 24x24 grid in currentColor, so AppIcon is a single v-for over
-// `path` elements — no v-html, identical in a browser and happy-dom. `as const` makes
-// IconName a union of the keys, so a misspelled `:name` is a build error.
+// Path data only on a 24x24 grid, so AppIcon is one v-for with no v-html; `as const` makes IconName a union, so a misspelled `:name` is a build error.
 export const ICONS = {
   namespace: ['M12 3l9 4.5-9 4.5-9-4.5z', 'M3 7.5v9L12 21v-9', 'M21 7.5v9L12 21'],
   lock: [
@@ -34,12 +32,9 @@ export const ICONS = {
     'M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
   ],
   search: ['M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z', 'm16.2 16.2 4.3 4.3'],
-  // A block of text rather than a paragraph mark: at 13px a pilcrow's bowl fills in, and the
-  // uneven rules are what make it read as many lines instead of a list.
+  // A block of text rather than a paragraph mark: at 13px a pilcrow's bowl fills in.
   lines: ['M3.5 6.5h17', 'M3.5 12h11', 'M3.5 17.5h14'],
-  // Corners out and in: the pair behind the full-screen value field, `expand` on the row that
-  // opens it and `collapse` inside the overlay that closes it, so each control names the change
-  // it makes rather than both wearing an x.
+  // Corners out and in: each control names the change it makes rather than both wearing an x.
   expand: ['M15 3h6v6', 'M9 21H3v-6', 'M21 3l-7 7', 'M3 21l7-7'],
   collapse: ['M4 14h6v6', 'M20 10h-6V4', 'M14 10l7 7', 'M3 21l7-7'],
   eye: ['M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
@@ -48,8 +43,7 @@ export const ICONS = {
     'M21.5 12S18 18.5 12 18.5a10 10 0 0 1-4.3-1',
     'm4 4 16 16',
   ],
-  // The display is the one state with no conventional glyph, so its word must survive as
-  // a label.
+  // The display is the one state with no conventional glyph, so its word must survive as a label.
   sun: [
     'M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z',
     'M12 2.5v2',

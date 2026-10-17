@@ -11,8 +11,7 @@ app.use(pinia)
 app.use(router)
 app.mount('#app')
 
-// After the OIDC callback the server lands the browser on the app root, so once the initial route
-// has resolved, send the operator back to the page they were on when their session expired.
+// After the OIDC callback the server lands on the app root, so send the operator back to the page they were on when the session expired.
 router.isReady().then(() => {
   const returnPath = consumeReturnPath()
   if (returnPath && returnPath !== router.currentRoute.value.fullPath) {
@@ -20,6 +19,5 @@ router.isReady().then(() => {
   }
 })
 
-// Reports to the API telemetry endpoint only when VITE_TELEMETRY_ENDPOINT is set, so
-// local dev and tests make no network requests.
+// Reports to the API telemetry endpoint only when VITE_TELEMETRY_ENDPOINT is set, so local dev and tests make no network requests.
 reportWebVitals()

@@ -23,14 +23,12 @@ import { revealRegion } from '@/utils/reveal'
 import { countLabel } from '@/utils/format'
 import type { DeliveryResult, Mutation, WorkflowStep } from '@/types'
 
-// One screen per Secret. The document is always visible and editable — no fold, no tray, no
-// second page — and the three presses all come from the one button at its foot.
+// One screen per Secret: the document is always editable, and the three presses all come from the one button at its foot.
 const route = useRoute(); const auth = useAuthStore(); const store = useSecretsStore(); const router = useRouter()
 const loading = ref(true); const error = ref('')
 const pressError = ref(''); const busy = ref(false)
 
-/** The rows the editor is holding. Only the first press reads it, which is why it stays here
- *  rather than being mirrored into the store on every keystroke. */
+/** The rows the editor is holding; only the first press reads it, so it is not mirrored into the store on every keystroke. */
 const batch = ref<Mutation[]>([])
 const editor = ref<InstanceType<typeof KeyRows> | null>(null)
 
@@ -38,8 +36,7 @@ const namespace = () => String(route.params.namespace)
 const name = () => String(route.params.name)
 const detail = computed(() => store.currentDetail)
 
-// A mode switch, not a route: the URL carries it so a reload lands where the operator was, but
-// moving between the two modes must not refetch the Secret.
+// A mode switch, not a route: the URL carries it so a reload lands here, but moving between modes must not refetch the Secret.
 const mode = computed<'rows' | 'yaml'>(() => (route.query.mode === 'yaml' ? 'yaml' : 'rows'))
 function setMode(next: 'rows' | 'yaml') {
   router.replace({ query: { ...route.query, mode: next } })
@@ -61,8 +58,7 @@ const driftStatus = () => {
   return git?.drift || (git?.in_sync_with_live ? 'in-sync' : 'unknown')
 }
 const driftLabel = computed(() => driftPresentation(driftStatus()).label)
-// Which part of the two documents disagrees. Without it the only way to find out is to fetch the
-// live resource and the file and diff them by hand, which is what this page exists to save.
+// Which part of the two documents disagrees; without it the only way to find out is to diff them by hand, which this page exists to save.
 const driftReason = computed(() => driftReasonSentence(detail.value?.git.drift_reason))
 const driftFields = computed(() => driftFieldList(detail.value?.git.drift_fields))
 
@@ -86,34 +82,27 @@ const destination = computed(() =>
 
 const staged = computed(() => batch.value.length || (store.change?.mutations.length ?? 0))
 
-// --- The three presses -----------------------------------------------------
+// The three presses
 const step = computed<WorkflowStep>(() => {
   if (!store.review) return 'review'
   if (!store.check) return 'apply-check'
   return 'deliver'
 })
 
-// Withheld when the batch is empty, and by capability and drift — the page's own gate, stated above
-// the content it disables. A press the server would refuse for any other reason is answered by the
-// refusal rather than by a dead button explaining itself.
+// Withheld when the batch is empty, by capability, and by drift; any other refusal is answered by the server rather than a dead button explaining itself.
 const ready = computed(() => {
   if (step.value === 'review') return batch.value.length > 0 && canPatch.value && baseCommit.value !== ''
   if (step.value === 'deliver') return canDeliver.value
   return true
 })
 
-// A press is offered only when there is a next one. A landed delivery is terminal: the bar is
-// hidden entirely in that case (its confirmation carries what comes next), so the delivered state
-// needs no sentence here.
+// A press is offered only when there is a next one; a landed delivery is terminal and shows its confirmation instead.
 const idle = computed(() => {
-  // A batch staged before drift arrived keeps its button, disabled: the alert above is what says
-  // why, and a sentence here would hide that anything is staged at all.
+  // A batch staged before drift arrived keeps its button, disabled, because the alert above says why.
   const withheldByDrift = !inSync.value && !(step.value === 'review' && batch.value.length > 0)
   if (withheldByDrift) return 'Reveal and editing are disabled while this Secret differs from Git.'
   if (step.value === 'review' && batch.value.length === 0) {
-    // "Change, remove, or add a key" is only true when this page is offering those controls. Over
-    // a Secret whose grants have withheld all three, it sends the operator looking for a button
-    // that is not there, so that reason gets its own sentence instead.
+    // That instruction is only true when this page offers those controls, so withheld grants get their own sentence rather than a hunt for a missing button.
     if (!scoped('secret:seal')) {
       return 'Staging a change needs the secret:seal capability in this namespace.'
     }
@@ -125,15 +114,10 @@ const idle = computed(() => {
   return ''
 })
 
-// Composing is the editing stage: no review, check, or delivery on screen. The document shows only
-// here; once a diff or confirmation is up, that one block is the task instead.
+// Composing is the editing stage: once a diff or confirmation is up, that one block is the task instead.
 const composing = computed(() => !store.review && !store.check && !store.delivery)
 
-// The four stops this flow passes through. Edit is home base, and the only stop with a way back — the
-// press bar carries the next press and nothing else — and it is a back target only while the delivery
-// has not landed. The rail shows only while the Secret is editable; drift takes the screen otherwise,
-// and a review can only have landed while the Secret was in sync, so the stop is on screen whenever it
-// is needed.
+// The four stops; Edit is the only one with a way back, and only while the delivery has not landed. Drift takes the screen instead of the rail.
 const railSteps = computed(() => [
   { key: 'edit', label: 'Edit', back: !store.delivery },
   { key: 'review', label: 'Review' },
@@ -145,9 +129,7 @@ function onRailNavigate(key: string) {
   if (key === 'edit' && !store.delivery) startOver()
 }
 
-// Each press opens its result below the editor; the viewport is carried to it so the operator is
-// not left scrolling past the key rows to find what the press produced. One diff shows at a time
-// (the review folds away when the check lands), so each watcher reveals the panel now on screen.
+// Each press opens its result below the editor and the viewport is carried to it; one diff shows at a time, so each watcher reveals the panel now on screen.
 const reviewFold = ref<HTMLElement | null>(null)
 const checkFold = ref<HTMLElement | null>(null)
 const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
@@ -163,8 +145,7 @@ watch(pressError, (next) => { if (next) revealRegion(() => pressErrorAlert.value
 async function press() {
   if (!ready.value) return
   pressError.value = ''
-  // An incomplete batch is the operator asking what is missing, so every row answers at once
-  // and nothing is sent.
+  // An incomplete batch is the operator asking what is missing, so every row answers at once and nothing is sent.
   if (step.value === 'review' && editor.value?.batchProblem) { editor.value.showProblems(); return }
   busy.value = true
   try {
@@ -182,38 +163,26 @@ async function press() {
   } finally { busy.value = false }
 }
 
-// A delivery consumes the staged set: the ciphertext that reached Git was built from these rows,
-// so leaving them standing would show a change that has already landed.
+// A delivery consumes the staged set: leaving those rows standing would show a change that has already landed.
 watch(() => store.delivery, (outcome) => { if (outcome) { editor.value?.clear(); batch.value = [] } })
 
-// Editing a row after a review was taken makes that review stale — it diffed a batch the rows no
-// longer match — so the review and check are dropped and the workflow returns to its first step,
-// reflecting the new edits. Skipped while a delivery is on screen: that batch-clear is the delivery
-// landing, not an edit, and its success must not be wiped. `startOver` below asks for the same move
-// deliberately, from the rail.
+// Editing after a review makes that review stale, so it is dropped; skipped while a delivery is on screen, because that clear is the delivery landing, not an edit.
 watch(batch, () => {
   if ((store.review || store.check) && !store.delivery) store.discardReview()
 })
 
-// The rail's Edit stop, from a review or a check: drop the derived steps and return to editing the
-// rows, which are still holding the staged change. It is the same move the row edit above makes
-// automatically, asked for deliberately rather than by touching a row.
+// The rail's Edit stop: the same move the row edit above makes automatically, asked for deliberately.
 function startOver() { store.discardReview() }
 
-// --- Sync ------------------------------------------------------------------
+// Sync
 const syncError = ref('')
 const syncOutcome = ref<DeliveryResult | null>(null)
 const syncing = ref(false)
-// The endpoint compares this against the branch head and refuses an empty one, so an absent
-// value withholds the control rather than sending an empty string. The server reports a head
-// even for a manifest Git does not hold yet — exactly the live-only Secret this is for.
+// The endpoint refuses an empty base commit, so an absent value withholds the control; the server reports a head even for a live-only Secret.
 const syncBaseCommit = computed(() => detail.value?.git.base_commit || '')
-// The live Secret still holds the version the Git file had before its last change, so the file
-// has moved on and a sync would overwrite whatever replaced it.
+// The Git file moved on since the live Secret's version, so a sync would overwrite whatever replaced it.
 const gitMovedAhead = computed(() => Boolean(detail.value?.git.git_moved_ahead))
-// Identity drift is the one divergence a sync cannot resolve: the mapped file is another Secret's
-// manifest, so the server refuses the sync as PATH_OCCUPIED. Withhold the control rather than offer a
-// button that only ever returns a conflict.
+// Identity drift is the one divergence a sync cannot resolve — the mapped file belongs to another Secret, refused as PATH_OCCUPIED — so the control is withheld.
 const identityDrift = computed(() => detail.value?.git.drift_reason === 'identity')
 const canSync = computed(() => {
   if (identityDrift.value) return false
@@ -244,8 +213,7 @@ async function onSync() {
     syncError.value = describeError(e, 'The live Secret could not be synced to Git')
   } finally {
     syncing.value = false
-    // The dialog unmounts with the pressed button inside it, so focus is carried to the alert the
-    // press produced rather than left on `<body>`; the opener is the fallback when there is none.
+    // The dialog unmounts with the pressed button inside it, so focus is carried to the alert the press produced; the opener is the fallback.
     const fallback = confirmReturn
     confirmReturn = null
     confirming.value = false
@@ -253,8 +221,7 @@ async function onSync() {
   }
 }
 
-// A sync overwrites the mapped file, so it is confirmed first, and the dialog carries both
-// documents: the file as Git holds it and the cluster's manifest that would replace it.
+// A sync overwrites the mapped file, so it is confirmed first, with the Git copy and the replacing manifest side by side.
 const confirming = ref(false)
 const confirmOverlay = ref<HTMLElement | null>(null)
 let confirmReturn: HTMLElement | null = null
@@ -290,11 +257,10 @@ function trapConfirmTab(event: KeyboardEvent) {
 watch(confirming, (open) => { document.body.style.overflow = open ? 'hidden' : '' })
 onUnmounted(() => { document.body.style.overflow = '' })
 
-// --- Load ------------------------------------------------------------------
+// Load
 async function load() {
   loading.value = true; error.value = ''
-  // A route change reuses this view instance, so a stale report would otherwise render above
-  // the next Secret, and a stale change would be applied to it.
+  // A route change reuses this instance, so a stale report would render above the next Secret and a stale change would be applied to it.
   syncOutcome.value = null; syncError.value = ''; pressError.value = ''
   batch.value = []
   store.clearSensitiveState()
@@ -306,8 +272,7 @@ async function load() {
 }
 
 onMounted(load)
-// Two sources, not a getter returning an array: a fresh array never compares equal, so that form
-// reloads on every route change — including the `?mode=` flip, which is meant to be a mode switch.
+// Two sources, not a getter returning an array: a fresh array never compares equal, so that form would reload on the `?mode=` flip.
 watch([() => route.params.namespace, () => route.params.name], load)
 </script>
 

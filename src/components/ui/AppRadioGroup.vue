@@ -1,11 +1,5 @@
 <script setup lang="ts">
-// Real radios inside `<label>`s rather than styled divs, so the browser supplies the arrow keys,
-// the single tab stop, and the checked announcement. `w-fit` is load-bearing on the segmented
-// variant: both call sites put the group in a `flex-col`, whose `align-items: stretch` would
-// otherwise override `inline-flex` and draw the pill across the whole track rather than around its
-// segments. The dot is `sr-only` rather than removed — the input stays the control, and
-// `has-[:focus-visible]` moves the ring out to the segment, since a clipped input's outline goes
-// with it.
+// Real radios inside `<label>`s so the browser supplies arrow keys, one tab stop, and the announcement; `w-fit` keeps a flex-col parent from stretching the segmented pill.
 withDefaults(
   defineProps<{
     modelValue: string
@@ -32,8 +26,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
         : 'flex flex-wrap gap-x-4 gap-y-1'
     "
   >
-    <!-- A group of options with no visible question is a set of answers to nothing; the
-         caption is also the group's accessible name, so the two cannot drift apart. -->
+    <!-- A group of options with no visible question is answers to nothing; the caption is also the group's accessible name. -->
     <span v-if="label" class="w-full text-[13px] font-semibold text-ink">{{ label }}</span>
     <label
       v-for="option in options"
@@ -52,9 +45,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
             ]
       "
     >
-      <!-- The platform's own radio, tinted. `appearance-none` would mean redrawing the
-           unchecked circle from `color-scheme` by hand for no gain: this control is one
-           dot, and every browser already draws it against the right theme. -->
+      <!-- The platform's own radio, tinted: `appearance-none` would mean redrawing the unchecked circle for no gain. -->
       <input
         type="radio"
         :name="name"

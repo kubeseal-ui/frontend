@@ -1,21 +1,6 @@
 @import "tailwindcss";
 
-/* Light palette. Must stay the first palette block: theme-contrast.spec.ts slices the
-   light tokens from the first root selector to the first closing brace, and palette.spec.ts
-   compares this block's position against the Tailwind theme block — both by plain index-of
-   over the raw text, so neither literal may appear ahead of it, not even inside a comment.
-
-   These are the runtime tokens; the inline bridge below derives Tailwind's utility names
-   from them, so a value changed here reaches every `bg-*`/`text-*`/`border-*` class.
-   Non-colour values (radii, durations, easings) stay literals in the rules below, because
-   the contrast spec captures colour values only and refuses any var() it did not capture.
-   Adding a token here means adding it to both dark blocks.
-
-   --app-faint is the third text step and it is DECORATIVE ONLY: the concealed dots, the keycap
-   glyph, a hairline. It is held below WCAG AA on purpose so it recedes, which means nothing that
-   carries information may use it — that is why theme-contrast.spec.ts leaves it out of its
-   textPairs rather than measuring it. --app-accent-ink is the readable colour ON the accent, which
-   is not the page background once the accent is a light iris in dark mode. */
+/* Light palette, and it must stay the first block: theme-contrast.spec.ts and palette.spec.ts find it by index-of over the raw text, so neither marker may appear earlier. --app-faint is decorative only (below AA on purpose); --app-accent-ink is the readable colour on the accent. */
 :root, :root[data-theme="light"] {
   color-scheme: light;
   --app-bg: #f4f6fb;
@@ -35,16 +20,7 @@
   --app-focus: #3b4fd8;
 }
 
-/* Dark palette, media form. This is the design's home theme: the app is a tool an
-   operator leaves open and its content is machine output, so the dark values are the
-   ones the redesign was drawn against and light is the alternate.
-   theme-contrast.spec.ts matches this as exactly one prefers-color-scheme rule wrapping
-   one root rule, so the shape is fixed: nothing may precede the selector inside the
-   media rule, and the palette stays free of nested rules.
-
-   --app-surface-raised is a step TOWARD the page from the surface it nests in, in both
-   themes: in dark it is lighter than --app-surface, in light it is darker. It is the
-   well a field, a code block, or a hovered tile is cut into. */
+/* Dark palette, media form: theme-contrast.spec.ts requires exactly one rule wrapping one root rule, nothing before the selector and no nesting. --app-surface-raised is a step toward the page in both themes. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
@@ -66,10 +42,7 @@
   }
 }
 
-/* Dark palette, explicit-choice form. A stored preference cannot be expressed from
-   inside a media rule, so the same values are declared twice; palette.spec.ts
-   pins the copies identical so they cannot drift. This selector out-specifies the media
-   rule, so an explicit light choice also wins on a dark host. */
+/* Dark palette, explicit-choice form: a stored preference cannot live inside a media rule, so palette.spec.ts pins this copy identical to the one above. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --app-bg: #0b0e15;
@@ -89,16 +62,7 @@
   --app-focus: #7f95ff;
 }
 
-/* Bridge the runtime tokens into Tailwind's colour namespace, so `bg-surface`, `text-ink`,
-   `border-border`, and friends exist as real utilities. `inline` makes the generated
-   utilities emit `var(--app-surface)` rather than routing through a second `--color-*`
-   variable, so there is one copy of every value and a theme swap needs no rebuild.
-
-   The light palette deliberately does NOT live in a @theme block: Tailwind emits its
-   output inside `@layer theme, base, components, utilities`, and unlayered CSS outranks
-   every layer before specificity is consulted, so a layered light palette would lose to
-   the unlayered dark media rule above on a dark-preferring host and an explicit
-   data-theme="light" there would silently stop working. */
+/* Bridge runtime tokens into Tailwind's colour namespace; the light palette stays unlayered because unlayered CSS outranks Tailwind's layers before specificity is consulted. */
 @theme inline {
   --color-bg: var(--app-bg);
   --color-surface: var(--app-surface);
@@ -117,12 +81,7 @@
   --color-focus: var(--app-focus);
 }
 
-/* Geometry. Not themed, so it lives outside the palette blocks and the parity check does
-   not ask the dark blocks to repeat it. The radius scale is concentric — a surface nested
-   at an inset uses the outer radius less that inset — and stating the relation as calc()
-   stops it drifting when either number is edited. `--radius-screen` and `--radius-inset` are
-   the two steps no utility reads: they exist so the calc() above names a scale rather than
-   two loose numbers. */
+/* Geometry, unthemed so the palette parity check does not require it; the radius scale is concentric, and `--radius-screen`/`--radius-inset` exist only so the calc() names a scale. */
 @theme {
   --radius-screen: 14px;
   --radius-card: 12px;
@@ -133,12 +92,7 @@
   --radius-chip: 6px;
 }
 
-/* The sync confirmation's material, and the only translucent surface in the app — everywhere else
-   is opaque because the app is read as a document, but this dialog is a decision about the page
-   underneath it. The panel's fill moves the surface toward the page, and the worst text pair that
-   composite produces, over the three surfaces a page can be, is 5.21:1 — so theme-contrast.spec.ts
-   needs no composite case. The blur and the top-edge highlight are what make it read as a pane
-   rather than a dimmed box. */
+/* The sync confirmation's material and the app's only translucent surface; its worst composite text pair is 5.21:1, so theme-contrast.spec.ts needs no composite case. */
 .glass-scrim {
   background: color-mix(in srgb, var(--app-bg) 42%, transparent);
   backdrop-filter: blur(10px);
@@ -153,8 +107,7 @@
   backdrop-filter: blur(36px) saturate(180%);
 }
 
-/* Without a backdrop filter the translucency is only a washed-out fill, so the panel goes
-   opaque rather than showing blurred-through text at a contrast nobody measured. */
+/* Without a backdrop filter the translucency is only a washed-out fill, so the panel goes opaque rather than showing blurred-through text. */
 @supports not (backdrop-filter: blur(1px)) {
   .glass-panel {
     background: var(--app-surface);
@@ -163,8 +116,7 @@
 
 /* Motion. Durations stay literals: the palette specs reject a var() they did not capture. */
 :root {
-  /* What each drawn bar grows to. The tile publishes its own width here, because an animation
-     cannot read the inline `width` it is replacing. */
+  /* What each drawn bar grows to; the tile publishes its width because an animation cannot read the inline `width` it replaces. */
   --bar-ok: 0%;
   --bar-bad: 0%;
   --mo-flip: 90ms;
@@ -180,8 +132,7 @@
 
 body {
   margin: 0;
-  /* dvh after vh: on phones the toolbars fold 100vh past the viewport and the page grows a
-     phantom scroll; the dvh line wins where it is supported and is dropped where it is not. */
+  /* dvh after vh: on phones the toolbars fold 100vh past the viewport and the page grows a phantom scroll. */
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--app-bg);
@@ -236,19 +187,12 @@ button:active:not(:disabled) { opacity: 0.82; }
 details summary .chev { transition: rotate var(--mo-quick) var(--mo-out); }
 details[open] summary .chev { rotate: 180deg; }
 
-/* The focus ring is the one place the accent is allowed to be a hard outline, and it is
-   the one thing in the product that must never animate: a keyboard user may not wait for
-   their position to settle. */
+/* The focus ring is the one place the accent may be a hard outline, and it must never animate: a keyboard user may not wait for their position to settle. */
 :focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 /* Fields focus by accent border, not ring: unlayered outline would stack on it. */
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 
-/* ---------------------------------------------------------------------------------------
-   The five moves. Each answers something a person did, so nothing here runs on its own;
-   the one exception is the spinner, which is a progress indicator and stops when the work
-   does. The concealed dots never animate: a pulsing mask would say the value is doing
-   something while it sits still in the cluster.
-   --------------------------------------------------------------------------------------- */
+/* The five moves: each answers something a person did; the concealed dots never animate. */
 @keyframes mgrown { from { width: 0 } to { width: var(--bar-ok) } }
 @keyframes mgrowd { from { width: 0 } to { width: var(--bar-bad) } }
 @keyframes mwipe { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
@@ -257,22 +201,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 @keyframes mlblout { to { transform: translateY(-70%); opacity: 0 } }
 @keyframes mlblin { from { transform: translateY(70%); opacity: 0 } to { transform: none; opacity: 1 } }
 
-/* 1 — the draw, once per page load and only on the fleet. Size first, then health: the red
-   segment of a drifted tile arrives after its grey one, so the motion leads the eye to the
-   tiles that need work. `--d` staggers the tiles 40ms apart. */
+/* The draw, once per page load and only on the fleet: size before health, and `--d` staggers the tiles 40ms apart. */
 .draw .level .ok { animation: mgrown 260ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 70ms); }
 .draw .level .bad { animation: mgrowd 200ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 210ms); }
 
-/* 2 — the reveal. The mask is wiped back rather than faded out, and an accent edge crosses
-   the slot and leaves the value behind it. Concealing has no counterpart: the value leaves the
-   document in the frame the operator asks for it to, plaintext not being something to animate. */
+/* The reveal: the mask is wiped back rather than faded, and concealing has no counterpart because plaintext is not something to animate. */
 .reveal-in { animation: mwipe var(--mo-reveal) var(--mo-out); }
 .sweep { animation: msweep var(--mo-reveal) var(--mo-out); }
 
-/* The multi-line value field's mask. `-webkit-text-security` is the only way to conceal a field
-   that is not `type=password`, and it is WebKit/Blink-only, so KeyRows offers the eye only where
-   `CSS.supports` confirms it: a mask that silently does nothing is worse than no mask, and the
-   plain input keeps the native password field everywhere. */
+/* The multi-line value field's mask: `-webkit-text-security` is Blink/WebKit-only, so KeyRows offers it only where `CSS.supports` confirms it. */
 .conceal { -webkit-text-security: disc; }
 .spin {
   display: inline-block; width: 11px; height: 11px; border-radius: 50%;
@@ -280,20 +217,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   animation: mspin 700ms linear infinite;
 }
 
-/* 3 — a panel opening: the staged change inside its row, and a press's result underneath. Both
-   draw their content only while open, so a closed one has already left the document. */
+/* A panel opening: both draw their content only while open, so a closed one has already left the document. */
 .fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--mo-base) var(--mo-out); }
 .fold.open { grid-template-rows: 1fr; }
 .fold > * { overflow: hidden; }
 
-/* 4 — a label advancing down the flow, which only ever moves one way: the label being left
-   behind goes up, and the next press arrives from below. */
+/* A label advancing down the flow, which only ever moves one way: the left label goes up and the next press arrives from below. */
 .roll-out { animation: mlblout var(--mo-quick) var(--mo-out) both; }
 .roll-next { animation: mlblin var(--mo-quick) var(--mo-out) both; }
 
-/* A column of folds carries its own spacing rather than a flex `gap`. A shut region still owns
-   its gap slot, so a stack with one region open would keep the air of every region that is
-   closed; the fold carries the gap above it instead, and gives it back when it shuts. */
+/* A column of folds owns the gap above each fold, because a shut region still holds a flex `gap` slot. */
 .fold-stack { display: flex; flex-direction: column; }
 .fold-stack > .fold {
   margin-top: 16px;
@@ -301,10 +234,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 .fold-stack > .fold:not(.open) { margin-top: 0; }
 
-/* 5 — the fill. The workflow rail is a state indicator rather than a control, so both of its parts
-   move on the base step and not the pointer step, and both reverse — which is what makes stepping
-   back read as a rewind rather than as a second, different move. The connector is wiped in rather
-   than swapped to the accent colour, so progress advances along the rail. */
+/* The fill: the rail is a state indicator, so both parts move on the base step and reverse, making a step back read as a rewind. */
 .rail-bar { position: relative; background: var(--app-border-strong); }
 .rail-bar::after {
   content: ""; position: absolute; inset: 0; background: var(--app-accent);
@@ -318,11 +248,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
     box-shadow var(--mo-base) var(--mo-out);
 }
 
-/* Reduced motion is a switch honoured from two places, and both are needed: the media
-   query serves the operating system, and the attribute serves the in-app preference.
-   animation-iteration-count is in both lists on purpose — without it a spinner with
-   `infinite` would attempt a thousand rotations a second and the "reduction" would be
-   worse than the animation it replaced. */
+/* Reduced motion must set animation-iteration-count too, or an `infinite` spinner would attempt a thousand rotations a second. */
 html[data-motion="reduced"] *,
 html[data-motion="reduced"] *::before,
 html[data-motion="reduced"] *::after {
@@ -342,13 +268,10 @@ html[data-motion="reduced"] *::after {
   }
 }
 
-/* Phone gutter. Sections own their horizontal padding through this one class rather than a
-   literal, so a phone viewport can narrow the gutter from a single place; desktop keeps the
-   26px handoff a full-bleed keyline can be drawn against. */
+/* Phone gutter in one class, so a phone viewport can narrow it from a single place. */
 .page-x { padding-inline: 26px; }
 @media (max-width: 640px) { .page-x { padding-inline: 16px; } }
 
-/* Horizontal scroll bands without a scrollbar track (the phone workflow rail), where the
-   track would sit under the thumb and the overflow itself is the affordance. */
+/* Horizontal scroll bands without a scrollbar track (the phone workflow rail), where the overflow itself is the affordance. */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

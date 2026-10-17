@@ -9,16 +9,13 @@ import { driftPresentation } from '@/utils/drift'
 import { countLabel } from '@/utils/format'
 import { highlightSegments, searchSecrets, type SearchHit } from '@/utils/searchIndex'
 
-// What the strip shows instead of the route. It replaces the page rather than sitting over it,
-// which is why the query lives in AppShell: the route stays mounted underneath and keeps whatever
-// the operator had staged.
+// What the strip shows instead of the route; the query lives in AppShell so the route stays mounted underneath with whatever was staged.
 const props = defineProps<{ query: string }>()
 const secrets = useSecretsStore()
 
 const hits = computed(() => searchSecrets(secrets.index, props.query))
 
-// Grouped by namespace, because that is the axis the operator thinks in: a hit is "payments /
-// api", not a bare "api" — the same name exists in more than one namespace often enough.
+// Grouped by namespace, because that is the axis the operator thinks in: a hit is "payments / api".
 const groups = computed(() => {
   const byNamespace = new Map<string, SearchHit[]>()
   for (const hit of hits.value) {
@@ -33,8 +30,7 @@ const namespaceCount = computed(() => groups.value.length)
 
 const status = computed<'error' | 'loading' | 'empty' | 'results'>(() => {
   if (secrets.indexError) return 'error'
-  // Not loaded and not failed means the listing is still coming: the strip asks for it as soon as
-  // there is a query, so this is where the first keystroke lands.
+  // Not loaded and not failed means the listing is still coming; the strip asks for it as soon as there is a query.
   if (!secrets.indexLoaded) return 'loading'
   return hits.value.length ? 'results' : 'empty'
 })
@@ -50,9 +46,7 @@ const retry = () => secrets.fetchIndex().catch(() => {
 
     <p v-if="status === 'loading'" role="status" class="m-0 page-x pt-[18px] text-[12.5px] text-muted">Searching…</p>
 
-    <!-- The label names the failure and the server's detail follows it. The store only ever holds
-         an Error, so a fallback alone would never render and the operator would read a bare
-         message like "gateway" with nothing saying what failed. -->
+    <!-- The label names the failure and the server's detail follows, since the store only holds a bare Error. -->
     <div v-else-if="status === 'error'" class="flex flex-col items-start gap-2 page-x pt-[18px]">
       <p class="m-0 text-[12.5px] text-danger">
         The search index could not be loaded. {{ describeError(secrets.indexError, 'No detail was reported.') }}
@@ -65,8 +59,7 @@ const retry = () => secrets.fetchIndex().catch(() => {
     </p>
 
     <template v-else>
-      <!-- What was searched, because the answer spans namespaces and the strip gives no sign of
-           that on its own. -->
+      <!-- What was searched, because the answer spans namespaces and the strip gives no sign of that on its own. -->
       <p role="status" class="m-0 flex items-baseline gap-[7px] page-x pt-[18px] text-[12.5px] text-muted">
         <em class="font-mono font-[650] not-italic text-ink">{{ hits.length }}</em>
         {{ hits.length === 1 ? 'match' : 'matches' }} in
@@ -97,8 +90,7 @@ const retry = () => secrets.fetchIndex().catch(() => {
             <span class="mt-0.5 block text-[11.5px] text-muted">{{ countLabel(hit.key_count, 'key') }} · {{ hit.scope === 'strict' ? 'strict' : 'namespace-wide' }}</span>
           </span>
 
-          <!-- The key names are here and nowhere else on a list: a search is a question the
-               operator asked, not an inventory they were handed. -->
+          <!-- The key names are here and nowhere else on a list: a search is a question, not an inventory. -->
           <span class="min-w-0 truncate font-mono text-xs text-accent max-sm:col-span-full max-sm:whitespace-normal max-sm:break-all">
             <template v-for="(key, index) in hit.matchedKeys.slice(0, 3)" :key="key">
               <span v-if="index > 0">, </span>{{ key }}

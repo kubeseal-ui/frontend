@@ -9,8 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import type { Mutation, MutationOperation, SealedSecretDetail } from '@/types'
 
-// Every staged change — replacement, deletion, new key — lands in one diff and one commit.
-// Each key keeps its own Reveal: one decrypt per key, each its own audit event.
+// Every staged change lands in one diff and one commit; each key keeps its own Reveal — one decrypt, one audit event.
 const props = defineProps<{ detail: SealedSecretDetail }>()
 const emit = defineEmits<{ 'update:batch': [Mutation[]] }>()
 
@@ -19,33 +18,17 @@ const store = useSecretsStore()
 const revealed = reactive<Record<string, string>>({})
 const replacements = reactive<Record<string, string>>({})
 const operation = reactive<Record<string, MutationOperation>>({})
-/** Keys whose row is open for editing. The row states what the Secret has; the change is
- *  staged inside it rather than in a tray below, so nothing folds away. */
+/** Keys whose row is open for editing; the change is staged inside the row rather than in a tray below. */
 const editing = reactive<Record<string, boolean>>({})
-/** Value fields showing what was typed into them rather than dots. This is not the row's Reveal:
- *  that decrypts one key for the audit trail, while a field the operator is typing into holds a
- *  value nothing else on the page can check, so unmasking it costs nothing and asks no capability. */
+/** Value fields showing what was typed rather than dots; this is not the row's Reveal, so it asks no capability. */
 const peek = reactive<Record<string, boolean>>({})
-/** Value fields opened out into a multi-line box. A private key, a kubeconfig, or a config file
- *  cannot be staged in a single-line field at all — HTML strips newlines from `type=text` and
- *  `type=password`, so a pasted value would arrive silently joined into one line — and nothing
- *  here inspects the value to guess: `password` and a base64 blob are both long and one line,
- *  while a two-line value can be deliberate, so only the operator knows which kind they hold. */
+/** Value fields opened out into a multi-line box: HTML strips newlines from `type=text`/`type=password`, so a pasted key would arrive silently joined; nothing here guesses which values need it. */
 const multiline = reactive<Record<string, boolean>>({})
-// `-webkit-text-security` is the only mask for a field that is not `type=password`, and it is
-// WebKit/Blink-only. Checked once at module scope: where it is missing the multi-line box stays
-// usable and simply does not offer the eye, rather than promising a concealment it cannot draw.
+// `-webkit-text-security` is the only mask for a non-`type=password` field and is WebKit/Blink-only; where it is missing the box simply offers no eye.
 const canConceal = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('-webkit-text-security', 'disc')
-/** The mask is for a value, not for the field: the property stipples the placeholder too, and an
- *  empty multi-line box rendered as dots reads as one that already holds something. `Boolean` rather
- *  than `!== ''` because a row that has just opened has no entry in `replacements` at all — the box
- *  renders empty, so the test has to be for a value rather than for the string that is not there. */
+/** The mask is for a value, not the field: an empty box rendered as dots reads as one that already holds something. */
 const concealed = (id: string, value: string | undefined) => Boolean(multiline[id]) && canConceal && !peek[id] && Boolean(value)
-/** The value field opened to fill the screen, one at a time. The binding is a pair of closures
- *  rather than a copy of the value, so the overlay edits the same string the row holds and
- *  closing can never fork it. A null `set` is a read-only overlay: a revealed value has no
- *  string to write back to, so its expansion is a bigger look at the same plaintext, not a
- *  second place to edit one. */
+/** The field opened to fill the screen; the closures edit the same string the row holds, and a null `set` is read-only (a revealed value). */
 const fullscreen = ref<{ id: string; label: string; get: () => string; set: ((value: string) => void) | null } | null>(null)
 const fullscreenValue = computed({
   get: () => fullscreen.value?.get() ?? '',
@@ -62,16 +45,14 @@ async function openFullscreen(id: string, label: string, get: () => string, set:
   fullscreenInput.value?.focus()
 }
 
-// Focus returns to the control that opened the field, the way it returns to the row Change
-// opened; a row discarded while its field held the screen has no control left, and then nowhere.
+// Focus returns to the control that opened the field; a row discarded while it held the screen leaves nowhere to return to.
 function closeFullscreen() {
   fullscreen.value = null
   fullscreenReturn?.focus()
   fullscreenReturn = null
 }
 
-// Tab stays inside the overlay: the page behind it is not reachable while the field holds the
-// screen, so cycling off either end wraps instead of escaping.
+// Tab wraps inside the overlay: the page behind it is not reachable while the field holds the screen.
 function trapTab(event: KeyboardEvent) {
   if (event.key !== 'Tab' || !overlay.value) return
   const focusable = Array.from(overlay.value.querySelectorAll<HTMLElement>('button, textarea'))
@@ -82,8 +63,7 @@ function trapTab(event: KeyboardEvent) {
   else if (!event.shiftKey && document.activeElement === last) { first.focus(); event.preventDefault() }
 }
 
-// The page behind the overlay is still there; only the field holds the screen. A route change
-// unmounts this component without the watcher firing again, so the lock is released here too.
+// A route change unmounts this component without the watcher firing again, so the lock is released here too.
 watch(fullscreen, (open) => { document.body.style.overflow = open ? 'hidden' : '' })
 onUnmounted(() => { document.body.style.overflow = '' })
 
@@ -97,17 +77,13 @@ const revealButtons = ref<Record<string, HTMLButtonElement | null>>({})
 
 const namespace = computed(() => props.detail.namespace)
 const canReveal = computed(() => auth.hasCapability(namespace.value, 'secret:decrypt'))
-// The server refuses reveal and patch with a 409 while Git and the cluster differ, so the
-// controls that would earn one are withheld rather than offered. Concealing is not gated: it
-// drops plaintext this page already holds and sends nothing.
+// The server answers 409 while Git and the cluster differ, so these controls are withheld; concealing stays ungated — it sends nothing.
 const canRevealValue = computed(() => canReveal.value && props.detail.git.in_sync_with_live)
 const canPatch = computed(() => auth.hasCapability(namespace.value, 'secret:seal') && props.detail.git.in_sync_with_live)
-// The commit every reveal and review is made against. Absent means the server did not report
-// one, which the controls that need it refuse rather than send.
+// The commit every reveal and review is made against; absent means the controls that need it refuse rather than send.
 const baseCommit = computed(() => props.detail.git.base_commit || '')
 
-// The twelve dots the product is: a value that is there and cannot be read, until one key is
-// asked for.
+// The twelve dots the product is: a value that is there and cannot be read, until one key is asked for.
 const DOTS = '••••••••••••'
 
 // An add over a key that is present is refused by the API, so it is not offered.
@@ -118,15 +94,13 @@ const EXISTING_OPERATIONS = [
 
 let nextRowId = 0
 
-// Which rows have been left. A row just opened is not yet wrong, and a field that turns red the
-// moment it appears reads as a fault rather than a prompt.
+// Which rows have been left: a field that turns red the moment it appears reads as a fault rather than a prompt.
 const shown = reactive<Record<string, boolean>>({})
 const stagedRowId = (key: string) => `key-${key}`
 const addedRowId = (row: { id: number }) => `add-${row.id}`
 const revealRowId = (key: string) => `reveal-${key}`
 
-// Leaving the row is what turns its problems on. Moving between the row's own fields is not
-// leaving it, so tabbing from the name to the value does not answer a value not yet typed.
+// Leaving the row turns its problems on; moving between the row's own fields is not leaving it.
 function leave(id: string, event: FocusEvent) {
   const next = event.relatedTarget as Node | null
   if (next && (event.currentTarget as HTMLElement).contains(next)) return
@@ -151,16 +125,13 @@ async function reveal(key: string) {
 async function conceal(key: string) {
   if (fullscreen.value?.id === revealRowId(key)) fullscreen.value = null
   delete revealed[key]
-  // Conceal is unmounted by its own press, so focus moves to the Reveal that replaces it rather
-  // than falling to the body.
+  // Conceal is unmounted by its own press, so focus moves to the Reveal that replaces it rather than falling to the body.
   await nextTick()
   revealButtons.value[key]?.focus()
 }
 const setRevealButton = (key: string, element: unknown) => { revealButtons.value[key] = element instanceof HTMLButtonElement ? element : null }
 
-// Focus follows the row that was just opened. Change is the button that opened it and is gone
-// the moment it is pressed, so without this focus falls to the body and the keyboard user tabs
-// back through the inventory to reach the field they just asked for.
+// Focus follows the row just opened: Change is gone by the time it is pressed, so without this focus falls to the body.
 async function startEdit(key: string) {
   editing[key] = true
   operation[key] = operationOf(key)
@@ -168,9 +139,7 @@ async function startEdit(key: string) {
   rows.value[key]?.querySelector<HTMLInputElement>(`#staged-input-${CSS.escape(key)}`)?.focus()
 }
 
-// A removal is a delete of a key that is here, and the row states it outright rather than as a
-// mode of Change: a delete opens no value field, so nothing sits between choosing it and
-// reviewing it. Focus follows the option it staged.
+// A removal is a delete of a key that is here, stated outright rather than as a mode of Change; focus follows the option it staged.
 async function removeKey(key: string) {
   editing[key] = true
   operation[key] = 'delete'
@@ -185,8 +154,7 @@ async function addRow() {
   addInputs.value[id]?.focus()
 }
 
-// The Discard button is inside the row it removes, so focus has to be carried out of it: to the
-// row that takes its place, or to the Add button when that was the last one.
+// Discard sits inside the row it removes, so focus must be carried out of it — to the next row, or to Add when that was the last.
 async function removeAdded(index: number) {
   const [row] = added.value.splice(index, 1)
   if (row) {
@@ -228,14 +196,10 @@ const batch = computed<Mutation[]>(() => {
   return out
 })
 
-// The surface owns the presses and needs the batch the first one would send, so it is mirrored
-// up rather than read back out of the store.
+// The surface owns the presses and needs the batch, so it is mirrored up rather than read back out of the store.
 watch(batch, (value) => emit('update:batch', value), { immediate: true, deep: true })
 
-// The server refuses a batch that would leave the Secret with no keys — a SealedSecret with an
-// empty encryptedData is meaningless — with a 400 after it has decrypted. Caught here so deleting
-// the only key is answered in the row instead. The test is the net count: a delete paired with an
-// add that keeps the Secret non-empty is fine, so it is not "any delete present".
+// The server refuses this with a 400 after decrypting, so it is caught here; net count, since a delete paired with an add is fine.
 const emptiesSecret = computed(() => {
   const current = (props.detail.keys || []).length
   if (current === 0) return false
@@ -247,8 +211,7 @@ const emptiesSecret = computed(() => {
   return current - deletes + adds < 1
 })
 
-// The server refuses all of these too, so this is not a second set of rules — it avoids a round
-// trip, and a decrypt's worth of audit trail, on a request already known to fail.
+// The server refuses these too — this only avoids a round trip and a decrypt's audit trail on a request known to fail.
 const batchProblem = computed(() => {
   if (batch.value.length === 0) return ''
   if (batch.value.some((entry) => entry.key === '')) return 'Every key being added needs a name.'
@@ -271,8 +234,7 @@ const batchProblem = computed(() => {
   return ''
 })
 
-// A row states its own problem, under the field it belongs to. `batchProblem` decides whether
-// anything is missing; its sentence is never rendered, because it names no key.
+// A row states its own problem under its own field; `batchProblem` decides whether anything is missing and names no key.
 function addNameProblem(row: { id: number; key: string }) {
   if (!shown[addedRowId(row)]) return ''
   const key = row.key.trim()
@@ -333,10 +295,7 @@ defineExpose({ batchProblem, showProblems, clear })
         <span class="truncate font-mono text-[13.5px] font-[550] text-ink">{{ key }}</span>
 
         <span class="relative min-w-0">
-          <!-- A revealed value wraps and scrolls rather than truncating: a sealed value is often a
-               long token, and a row that shows the first few characters and hides the rest is the
-               opposite of what revealing is for. Focusable so a keyboard user can scroll it, and
-               one click selects the whole value to copy. -->
+          <!-- A revealed value wraps and scrolls rather than truncating, and is focusable so a keyboard user can scroll it. -->
           <div
             v-if="hasRevealed(key)"
             role="textbox"
@@ -345,9 +304,7 @@ defineExpose({ batchProblem, showProblems, clear })
             :aria-label="`Revealed value for ${key}`"
             class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised py-1 pr-9 max-sm:pr-10 pl-2.5 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
           >{{ revealed[key] }}</div>
-          <!-- A revealed value is the same plaintext the row already holds, so the same control
-               opens it to the screen; the overlay is read-only there, since a reveal is a look
-               and has no string to write back to. -->
+          <!-- The same plaintext the row holds opens to the screen; read-only, since a reveal has no string to write back to. -->
           <button
             v-if="hasRevealed(key)"
             type="button"
@@ -355,9 +312,7 @@ defineExpose({ batchProblem, showProblems, clear })
             class="absolute top-1 right-1 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
             @click="openFullscreen(revealRowId(key), `Revealed value for ${key}`, () => revealed[key] ?? '', null)"
           ><AppIcon name="expand" :size="13" /></button>
-          <!-- A reveal is one decryption and one audit event, and the row says what it is waiting
-               for rather than leaving the dots in place as if nothing had been asked. Announced,
-               because the press that started it is disabled while it runs. -->
+          <!-- Announced, because the press that started it is disabled while it runs. -->
           <span
             v-else-if="activeKey === key"
             role="status"
@@ -371,16 +326,11 @@ defineExpose({ batchProblem, showProblems, clear })
             class="font-mono text-[13px] tracking-[0.14em] text-faint select-none"
             :class="editing[key] && operationOf(key) === 'delete' ? 'line-through opacity-55' : ''"
           >{{ DOTS }}</span>
-          <!-- The accent edge that crosses the slot with the wipe. Decorative, and gone by the
-               time the wipe ends. -->
+          <!-- The accent edge that crosses the slot with the wipe; decorative. -->
           <span v-if="hasRevealed(key)" class="sweep" aria-hidden="true" />
         </span>
 
-        <!-- The value's own controls, in the row they act on. Under drift the row keeps its dots
-             and loses every button: a control that cannot act is worse than no control.
-             The negative edges cancel the end buttons' own `px-2.5`, so the cluster's visible box
-             lands on the key's edges; the left one is phone-only, because desktop right-aligns
-             this column and the pull would eat the gap to the value instead. -->
+        <!-- Under drift the row keeps its dots and loses every button; the negative edges cancel the end buttons' own `px-2.5`. -->
         <span class="flex items-center gap-[3px] -mr-2.5 max-sm:-ml-2.5">
           <button
             v-if="canRevealValue && !hasRevealed(key)"
@@ -403,10 +353,7 @@ defineExpose({ batchProblem, showProblems, clear })
             <AppIcon name="eye-off" :size="13" />Conceal
           </button>
 
-          <!-- One control both ways: it opens the row's staged change and closes it again,
-               discarding what was staged. Offered alongside Reveal/Conceal rather than instead of
-               them, so revealing a value to read it does not take away the ability to change it. It
-               stays openable while `canPatch` is false only to close a row drift appeared under. -->
+          <!-- One control both ways, offered alongside Reveal/Conceal; stays openable while `canPatch` is false only to close a row drift appeared under. -->
           <button
             v-if="canPatch || editing[key]"
             type="button"
@@ -416,8 +363,7 @@ defineExpose({ batchProblem, showProblems, clear })
             class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="editing[key] ? clear(key) : startEdit(key)"
           ><AppIcon :name="editing[key] ? 'x' : 'pencil'" :size="13" />{{ editing[key] ? 'Discard' : 'Change' }}</button>
-          <!-- The one action here that pressing it again does not undo, so it is the one that
-               carries danger rather than the neutral tone its neighbours use. -->
+          <!-- The one action here that pressing it again does not undo, so it carries danger rather than the neutral tone. -->
           <button
             v-if="canPatch && !editing[key]"
             type="button"
@@ -427,10 +373,7 @@ defineExpose({ batchProblem, showProblems, clear })
           ><AppIcon name="trash" :size="13" />Remove</button>
         </span>
 
-        <!-- The change opens inside the row it belongs to, indented under the key it acts on, and
-             the rows below move down rather than jumping. The fold is one-way on purpose:
-             discarding unmounts the panel in the same frame, so a form holding a password field
-             is never left in the document at a height of nothing. -->
+        <!-- The change opens inside its row; the fold is one-way so a form holding a password field is never left mounted at zero height. -->
         <div class="fold col-span-full" :class="{ open: editing[key] }">
           <div>
             <div
@@ -448,9 +391,7 @@ defineExpose({ batchProblem, showProblems, clear })
               />
 
               <span v-if="operationOf(key) !== 'delete'" class="relative block">
-                <!-- The same field, opened out: an operator staging a private key or a config file
-                     presses the lines control, and the value arrives with its newlines intact. The
-                     mask is CSS here because a textarea has no `type=password`. -->
+                <!-- The same field opened out; the mask is CSS here because a textarea has no `type=password`. -->
                 <textarea
                   v-if="multiline[stagedRowId(key)]"
                   :id="`staged-input-${key}`"
@@ -478,9 +419,7 @@ defineExpose({ batchProblem, showProblems, clear })
                   spellcheck="false"
                   class="h-8 w-full rounded-[8px] border border-border-strong bg-bg py-0 pr-[62px] pl-2.5 max-sm:pr-[74px] font-mono text-[13px] max-sm:text-[14px] text-ink placeholder:font-sans placeholder:text-faint"
                 />
-                <!-- In the opened box the three field controls line up along the top edge, where
-                     the eye already sat, instead of floating mid-text; the one-line input keeps
-                     its vertically centred pair. -->
+                <!-- In the opened box the controls line up along the top edge; the one-line input keeps its centred pair. -->
                 <button
                   type="button"
                   :aria-label="multiline[stagedRowId(key)] ? `Use a one-line field for ${key}` : `Use a multi-line field for ${key}`"
@@ -607,10 +546,7 @@ defineExpose({ batchProblem, showProblems, clear })
       Add a key
     </button>
 
-    <!-- The same field with the screen to itself: the value, its mask, and its eye travel with it
-         unchanged — the overlay edits the string the row holds through the closures it was opened
-         with — and closing hands focus back to the control that opened it. Solid backdrop, one
-         border, no lift: the design's rules do not loosen for taking up more room. -->
+    <!-- The same field with the screen to itself; closing hands focus back to the control that opened it. -->
     <Teleport to="body">
       <div
         v-if="fullscreen"

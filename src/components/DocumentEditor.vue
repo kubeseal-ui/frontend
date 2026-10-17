@@ -3,16 +3,13 @@ import { computed, ref } from 'vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import type { SealedSecretDetail } from '@/types'
 
-// The document's second mode. It renders the ciphertext the cluster holds rather than an editor
-// over it: every write in this app travels as a batch of `mutations`, which a free-text YAML box
-// has no way to express, so an edit made here could not be reviewed or applied.
+// Renders the ciphertext rather than editing it: every write travels as a batch of mutations, which a free-text YAML box cannot express.
 const props = defineProps<{ detail: SealedSecretDetail }>()
 
 const yaml = computed(() => props.detail.sealed_secret_yaml || props.detail.yaml || '')
 const copied = ref(false)
 
-// The clipboard is not always granted, and a copy button that silently does nothing is worse
-// than no button, so the failure is shown as plainly as the success.
+// The clipboard is not always granted, and a copy button that silently does nothing is worse than no button.
 async function copy() {
   try {
     await navigator.clipboard.writeText(yaml.value)

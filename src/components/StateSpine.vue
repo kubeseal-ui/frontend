@@ -3,8 +3,7 @@ import { computed } from 'vue'
 import { useSecretsStore } from '@/stores/secrets'
 import type { SealedSecretDetail } from '@/types'
 
-// The spine holds the state of the change, not a second copy of the editor: which of the three
-// presses have happened, what the change is still against, and what this screen is allowed to do.
+// The spine holds the state of the change, not a second copy of the editor: what the change is against, and what this screen may do.
 const props = defineProps<{
   detail?: SealedSecretDetail
   staged: number
@@ -16,8 +15,7 @@ const props = defineProps<{
 }>()
 const store = useSecretsStore()
 
-// A change in flight has something to be against; with nothing staged the panel answers the other
-// question, which is what this screen will let you do at all.
+// A change in flight has something to be against; with nothing staged the panel answers what this screen will let you do at all.
 const inFlight = computed(() => props.staged > 0 || Boolean(store.review))
 
 const branchHead = computed(() => props.detail?.git.base_commit || '')
@@ -31,10 +29,7 @@ const abilities = computed(() => [
 </script>
 
 <template>
-  <!-- The change's own column, not a second card: the document beside it carries the content, and
-       this only states where the change stands. The workflow stages themselves live in the rail
-       above the editor now, so this panel no longer repeats them — it answers what the change is
-       against, and what this screen is allowed to do. -->
+  <!-- The change's own column, not a second card; the stages live in the rail above the editor now. -->
   <aside aria-label="Change state" class="flex w-full min-[820px]:w-[258px] shrink-0 flex-col gap-[22px]">
     <div v-if="inFlight">
       <h2 class="mb-[9px] text-xs font-[650] text-muted">Against</h2>

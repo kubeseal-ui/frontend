@@ -1,14 +1,11 @@
 import type { IconName } from '@/components/ui/icons'
 
-// One table for the namespace index, the search results, the namespace page and the Secret
-// surface, which must not disagree about a state's name. Tailwind reads these class literals
-// out of this file.
+// One table for every surface, so they cannot disagree about a state's name; Tailwind reads these class literals out of this file.
 export interface DriftPresentation {
   icon: IconName
   label: string
   classes: string
-  /** The row's left edge. Transparent for a state with nothing to report, so a page of clean
-   *  rows has no coloured column and the one that drifted is the only mark on it. */
+  /** The row's left edge; transparent when there is nothing to report, so the one drifted row is the only mark on the page. */
   gutter: string
 }
 
@@ -34,9 +31,7 @@ export function driftPresentation(status: string): DriftPresentation {
   return STATES[status] ?? { ...UNKNOWN, label: status }
 }
 
-// Why the two sides disagree, in the product's own words. Every sentence is a claim about the
-// documents only: the report compares ciphertext and never decrypts, so none of these may say that
-// the values match — "the encrypted values are the same" is the most any of them has established.
+// Every sentence is a claim about the documents only: the report compares ciphertext and never decrypts, so none may say the values match.
 const REASONS: Record<string, string> = {
   ciphertext:
     'The file and the cluster hold separate encryptions of the same keys. Sealing is not deterministic, so re-sealing unchanged values produces this.',
@@ -46,15 +41,13 @@ const REASONS: Record<string, string> = {
   identity: 'The file at this path is a manifest for a different Secret.',
 }
 
-/** The sentence for a diverged Secret's reason. Empty for a payload that carries none, which is
- *  every drift but `diverged` and every response from a server older than the field. */
+/** The sentence for a diverged Secret's reason; empty for a payload without one (every other state, or a server older than the field). */
 export function driftReasonSentence(reason?: string): string {
   if (!reason) return ''
   return REASONS[reason] ?? ''
 }
 
-// The paths are the answer, so they are named rather than counted; the cap only keeps a Secret with
-// a hundred resealed keys from filling the alert with a paragraph of field names.
+// The paths are the answer, so they are named rather than counted; the cap keeps a hundred resealed keys from filling the alert.
 const MAX_FIELDS = 6
 
 /** The differing paths as one line: `a.b, a.c and 3 more`. */

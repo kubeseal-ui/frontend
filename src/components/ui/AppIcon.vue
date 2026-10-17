@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ICONS, type IconName } from './icons'
 
-// No fallback branch for an unknown name: `IconName` makes it a compile error, and a
-// runtime fallback would only hide a regression `vue-tsc` already catches. Icons here are
-// decorative — each accompanies a text label — so the svg is `aria-hidden`.
+// No fallback for an unknown name: `IconName` makes it a compile error, and icons are decorative here so the svg is `aria-hidden`.
 withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 18 })
 </script>
 

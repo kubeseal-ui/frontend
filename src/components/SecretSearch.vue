@@ -3,9 +3,7 @@ import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import { useSecretsStore } from '@/stores/secrets'
 
-// The strip's search control, and the owner of the ⌘K shortcut. It holds no results: the query
-// is the caller's — it decides what the page below renders — and this component's whole job is
-// to be the box that query is typed into.
+// The strip's search control and owner of the ⌘K shortcut; it holds no results — the query is the caller's, this is just the box it is typed into.
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 
@@ -15,18 +13,14 @@ const focused = ref(false)
 
 // A whole cross-namespace listing, so it is built on first use rather than on every page load.
 function ensureIndex() {
-  // A query arrives one keystroke at a time and every one of them wants the same request, so an
-  // index already held — or already in flight — is not asked for again.
+  // Every keystroke wants the same request, so an index already held — or in flight — is not asked for again.
   if (secrets.indexLoaded || secrets.indexLoading) return
   return secrets.fetchIndex().catch(() => {
-    // Reported by the results panel, which is where a failed index is worth a sentence; the
-    // strip stays a box and never takes the route down with it.
+    // Reported by the results panel; the strip stays a box and never takes the route down with it.
   })
 }
 
-// Typing is asking for the index. A query can reach the box before it is ever focused — restored
-// or set programmatically — and answering that from an index nobody requested reads "No Secret or
-// key matches." off a listing that was never made.
+// A query can reach the box before it is ever focused, and answering from an index nobody requested reads "No Secret or key matches." off a listing never made.
 watch(() => props.modelValue, (query) => { if (query.trim()) ensureIndex() }, { immediate: true })
 
 async function focus() {
@@ -35,8 +29,7 @@ async function focus() {
   box.value?.focus()
 }
 
-// ⌘K on a Mac, Ctrl+K everywhere else. Registered on the window rather than on the input,
-// because the whole point is that it works from wherever the operator happens to be.
+// ⌘K on a Mac, Ctrl+K elsewhere; registered on the window because the point is that it works from wherever the operator is.
 function onKeydown(event: KeyboardEvent) {
   const combo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k'
   if (combo) {
@@ -56,10 +49,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <!-- Capped and never wider: a box that spans a wide window stops reading as a field and starts
-       reading as a banner. Focus is the whole "on" state — the accent keyline, the raised fill and
-       the halo — and a query set without focus keeps it, because a strip that is answering is not
-       an idle one. -->
+  <!-- Capped and never wider; focus is the whole "on" state, and a query set without focus keeps it because a strip that is answering is not idle. -->
   <div
     class="flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-control border border-border pr-[9px] pl-[10px]"
     :class="
@@ -84,8 +74,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       @blur="focused = false"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
-    <!-- The query's own clear, drawn as the keycap it mirrors. It is a button and not a keycap,
-         but it is read as one: the shortcut works whether or not it is read at all. -->
+    <!-- The query's own clear, drawn as the keycap it mirrors; it is read as one. -->
     <button
       v-if="modelValue"
       type="button"

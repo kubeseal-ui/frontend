@@ -3,13 +3,10 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useSecretsStore } from '@/stores/secrets'
 
-// The sibling namespaces, as one scrolling line. It replaces the rail: a namespace is a place you
-// move between, and a rail spent a column of every screen saying so.
+// The sibling namespaces, as one scrolling line; a namespace is a place you move between, not a rail down every screen.
 defineProps<{ namespace: string }>()
 const secrets = useSecretsStore()
-// Two listings, both shared with the pages either side of this one: the namespace listing names
-// the siblings, and the search index is the only response that knows whether one of them drifted.
-// A deep link into this page is what makes them worth asking for at all.
+// The namespace listing names the siblings and the search index is what knows whether one drifted; a deep link is what makes both worth asking for.
 onMounted(() => {
   if (secrets.namespaces.length === 0 && !secrets.loading) secrets.fetchNamespaces().catch(() => {})
   if (secrets.indexLoaded || secrets.indexLoading) return
@@ -33,8 +30,7 @@ const drifted = computed(() => {
 })
 
 const strip = ref<HTMLElement | null>(null)
-// The names arrive after the strip mounts, so a deep link can land with the active chip
-// offscreen in the scroll line; bring it into view once the listing lands.
+// The names arrive after the strip mounts, so a deep link can land with the active chip offscreen; bring it into view once the listing lands.
 watch(names, async (list) => {
   if (!list.length) return
   await nextTick()

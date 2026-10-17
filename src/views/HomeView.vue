@@ -17,15 +17,13 @@ import { countLabel } from '@/utils/format'
 const secrets = useSecretsStore()
 const auth = useAuthStore()
 
-// "Seal, Reveal and Push": no comma before the last item, because these are read as a list of
-// names rather than as a sentence.
+// "Seal, Reveal and Push": no comma before the last item, because these read as names rather than a sentence.
 function listSentence(values: string[]): string {
   if (values.length < 2) return values[0] ?? ''
   return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`
 }
 
-// The value every row agrees on, or null when they differ. An empty string counts as no shared
-// fact — "every namespace maps to nothing" is not a sentence worth printing.
+// The value every row agrees on, or null when they differ; an empty string counts as no shared fact.
 function sharedString(values: string[]): string | null {
   return values.every((value) => value === values[0]) ? values[0] : null
 }
@@ -33,8 +31,7 @@ function sharedString(values: string[]): string | null {
 const problemsOnly = ref(false)
 const emptyOnly = ref(false)
 
-// Per-namespace tallies from the one cross-namespace listing. Nothing else can produce them:
-// GET /namespaces carries no secret count and no drift at all.
+// Per-namespace tallies from the one cross-namespace listing; GET /namespaces carries no secret count and no drift at all.
 const fleet = computed(() => {
   const counts = new Map<string, { total: number; outOfSync: number }>()
   for (const secret of secrets.index) {
@@ -46,8 +43,7 @@ const fleet = computed(() => {
   return counts
 })
 
-// One scale for every bar on the page, so their lengths compare. Without it each bar would be
-// full width and the chart would say nothing.
+// One scale for every bar on the page, so their lengths compare; without it each bar would be full width.
 const maxTotal = computed(() => Math.max(1, ...[...fleet.value.values()].map((entry) => entry.total)))
 
 const rows = computed(() =>
@@ -63,16 +59,14 @@ const rows = computed(() =>
       repository: [paths?.repository || namespace.git_mapping || '', paths?.branch ?? ''].filter(Boolean).join(' @ '),
       total,
       outOfSync,
-      // The bar's two segments are shares of the fleet's largest namespace, not of the tile, so
-      // one length across the grid means one size.
+      // Both segments are shares of the fleet's largest namespace, not of the tile, so one length across the grid means one size.
       ok: `${((total - outOfSync) / maxTotal.value) * 100}%`,
       bad: `${(outOfSync / maxTotal.value) * 100}%`,
     }
   }),
 )
 
-// A fact every namespace shares is stated once, in the header. Printed per tile it was the same
-// mapping on twenty tiles, when the name is the only thing that differs between them.
+// A fact every namespace shares is stated once in the header, not printed on twenty tiles.
 const shared = computed((): { repository: string; grants: string[] | null } => {
   // The header renders before the listing lands, so this is read with no rows at all.
   const first = rows.value[0]
@@ -99,8 +93,7 @@ const outOfSyncNamespaces = computed(() => [...fleet.value.values()].filter((ent
 
 const emptyCount = computed(() => rows.value.filter((row) => row.total === 0).length)
 
-// The fleet's own tally, and its health only once the listing that knows about drift has landed:
-// an unloaded index reports every namespace as clean, which is not the same fact.
+// The fleet's tally, with health only once the listing that knows about drift has landed: an unloaded index reports every namespace as clean.
 const facts = computed<Fact[]>(() => {
   if (!rows.value.length) return []
   const items: Fact[] = [{ value: String(rows.value.length), label: rows.value.length === 1 ? 'namespace' : 'namespaces' }]
@@ -135,22 +128,16 @@ function toggle(which: 'problems' | 'empty') {
 
 onMounted(async () => {
   await Promise.all([
-    // Reported through the store, which the error branch renders; catching here only
-    // stops it leaving this hook as an unhandled rejection.
+    // Reported through the store, which the error branch renders; catching here only stops an unhandled rejection.
     secrets.namespaces.length === 0 ? secrets.fetchNamespaces().catch(() => {}) : Promise.resolve(),
-    // Every destination this page states — the header's shared clause and a tile's own
-    // repository — is resolved from the mappings, so the page has to ask for them itself.
+    // Every destination the page states is resolved from the mappings, so the page has to ask for them itself.
     secrets.gitPathsLoaded ? Promise.resolve() : secrets.fetchGitPaths(),
   ])
-  // Off the critical path, and never awaited: the tiles render from the namespace listing and
-  // pick up their counts when this lands.
+  // Off the critical path and never awaited: the tiles render from the namespace listing and pick up their counts when this lands.
   if (!secrets.indexLoaded && !secrets.indexLoading) secrets.fetchIndex().catch(() => {})
 })
 
-// Refresh re-fetches everything the page renders from, not just the namespace list. The tiles'
-// counts and drift come from the cross-namespace index, so refreshing namespaces alone left those
-// numbers unchanged and the button looked dead — the common case, since the namespace set rarely
-// moves while its Secrets drift. The loading flag gives the press visible feedback either way.
+// Refresh re-fetches everything the page renders from: counts and drift come from the index, so refreshing namespaces alone looked dead.
 const refreshing = ref(false)
 async function refresh() {
   if (refreshing.value) return
@@ -194,8 +181,7 @@ async function refresh() {
     </div>
 
     <template v-if="secrets.namespaces.length">
-      <!-- Two named sets rather than a text box: "the two that are sick" is a question the fleet
-           can answer, and typing a namespace's name to find it is not. -->
+      <!-- Two named sets rather than a text box: "the two that are sick" is a question the fleet can answer. -->
       <div v-if="secrets.indexLoaded && (outOfSyncTotal || emptyCount)" class="page-x flex max-sm:flex-wrap items-center gap-2.5 pt-[18px] pb-3.5">
         <button
           v-if="outOfSyncTotal"
@@ -235,12 +221,7 @@ async function refresh() {
         :description="problemsOnly ? 'No namespace is out of sync.' : 'No namespace is empty.'"
       />
 
-      <!-- One tile per namespace, and the tile — not a panel around the grid — is the surface.
-           Its foot is its level: filled against the fleet's largest namespace with the drifted
-           share carved out, so one mark carries both size and health. It is decorative — the
-           count and the chip above it say both in words.
-           `draw` on the grid and `ok`/`bad` on the segments are the names `style.css` animates
-           the bars in by; the tile publishes its own width as `--bar-ok`/`--bar-bad`. -->
+      <!-- One tile per namespace, and the tile — not a panel — is the surface; the foot is decorative, with the count and chip carrying the same facts in words. -->
       <ul v-else class="tiles draw m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(232px,1fr))] max-sm:grid-cols-1 gap-2.5 page-x pb-10">
         <li v-for="(row, index) in visibleRows" :key="row.name" :style="{ '--d': `${Math.min(index, 8) * 40}ms` }">
           <RouterLink
@@ -265,8 +246,7 @@ async function refresh() {
               </span>
             </span>
 
-            <!-- Only when the fleet disagrees: a mapping every tile shares is stated once, above. -->
-            <span v-if="!shared.repository && row.repository" class="mt-1.5 block truncate font-mono text-xs text-faint">{{ row.repository }}</span>
+            <!-- Only when the fleet disagrees: a mapping every tile shares is stated once, above. -->            <span v-if="!shared.repository && row.repository" class="mt-1.5 block truncate font-mono text-xs text-faint">{{ row.repository }}</span>
 
             <span v-if="secrets.indexLoaded" class="level absolute inset-x-0 bottom-0 flex h-[3px]" aria-hidden="true">
               <i class="ok block h-full bg-accent/55" :style="{ width: row.ok, '--bar-ok': row.ok }" />

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// Native on purpose: the only list in the app is a handful of Git paths, and a native
-// `<select>` gives keyboard type-ahead, platform pickers, and correct announcement free.
+// Native on purpose: a handful of Git paths wants keyboard type-ahead, platform pickers, and correct announcement for free.
 withDefaults(
   defineProps<{
     modelValue: string

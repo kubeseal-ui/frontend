@@ -4,16 +4,12 @@ import AppIcon from './AppIcon.vue'
 import AppSpinner from './AppSpinner.vue'
 import { type IconName } from './icons'
 
-// The label is the default slot and nothing else joins the button's text, not even while
-// loading (the spinner is an svg): the specs match buttons by exact text, so this is a
-// contract. `type` defaults to "button", because an accidental submit would be a real
-// defect rather than a styling one.
+// The label is the default slot and nothing else joins the button's text, not even while loading: the specs match buttons by exact text.
 const props = withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'ghost'
     size?: 'small' | 'medium'
-    // Typed from the icon set: this forwards straight to AppIcon, so a plain string would
-    // push the check to a runtime lookup that renders an empty svg.
+    // Typed from the icon set: this forwards straight to AppIcon, so a plain string would render an empty svg.
     icon?: IconName
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
@@ -23,8 +19,7 @@ const props = withDefaults(
 )
 
 const VARIANTS: Record<string, string> = {
-  // `text-accent-ink`, not a fixed white: the accent is dark on the light theme and pale on
-  // the dark one, so the readable foreground inverts with it.
+  // `text-accent-ink`, not a fixed white: the accent is dark on light and pale on dark, so the readable foreground inverts with it.
   primary: 'border-transparent bg-accent font-semibold text-accent-ink hover:brightness-110',
   secondary: 'border-border-strong bg-surface-raised font-[550] text-ink hover:border-muted',
   ghost: 'border-transparent bg-transparent font-[550] text-accent hover:bg-surface-raised',
@@ -32,8 +27,7 @@ const VARIANTS: Record<string, string> = {
 
 const SIZES: Record<string, string> = {
   small: 'h-7 px-2.5 text-xs',
-  // `h-9` and 13px are the app's control scale, and they are load-bearing: the bar that presses
-  // this button draws its own secondary control inline at exactly these and sits it alongside.
+  // `h-9` and 13px are the app's control scale: the bar that presses this button sits its own control alongside at exactly these.
   medium: 'h-9 px-3.5 text-[13px]',
 }
 
