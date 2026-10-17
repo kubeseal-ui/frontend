@@ -47,7 +47,7 @@ function setMode(next: 'rows' | 'yaml') {
 
 const scoped = (capability: 'secret:seal' | 'secret:decrypt' | 'gitops:push' | 'gitops:propose') =>
   auth.hasCapability(namespace(), capability)
-const canPatch = computed(() => Boolean(detail.value?.git.in_sync_with_live) && scoped('secret:seal') && scoped('secret:decrypt'))
+const canPatch = computed(() => Boolean(detail.value?.git.in_sync_with_live) && scoped('secret:seal'))
 const baseCommit = computed(() => detail.value?.git.base_commit || '')
 const deliveryMode = computed(() => detail.value?.git.delivery_mode || store.namespaceDeliveryMode(namespace()))
 const canDeliver = computed(() => {
@@ -114,8 +114,8 @@ const idle = computed(() => {
     // "Change, remove, or add a key" is only true when this page is offering those controls. Over
     // a Secret whose grants have withheld all three, it sends the operator looking for a button
     // that is not there, so that reason gets its own sentence instead.
-    if (!scoped('secret:seal') || !scoped('secret:decrypt')) {
-      return 'Staging a change needs the secret:seal and secret:decrypt capabilities in this namespace.'
+    if (!scoped('secret:seal')) {
+      return 'Staging a change needs the secret:seal capability in this namespace.'
     }
     if (baseCommit.value === '') {
       return 'The Git source reported no base commit, so there is nothing to stage a change against.'

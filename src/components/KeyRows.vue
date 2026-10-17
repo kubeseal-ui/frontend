@@ -101,7 +101,7 @@ const canReveal = computed(() => auth.hasCapability(namespace.value, 'secret:dec
 // controls that would earn one are withheld rather than offered. Concealing is not gated: it
 // drops plaintext this page already holds and sends nothing.
 const canRevealValue = computed(() => canReveal.value && props.detail.git.in_sync_with_live)
-const canPatch = computed(() => auth.hasCapability(namespace.value, 'secret:seal') && canRevealValue.value)
+const canPatch = computed(() => auth.hasCapability(namespace.value, 'secret:seal') && props.detail.git.in_sync_with_live)
 // The commit every reveal and review is made against. Absent means the server did not report
 // one, which the controls that need it refuse rather than send.
 const baseCommit = computed(() => props.detail.git.base_commit || '')

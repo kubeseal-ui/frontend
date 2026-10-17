@@ -130,11 +130,17 @@ describe('revealing', () => {
     expect(button(wrapper, 'Remove password')).toBeDefined()
   })
 
-  it('hides the controls entirely, and says why, without reveal access', async () => {
+  it('withholds reveal without secret:decrypt, and says why, while edits stay available', async () => {
     const wrapper = mountRows(['metadata:read', 'secret:seal'])
     expect(wrapper.text()).toContain('this namespace does not grant reveal access')
     expect(revealButtons(wrapper)).toHaveLength(0)
-    expect(button(wrapper, 'Change password')).toBeUndefined()
+
+    // Editing is a seal, not a decrypt: staging a change never reads the old value, so seal alone
+    // is enough to add, replace, and remove.
+    expect(button(wrapper, 'Change password')).toBeDefined()
+    expect(button(wrapper, 'Remove password')).toBeDefined()
+    expect(button(wrapper, 'Add a key')).toBeDefined()
+
     // Names are still readable — that is what metadata:read buys — and the value is still there,
     // as the dots that stand in for it.
     expect(wrapper.text()).toContain('password')
