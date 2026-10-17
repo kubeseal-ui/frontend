@@ -388,7 +388,7 @@ defineExpose({ batchProblem, showProblems, clear })
             type="button"
             :disabled="!!activeKey"
             :aria-label="`Reveal ${key}`"
-            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
             @click="reveal(key)"
           >
             <AppIcon name="eye" :size="13" />Reveal
@@ -397,7 +397,7 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="hasRevealed(key)"
             type="button"
             :aria-label="`Conceal ${key}`"
-            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised"
             @click="conceal(key)"
           >
             <AppIcon name="eye-off" :size="13" />Conceal
@@ -413,7 +413,7 @@ defineExpose({ batchProblem, showProblems, clear })
             :aria-label="editing[key] ? `Discard the staged change to ${key}` : `Change ${key}`"
             :aria-expanded="editing[key]"
             :aria-controls="`staged-${key}`"
-            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="editing[key] ? clear(key) : startEdit(key)"
           ><AppIcon :name="editing[key] ? 'x' : 'pencil'" :size="13" />{{ editing[key] ? 'Discard' : 'Change' }}</button>
           <!-- The one action here that pressing it again does not undo, so it is the one that
@@ -422,7 +422,7 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="canPatch && !editing[key]"
             type="button"
             :aria-label="`Remove ${key}`"
-            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-danger hover:border-danger/40 hover:bg-danger/10"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-danger hover:border-danger/40 hover:bg-danger/10"
             @click="removeKey(key)"
           ><AppIcon name="trash" :size="13" />Remove</button>
         </span>
@@ -587,7 +587,7 @@ defineExpose({ batchProblem, showProblems, clear })
           <button
             type="button"
             :aria-label="`Remove new key ${index + 1}`"
-            class="inline-flex h-[27px] max-sm:h-11 cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-muted hover:border-border-strong hover:bg-surface-raised hover:text-ink"
             @click="removeAdded(index)"
           ><AppIcon name="x" :size="13" />Discard</button>
         </span>

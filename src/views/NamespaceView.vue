@@ -141,12 +141,11 @@ watch(() => props.namespace, load)
       <template #actions>
         <!-- A link, not a button: AppButton renders a bare <button>, and navigating is what this
              does. The classes restate its primary variant — including the size, because the two
-             sit in the same cluster and a restatement that drifts 2px reads as a mistake, and
-             including the phone floor, or this one stays 34px while Refresh beside it rises. -->
+             sit in the same cluster and a restatement that drifts 2px reads as a mistake. -->
         <RouterLink
           v-if="canSeal"
           :to="`/namespaces/${encodeURIComponent(props.namespace)}/new`"
-          class="inline-flex h-9 max-sm:h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-control border border-transparent bg-accent px-3.5 text-[13px] font-semibold text-accent-ink no-underline transition hover:brightness-110"
+          class="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-control border border-transparent bg-accent px-3.5 text-[13px] font-semibold text-accent-ink no-underline transition hover:brightness-110"
         >
           <AppIcon name="plus" :size="16" />
           New Secret
@@ -184,7 +183,7 @@ watch(() => props.namespace, load)
           v-for="chip in filters"
           :key="chip.value"
           type="button"
-          class="inline-flex h-[30px] max-sm:h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border-strong bg-transparent px-3 text-[12.5px] font-semibold whitespace-nowrap text-muted hover:border-muted hover:text-ink"
+          class="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[8px] border border-border-strong bg-transparent px-3 text-[12.5px] font-semibold whitespace-nowrap text-muted hover:border-muted hover:text-ink"
           :class="
             filter === chip.value
               ? chip.tone === 'danger'

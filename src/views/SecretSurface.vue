@@ -350,7 +350,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
           <!-- Where you are in the workflow, pinned above the editor. It shows only while the
                Secret is editable; when the Git source has drifted the alert below takes the screen
                and there is no workflow to be partway through. -->
-          <div v-if="inSync" class="sticky top-[59px] max-sm:top-[115px] z-10 mb-4 bg-bg py-1">
+          <div v-if="inSync" class="sticky top-[59px] max-sm:top-[105px] z-10 mb-4 bg-bg py-1">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 
@@ -412,7 +412,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
                   v-for="option in (['rows', 'yaml'] as const)"
                   :key="option"
                   type="button"
-                  class="h-[26px] max-sm:h-10 cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
+                  class="h-[26px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
                   :class="mode === option ? 'bg-surface-raised text-accent' : 'text-muted hover:text-ink'"
                   :aria-pressed="mode === option"
                   @click="setMode(option)"

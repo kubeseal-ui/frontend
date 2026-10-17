@@ -92,8 +92,8 @@ async function logout() {
 
     <!-- A band, not a panel: every screen shares it, and a rounded surface here would read as a
          second page.
-         Pinned arithmetic: desktop header = 59px (py-3 + 34px search + border); phone header = 115px
-         (24px padding + 36px row 1 + 10px gap + 44px search + border). The sticky offsets in
+         Pinned arithmetic: desktop header = 59px (py-3 + 34px search + border); phone header = 105px
+         (24px padding + 36px row 1 + 10px gap + 34px search + border). The sticky offsets in
          SecretSurface and NewSecretView are derived from these — change them together. -->
     <header class="sticky top-0 z-20 flex flex-wrap items-center gap-2.5 border-b border-border bg-surface px-4 py-3 sm:gap-[18px] sm:px-[22px]">
       <RouterLink to="/" class="flex shrink-0 items-center gap-2.5 no-underline">
@@ -105,7 +105,7 @@ async function logout() {
 
       <!-- The strip is what the query is typed into even when it is answering, so it is never an
            overlay. On a phone it drops to its own full-width row (order-last + basis-full), which
-           is the second row of the pinned 115px header above. -->
+           is the second row of the pinned 105px header above. -->
       <SecretSearch v-if="auth.user" v-model="query" class="max-sm:order-last max-sm:basis-full" />
 
       <span class="flex-1" aria-hidden="true" />

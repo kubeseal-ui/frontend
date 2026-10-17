@@ -166,10 +166,10 @@ onUnmounted(() => secrets.discardChange())
         <div class="flex min-w-0 flex-col">
           <!-- Where you are, pinned below the app header so it stays in view as the one changing
                button at the foot moves the flow on. The offset is the header's own pinned height
-               (59px desktop, 115px on a phone's two-row header — see AppShell), so the rail is
+               (59px desktop, 105px on a phone's two-row header — see AppShell), so the rail is
                never carried under it. The rail's own `18px 0 20px` is the padding here, so the air
                above and below it is the air the mockup draws. -->
-          <div class="sticky top-[59px] max-sm:top-[115px] z-10 bg-bg pt-[18px] pb-5">
+          <div class="sticky top-[59px] max-sm:top-[105px] z-10 bg-bg pt-[18px] pb-5">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 

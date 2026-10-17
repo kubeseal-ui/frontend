@@ -54,7 +54,7 @@ watch(names, async (list) => {
       :key="name"
       :to="`/namespaces/${name}`"
       :aria-current="name === namespace ? 'page' : undefined"
-      class="shrink-0 rounded-mini border px-[11px] py-[5px] max-sm:inline-flex max-sm:items-center max-sm:h-10 font-mono text-xs no-underline"
+      class="shrink-0 rounded-mini border px-[11px] py-[5px] font-mono text-xs no-underline"
       :class="
         name === namespace
           ? 'border-border-strong bg-surface-raised font-semibold text-accent'

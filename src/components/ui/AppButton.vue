@@ -34,9 +34,7 @@ const SIZES: Record<string, string> = {
   small: 'h-7 px-2.5 text-xs',
   // `h-9` and 13px are the app's control scale, and they are load-bearing: the bar that presses
   // this button draws its own secondary control inline at exactly these and sits it alongside.
-  // On a phone the medium control rises to the 44px touch floor; small stays as-is, since it
-  // only ever appears inside dense rows that set their own phone sizes.
-  medium: 'h-9 max-sm:h-11 px-3.5 text-[13px]',
+  medium: 'h-9 px-3.5 text-[13px]',
 }
 
 const classes = computed(() => [
