@@ -240,6 +240,8 @@ details[open] summary .chev { rotate: 180deg; }
    the one thing in the product that must never animate: a keyboard user may not wait for
    their position to settle. */
 :focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+/* Fields focus by accent border, not ring: unlayered outline would stack on it. */
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 
 /* ---------------------------------------------------------------------------------------
    The five moves. Each answers something a person did, so nothing here runs on its own;
