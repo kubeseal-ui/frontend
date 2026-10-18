@@ -1,19 +1,9 @@
-// The account photo. Gravatar — and the Libravatar-shaped mirrors of it — key an avatar on
-// md5(lowercase(trim(email))), and the browser has no digest that old: crypto.subtle stops at
-// SHA-1, so the key derivation below is our own. It is not security-bearing; it is a lookup key,
-// and the address itself never leaves the browser.
-//
-// Avatars are opt-in, matching src/utils/telemetry.ts: VITE_AVATAR_ENDPOINT unset (the default)
-// makes every call a no-op, so the header keeps the initials mark and nothing is requested. Naming
-// the endpoint rather than a boolean is what lets a deployment point it at its own mirror.
+// Gravatar/Libravatar key on md5(lowercase(trim(email))); the browser has no MD5, so it lives below. Opt-in via VITE_AVATAR_ENDPOINT (default off) — the endpoint never learns the address.
 
 /** 2× the header's 26px circle, so the image is sharp on a dense display. */
 const SIZE = 52
 
-/** The avatar for an email, or '' when avatars are off or the address is empty. The endpoint must
- *  answer the `/avatar/<md5>` shape and honour `d=404`, which asks for a miss rather than a
- *  placeholder image — that miss is what lets the header fall back to the initials instead of
- *  showing someone else's generic silhouette. */
+/** The avatar for an email, or '' when avatars are off. The endpoint must answer `/avatar/<md5>` and honour `d=404`, whose miss is what lets the header fall back to the initials. */
 export function avatarUrl(email: string): string {
   // Read per call rather than into a module constant, so a test can exercise both states.
   const endpoint = (import.meta.env.VITE_AVATAR_ENDPOINT ?? '').replace(/\/+$/, '')
@@ -41,13 +31,10 @@ const K = [
   0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 ]
 
-/** MD5 of a UTF-8 string: 32 lowercase hex characters. Exported for its vectors — it is the
- *  avatar key and nothing else. */
+/** MD5 of a UTF-8 string, 32 lowercase hex; exported for its test vectors — the avatar key and nothing else. */
 export function md5(input: string): string {
   const bytes = new TextEncoder().encode(input)
-  // 0x80, then zeros, then the message length in bits as a 64-bit little-endian value. The length
-  // occupies the last 8 bytes of the final block, so a message with fewer than 9 bytes left in its
-  // block needs another one.
+  // The length occupies the last 8 bytes of the final block, so a message with fewer than 9 bytes left in its block needs another one.
   const padded = new Uint8Array((((bytes.length + 8) >> 6) + 1) * 64)
   padded.set(bytes)
   padded[bytes.length] = 0x80

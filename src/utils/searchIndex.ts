@@ -10,8 +10,7 @@ export interface SearchHit {
   matchedKeys: string[]
 }
 
-/** Matches Secret names and key names. Key names already ride in the listing, so a match on
- *  `DATABASE_URL` costs no request and nothing here is plaintext. */
+/** Matches Secret names and key names; key names already ride in the listing, so nothing here is plaintext. */
 export function searchSecrets(index: SealedSecretSummary[], query: string): SearchHit[] {
   const needle = query.trim().toLowerCase()
   if (!needle) return []
@@ -40,9 +39,7 @@ export interface HighlightSegment {
   hit: boolean
 }
 
-/** Splits `text` into the runs the query matched and the runs it did not. Returned as data
- *  rather than markup, so the row renders it with v-for and the product never needs v-html.
- *  Case-insensitive, and an empty query is one unmatched run rather than every-character. */
+/** Splits `text` into matched and unmatched runs, returned as data rather than markup so the product never needs v-html. An empty query is one unmatched run. */
 export function highlightSegments(text: string, query: string): HighlightSegment[] {
   const needle = query.trim().toLowerCase()
   if (!needle) return [{ text, hit: false }]
@@ -50,8 +47,7 @@ export function highlightSegments(text: string, query: string): HighlightSegment
   const haystack = text.toLowerCase()
   const segments: HighlightSegment[] = []
   let cursor = 0
-  // A zero-length match would never advance `cursor`, which is why the empty needle returns
-  // above instead of being handled here.
+  // A zero-length match would never advance `cursor`, which is why the empty needle returns above.
   for (let found = haystack.indexOf(needle); found !== -1; found = haystack.indexOf(needle, cursor)) {
     if (found > cursor) segments.push({ text: text.slice(cursor, found), hit: false })
     segments.push({ text: text.slice(found, found + needle.length), hit: true })

@@ -297,8 +297,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
       Loading SealedSecret…
     </p>
 
-    <!-- The detail is cleared before every load, so an empty result and a failed one are told
-         apart rather than both reading as "not found". -->
+    <!-- The detail is cleared before every load, so an empty result and a failed one are told apart rather than both reading as "not found". -->
     <template v-else>
       <div class="page-x">
         <AppAlert v-if="error" type="error" title="Could not load SealedSecret">
@@ -312,9 +311,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
       <!-- Spine stacks under the document on a phone and sits beside it from 820px. -->
       <div v-if="detail" class="flex min-[820px]:flex-row flex-col items-start max-sm:items-stretch gap-7 page-x pb-10">
         <div class="min-w-0 flex-1">
-          <!-- Where you are in the workflow, pinned above the editor. It shows only while the
-               Secret is editable; when the Git source has drifted the alert below takes the screen
-               and there is no workflow to be partway through. -->
+          <!-- Pinned above the editor, shown only while the Secret is editable; drift takes the screen instead. -->
           <div v-if="inSync" class="sticky top-[59px] max-sm:top-[105px] z-10 mb-4 bg-bg py-1">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
@@ -338,17 +335,12 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncError }}</p>
           </AppAlert>
 
-          <!-- Drift gates revealing and editing, so it is stated before the content it disables.
-               Three facts only: which state, what differs, and the one control that can act. The
-               consequence of pressing it is the dialog's, where both documents are on screen. -->
+          <!-- Drift gates revealing and editing, so it is stated before the content it disables. -->
           <AppAlert v-if="!inSync" type="error" :title="`Not in sync: ${driftLabel}`" class="mb-5">
-            <!-- What differs, named here rather than left to a manual diff of the live resource
-                 against the file. The paths are set with the sentence they explain, apart from the
-                 paragraphs below, because they are one answer rather than two. -->
+            <!-- What differs, named here rather than left to a manual diff of the live resource against the file. -->
             <p v-if="driftReason" class="m-0 max-w-[62ch] text-[13px] text-muted">{{ driftReason }}</p>
             <p v-if="driftFields" class="mt-[3px] mb-0 max-w-[62ch] break-words font-mono text-xs text-muted">{{ driftFields }}</p>
-            <!-- Git-only is the one drift nothing here can act on: this page never writes to
-                 the cluster. -->
+            <!-- Git-only is the one drift nothing here can act on: this page never writes to the cluster. -->
             <p v-if="driftStatus() === 'git_only'" class="m-0 max-w-[62ch] text-[13px] text-muted">
               The manifest is in Git and there is no Secret for it in the cluster. Nothing on this page writes to the
               cluster — a GitOps controller managing this namespace is what would apply it.
@@ -364,13 +356,9 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <p v-else class="m-0 max-w-[62ch] text-[13px] text-muted">{{ syncUnavailable }}</p>
           </AppAlert>
 
-          <!-- The document region. It is hidden while a diff is under review or the change has
-               landed, so that one block — the diff, or the confirmation — is the task rather than a
-               panel stacked below the whole key list. Both editors stay mounted (v-show, never
-               v-if) so a staged batch survives the trip through review and back via the rail. -->
+          <!-- Hidden while a diff or confirmation is the task; both editors stay mounted (v-show) so a staged batch survives review and back. -->
           <div v-show="composing">
-            <!-- The mode switch: pressed buttons, so the state is announced, keyboard reachable,
-                 and never colour alone. -->
+            <!-- Pressed buttons, so the state is announced and never colour alone. -->
             <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Document mode">
               <span class="flex max-sm:gap-2 gap-[3px] rounded-control border border-border bg-surface p-[3px]">
                 <button
@@ -391,24 +379,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
             <DocumentEditor v-show="mode === 'yaml'" :detail="detail" />
           </div>
 
-          <!-- What the review returned, and what the check verified. Both read from the store:
-               the review is frozen at the moment it was made, so it keeps showing the ciphertext
-               that was reviewed even after the rows move on. Each folds open where it lands, so
-               the presses below it move down rather than jumping. The fold's child stays mounted
-               only while the panel is; a result that has been spent leaves at once. -->
-          <!-- One diff at a time. The review's predicted ciphertext and the check's dry-run against
-               the branch are near-identical YAML, so showing both stacks two walls of text that
-               say almost the same thing; once the check lands it supersedes the review, so the
-               review folds away and the check takes its place. Because only one is ever open, the
-               open one carries the way back: an Edit in its heading, the same control — and the
-               same accent — as the create form's folded row.
-               The heading is keylined like that row too. The two stages are the same moment in the
-               same product, and the create flow puts its bar around the line bearing Edit rather
-               than leaving it as prose; a heading here would be the one place the way back is not
-               dressed the way the other flow dresses it. This is not the create bar's content —
-               that bar names the Secret, and the page header above already does here — only its
-               shape. Each is rendered only while its own fold is open, because a shut fold keeps
-               its children mounted and a tab stop on a panel nobody can see is a trap. -->
+          <!-- One diff at a time: the check supersedes the near-identical review, and the open fold's Edit heading is the way back, keylined like the create form's folded row. Each child renders only while open, because a tab stop on a hidden panel is a trap. -->
           <div class="fold" ref="reviewFold" :class="{ open: Boolean(store.review) && !store.check }">
             <div>
               <template v-if="store.review">
@@ -460,14 +431,11 @@ watch([() => route.params.namespace, () => route.params.name], load)
                   rel="noopener noreferrer"
                   class="font-mono text-xs break-all text-accent no-underline hover:underline"
                 >{{ store.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
-                <!-- False for every delivery: this workflow writes to Git and never watches the
-                     cluster afterwards. -->
+                <!-- False for every delivery: this workflow writes to Git and never watches the cluster afterwards. -->
                 <p v-if="!store.delivery.argocd_sync_verified" class="mt-[3px] mb-0 border-t border-border pt-[9px] text-xs text-muted">
                   A GitOps controller has not confirmed this reached the cluster.
                 </p>
-                <!-- The next step rides with the confirmation rather than a spent workflow bar.
-                     Editing again reloads the Secret so the next change is staged against the commit
-                     this delivery just made, not the stale one it started from. -->
+                <!-- Editing again reloads the Secret so the next change is staged against the commit this delivery just made. -->
                 <AppButton class="mt-2.5 self-start" icon="pencil" @click="load">Edit this Secret again</AppButton>
               </AppAlert>
             </div>
@@ -497,8 +465,7 @@ watch([() => route.params.namespace, () => route.params.name], load)
       </div>
     </template>
 
-    <!-- The two documents travel with the confirmation: "overwrite" is not a fact the operator can
-         check from the page that offers it. -->
+    <!-- The two documents travel with the confirmation: "overwrite" is not a fact the operator can check from the page that offers it. -->
     <Teleport to="body">
       <div
         v-if="confirming"

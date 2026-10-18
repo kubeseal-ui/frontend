@@ -1,14 +1,7 @@
-// The two Kubernetes name rules this app can pre-check, so a seal is refused at the field
-// that caused it rather than by the API server after delivery: data keys must satisfy the
-// ConfigMap-key rule, and Secret names the DNS1123 subdomain rule.
+// The two Kubernetes name rules this app can pre-check: data keys (apimachinery's IsConfigMapKey) and Secret names (DNS1123 subdomain), so a seal is refused at the field that caused it.
 
 const MAX_NAME_LENGTH = 253
-
-// [-._a-zA-Z0-9]+, starting and ending alphanumeric — what the API server demands of a
-// Secret's data keys (apimachinery's IsConfigMapKey).
 const KEY_NAME_RE = /^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$/
-
-// Lowercase alphanumerics, '-' and '.', per label or per dot-separated segment.
 const DNS1123_SUBDOMAIN_RE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/
 
 export function keyNameProblem(key: string): string {

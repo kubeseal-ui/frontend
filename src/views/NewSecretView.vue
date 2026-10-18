@@ -21,34 +21,29 @@ const auth = useAuthStore()
 const secrets = useSecretsStore()
 
 const canSeal = computed(() => auth.hasCapability(props.namespace, 'secret:seal'))
-// Fixed per namespace. An unmapped namespace can still be encrypted, so the spine says so
-// before the operator writes a manifest rather than after.
+// Fixed per namespace; an unmapped namespace can still be encrypted, so the spine says so before the manifest is written.
 const deliveryMode = computed(() => secrets.namespaceDeliveryMode(props.namespace))
 const hasDeliveryPolicy = computed(() => Boolean(deliveryMode.value))
 const mapping = computed(() => secrets.namespaceGitPaths(props.namespace))
 
-// The directories a Secret can land in, rendered the way the server renders them, so the spine
-// lists paths rather than templates. The default is the one the template itself lands in.
+// Rendered the way the server renders them, so the spine lists paths rather than templates; the default is the one the template itself lands in.
 const allowedPaths = computed(() => (mapping.value?.allowed_paths || []).map((directory) => renderNamespace(directory, props.namespace)))
 const defaultDirectory = computed(() => templateDirectory(mapping.value?.path_template || '', props.namespace))
-// A wildcard names no paths: the server renders the target from a template the listing does not
-// carry, so the spine can say where the path comes from but not what it is.
+// A wildcard names no paths: the server renders the target from a template the listing does not carry.
 const isWildcard = computed(() => mapping.value?.namespace === '*')
 
-// What the form above is typing, so the spine can say whether the name is already taken. The
-// listing rides in the search index, which is one request for the whole fleet.
+// What the form is typing; the listing rides in the search index, one request for the whole fleet.
 const typedName = ref('')
 const existingNames = computed(() => secrets.index.filter((entry) => entry.namespace === props.namespace).map((entry) => entry.name))
 
 onMounted(() => {
   // The form reads the same listing; either may mount first.
   if (!secrets.gitPaths) secrets.fetchGitPaths()
-  // The spine names what is already here, which is the index the strip already loads for search.
+  // The spine names what is already here, which is the index the strip loads for search.
   if (!secrets.indexLoaded && !secrets.indexLoading) secrets.fetchIndex().catch(() => {})
 })
 
-// A create's first press is Encrypt, inside the name editor. What is left of the three is the
-// same two the edit path runs, so it is the same bar: check the ciphertext, then deliver it.
+// A create's first press is Encrypt, inside the name editor; what is left of the three is the same bar the edit path runs.
 const step = computed<WorkflowStep>(() => (secrets.check ? 'deliver' : 'check'))
 const busy = ref(false)
 const pressError = ref('')
@@ -58,9 +53,7 @@ const canDeliver = computed(() => {
 })
 const ready = computed(() => (step.value === 'deliver' ? canDeliver.value : true))
 
-// The four stops the create flow passes through. Compose is the home base — the only stop with a
-// way back — and the rail marks which one the operator is standing on, so pressing Check moves it
-// from Review to Check rather than only relabelling the button.
+// The four stops the create flow passes through; Compose is the only stop with a way back, and the rail marks which one the operator is standing on.
 const editorRef = ref<{ edit?: () => void } | null>(null)
 const composeSection = ref<HTMLElement | null>(null)
 const railSteps = [
@@ -70,23 +63,17 @@ const railSteps = [
   { key: 'deliver', label: 'Deliver' },
 ]
 const activeStep = computed(() => (secrets.delivery ? 3 : secrets.check ? 2 : secrets.change?.encrypted ? 1 : 0))
-// Where the checked dry-run says the manifest will land. A new Secret has no file in Git yet, so
-// the diff shows no before and the check otherwise leaves no mark; this is what makes "it passed"
-// visible rather than only renaming the button.
+// Where the checked dry-run says the manifest will land; a new Secret has no file in Git, so this is what makes "it passed" visible.
 const checkedPath = computed(() => secrets.check?.result.path || '')
 function onRailNavigate(key: string) {
-  // Only Compose steps back. From a landed delivery that means starting a fresh Secret; from an
-  // encrypted-but-undelivered draft it is the fold's own Edit — the draft goes and the form comes
-  // back — so the rail, the results below and the press bar all return to Compose with it.
+// Only Compose steps back: from a landed delivery that starts a fresh Secret; from a draft it is the fold's own Edit, and everything below returns with it.
   if (key !== 'compose') return
   if (secrets.delivery) { startAnother(); return }
   editorRef.value?.edit?.()
   revealRegion(() => composeSection.value)
 }
 
-// A landed delivery is terminal: the spent draft and its diff come off the screen, leaving the
-// confirmation alone, and starting another clears that confirmation so the flow returns to Compose
-// with the already-reset form.
+// A landed delivery is terminal: the spent draft and its diff come off the screen, leaving the confirmation alone.
 function startAnother() {
   secrets.discardChange()
   revealRegion(() => composeSection.value)
@@ -103,10 +90,7 @@ async function press() {
   } finally { busy.value = false }
 }
 
-// Each press opens its result below the form, so the viewport is carried to the new stage rather
-// than leaving the operator to scroll for what the press produced. The draft section is brought up
-// when the ciphertext first appears; the delivery confirmation takes focus when it lands, by which
-// time the form above has reset and nothing else is competing for attention.
+// Each press carries the viewport to its result below the form, so nothing lands off the bottom of the page.
 const draftSection = ref<HTMLElement | null>(null)
 const deliveryAlert = ref<{ $el?: HTMLElement } | null>(null)
 const pressErrorAlert = ref<{ $el?: HTMLElement } | null>(null)
@@ -116,19 +100,16 @@ watch(() => Boolean(secrets.change?.encrypted), (encrypted) => {
 watch(() => secrets.delivery, (delivered) => {
   if (delivered) revealRegion(() => deliveryAlert.value?.$el, { focus: true })
 })
-// A check or deliver that the server refused lands below the diff; it is carried into view and
-// focused so a failed press is never silent off the bottom of the page.
+// A refused press is carried into view and focused, so a failure is never silent off the bottom of the page.
 watch(pressError, (next) => { if (next) revealRegion(() => pressErrorAlert.value?.$el, { focus: true }) })
 
-// A half-finished encrypted draft belongs to this page and would follow the user to the
-// next one, where it has no meaning.
+// A half-finished encrypted draft belongs to this page and would follow the user to the next one.
 onUnmounted(() => secrets.discardChange())
 </script>
 
 <template>
   <section aria-labelledby="page-title">
-    <!-- One padding block for the page body, the mockup's `24px 26px 30px`: the heading and the
-         grid below it are the same column, and a band between them would be a second one. -->
+    <!-- One padding block for the page body, the mockup's `24px 26px 30px`: heading and grid are the same column. -->
     <div class="page-x pt-6">
       <div class="min-w-0">
         <RouterLink
@@ -160,32 +141,20 @@ onUnmounted(() => secrets.discardChange())
         >Back to {{ props.namespace }}</RouterLink>
       </AppAlert>
 
-      <!-- Form column and namespace card: the mockup's `1fr 210px` at a 30px gap, and the card
-           drops below the form at the width the mockup drops it at. -->
+      <!-- The mockup's `1fr 210px` at 30px gap; the card drops below the form where the mockup drops it. -->
       <div v-else class="grid grid-cols-1 items-start gap-x-[30px] gap-y-8 min-[820px]:grid-cols-[1fr_210px]">
         <div class="flex min-w-0 flex-col">
-          <!-- Where you are, pinned below the app header so it stays in view as the one changing
-               button at the foot moves the flow on. The offset is the header's own pinned height
-               (59px desktop, 105px on a phone's two-row header — see AppShell), so the rail is
-               never carried under it. The rail's own `18px 0 20px` is the padding here, so the air
-               above and below it is the air the mockup draws. -->
+          <!-- Sticky offset is the pinned header's height (59px desktop, 105px phone — see AppShell); change together. The rail's own `18px 0 20px` is the padding here. -->
           <div class="sticky top-[59px] max-sm:top-[105px] z-10 bg-bg pt-[18px] pb-5">
             <ProgressRail :steps="railSteps" :active="activeStep" @navigate="onRailNavigate" />
           </div>
 
-          <!-- A delivered draft takes the editor off the screen: the confirmation below is the whole
-               task now, and "Encrypt another" brings a fresh form back rather than leaving a spent
-               one stacked above the result. -->
+          <!-- A delivered draft takes the editor off the screen; the confirmation below is the whole task now. -->
           <div v-show="!secrets.delivery" ref="composeSection">
             <SecretNameEditor ref="editorRef" :namespace="props.namespace" @update:name="typedName = $event" />
           </div>
 
-          <!-- Each result opens where it lands rather than replacing the last one, so the press bar
-               below moves down instead of jumping. The section itself is always here — a fold cannot
-               animate a region that arrives already open — and every region in it is shut until the
-               workflow needs it. The action bar is its sibling and not one of its regions: sticky
-               positioning is bounded by the containing block, so a bar folded in here would be
-               pinned to the bottom of the results instead of staying over the form it presses on. -->
+          <!-- Each result opens where it lands rather than replacing the last one. The section is always here — a fold cannot animate a region that arrives already open. The action bar is its sibling, not one of its regions: sticky positioning is bounded by the containing block. -->
           <section
             ref="draftSection"
             class="fold-stack"
@@ -193,8 +162,7 @@ onUnmounted(() => secrets.discardChange())
           >
             <div class="fold" :class="{ open: Boolean(secrets.change?.encrypted) }">
               <div>
-                <!-- The ciphertext under review. Once delivered it is spent, so it comes off the screen
-                     and the confirmation stands alone. -->
+                <!-- The ciphertext under review; once delivered it is spent and comes off the screen. -->
                 <DiffBlocks
                   v-if="!secrets.delivery"
                   :after="secrets.check?.result.after || secrets.change?.encrypted || ''"
@@ -204,13 +172,10 @@ onUnmounted(() => secrets.discardChange())
               </div>
             </div>
 
-            <!-- The check adds this line and moves the heading above it; it does not touch the diff,
-                 which is the same ciphertext either way. The amount of motion is the amount of
-                 change, so Review to Check is one line opening and one heading rolling. -->
+            <!-- The check adds this line and moves the heading above it; the amount of motion is the amount of change. -->
             <div class="fold" :class="{ open: Boolean(secrets.check) && !secrets.delivery }">
               <div>
-                <!-- A new Secret has no file in Git to diff against, so a passing dry-run would otherwise
-                     be invisible. This is the check's result stated outright. -->
+                <!-- A new Secret has no file in Git to diff against, so a passing dry-run is stated outright. -->
                 <p v-if="secrets.check && !secrets.delivery" class="flex items-center gap-1.5 text-[13px] text-success">
                   <AppIcon name="check" :size="14" />
                   <span>The sealed manifest applies cleanly<template v-if="checkedPath"> at <span class="font-mono">{{ checkedPath }}</span></template>. Deliver writes it to Git.</span>
@@ -220,8 +185,7 @@ onUnmounted(() => secrets.discardChange())
 
             <div class="fold" :class="{ open: Boolean(secrets.delivery) }">
               <div>
-                <!-- The edit path reports a delivery; a create that delivered and said nothing left a
-                     spent draft on screen with no record of where it went. -->
+                <!-- A create that delivered and said nothing would leave a spent draft on screen with no record of where it went. -->
                 <AppAlert v-if="secrets.delivery" ref="deliveryAlert" type="success" :title="deliveryHeading(secrets.delivery)">
                   <span class="block text-[13px] text-muted">{{ summarizeDelivery(secrets.delivery) }}</span>
                   <a
@@ -232,8 +196,7 @@ onUnmounted(() => secrets.discardChange())
                     class="mt-1 block break-all text-[13px] text-accent no-underline hover:underline"
                   >{{ secrets.delivery.proposal_url }}<span class="sr-only"> (opens in a new tab)</span></a>
                   <span v-if="!secrets.delivery.argocd_sync_verified" class="mt-1 block text-[13px] text-muted">A GitOps controller has not confirmed this reached the cluster.</span>
-                  <!-- The next step rides with the confirmation rather than a workflow bar below a spent
-                       draft; pressing it brings a fresh form back and returns the rail to Compose. -->
+                  <!-- The next step rides with the confirmation rather than a workflow bar below a spent draft. -->
                   <AppButton class="mt-2.5 self-start" size="small" icon="lock" @click="startAnother">Encrypt another Secret</AppButton>
                 </AppAlert>
               </div>
@@ -243,11 +206,7 @@ onUnmounted(() => secrets.discardChange())
           <AppAlert v-if="pressError" ref="pressErrorAlert" type="error" closable title="Operation failed" class="mt-4" @close="pressError = ''">
             <p class="m-0 max-w-[62ch] text-[13px] text-muted">{{ pressError }}</p>
           </AppAlert>
-          <!-- The sticky action bar is the live workflow only; a delivered draft has no next press,
-               and its confirmation above carries what comes next. It spans the form column rather
-               than a measure of its own, so its one primary control sits on the right edge the
-               compose stage's own bar put the last press on. Its tally is one because a create
-               writes exactly one file, from the first press to the last. -->
+          <!-- The sticky action bar is the live workflow only; a delivered draft's confirmation carries what comes next. It spans the form column so its primary control sits on the same right edge as the compose stage's bar. Count is 1: a create writes exactly one file. -->
           <PendingBar
             v-if="secrets.change?.encrypted && !secrets.delivery"
             :step="step"
@@ -259,8 +218,7 @@ onUnmounted(() => secrets.discardChange())
           />
         </div>
 
-        <!-- What the form is writing into, stated beside it: the namespace's own terms, the
-             directories it allows, and the names already spoken for. -->
+        <!-- What the form is writing into, stated beside it. -->
         <aside aria-label="Namespace context" class="flex min-w-0 flex-col gap-5">
           <div>
             <h2 class="mb-[9px] text-xs font-[650] text-muted">This namespace</h2>

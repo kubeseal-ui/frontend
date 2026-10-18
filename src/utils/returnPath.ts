@@ -1,13 +1,8 @@
-// Where the operator was before an auth redirect, remembered across the round trip to the OIDC
-// provider so login returns them there instead of to the app root. sessionStorage is the right
-// store: it survives navigating away to the provider and back within the same tab, and does not
-// leak the path to other tabs or outlive the session the way localStorage would.
+// Where the operator was before an auth redirect, remembered across the OIDC round trip; sessionStorage so it survives the provider and back but not other tabs.
 
 const KEY = 'kubeseal_return_to'
 
-// A same-origin, absolute path only. Anything that could steer the browser to another origin — a
-// full URL, or a protocol-relative `//host` — is refused, so a tampered value cannot turn login
-// into an open redirect.
+// Same-origin absolute path only, so a tampered value cannot turn login into an open redirect.
 function isLocalPath(path: string | null): path is string {
   return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//')
 }
@@ -23,9 +18,7 @@ export function rememberReturnPath(path: string): void {
   }
 }
 
-/** Read and clear the remembered path. Consume-once: it is written only right before an auth
- *  redirect, so the first boot after the callback is the only one meant to act on it. Returns null
- *  when there is nothing to restore or the stored value is not a safe local path. */
+/** Consume-once: written only right before an auth redirect, so the first boot after the callback is the only one meant to act on it. */
 export function consumeReturnPath(): string | null {
   let path: string | null = null
   try {

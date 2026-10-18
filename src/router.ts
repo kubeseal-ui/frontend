@@ -29,14 +29,12 @@ export const router = createRouter({
       props: true,
       meta: { requiresAuth: true },
     },
-    // No requiresAuth: this is where sign-out lands, and a session check here would send the
-    // browser straight back into the OIDC flow the operator just left.
+    // No requiresAuth: sign-out lands here, and a session check would send the browser straight back into the OIDC flow the operator just left.
     { path: '/signed-out', name: 'signed-out', component: () => import('./views/SignedOutView.vue') },
   ],
 })
 
-// Only 401 means "no session"; anything else is let through so the view reports the
-// real failure instead of sending the operator to sign in again on a broken page.
+// Only 401 means "no session"; anything else is let through so the view reports the real failure instead of sending the operator to sign in again on a broken page.
 router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) return true
   const auth = useAuthStore(pinia)

@@ -13,9 +13,7 @@ function darkMediaQuery(): MediaQueryList | null {
   return media.call(globalThis, DARK_QUERY)
 }
 
-// Follows the OS live while the preference is `system`; an explicit choice outranks it.
-// Publishing the result as `data-theme` is what lets the stylesheet's non-media palette
-// blocks override the host's preference.
+// Follows the OS live while the preference is `system`; publishing as `data-theme` is what lets the stylesheet's non-media palette blocks override the host's preference.
 export function useColorScheme() {
   const ui = useUiStore()
   const query = darkMediaQuery()

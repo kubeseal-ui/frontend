@@ -1,8 +1,5 @@
 <script setup lang="ts">
-// The facts line under a page title. A value is a cluster identifier — a count, a scope — so it
-// is set in monospace at the ink colour; its label is one of the app's own words and stays in
-// the system sans. The separators are `/` at the border colour rather than a middle dot, so the
-// line reads as a tally instead of a sentence.
+// Values are cluster identifiers, so they are monospace at ink; labels are the app's own words and stay in the sans.
 export interface Fact {
   value?: string
   label: string

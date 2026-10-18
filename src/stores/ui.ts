@@ -1,12 +1,6 @@
 import { defineStore } from 'pinia'
 
-// The only thing this store persists is a non-sensitive layout preference, which the
-// frontend state contract allows in localStorage. Secret values, drafts, and session
-// state are never stored here.
-//
-// The search query is deliberately NOT here either. It lives in AppShell, above the route —
-// where the strip that owns it also decides what the page below renders. Nothing else needs
-// to read it, so nothing else can.
+// Only a non-sensitive layout preference is persisted. The search query is deliberately not here either: it lives in AppShell, above the route, and nothing else can read it.
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'kubeseal-ui.theme'
