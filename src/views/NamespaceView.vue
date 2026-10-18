@@ -40,7 +40,8 @@ interface DriftFilterChip {
 
 const filter = ref<DriftFilter>('all')
 
-// "Out of sync" covers every non-in-sync state: they all want the same thing from the reader. = computed(() => {
+// "Out of sync" covers every non-in-sync state: they all want the same thing from the reader.
+const driftCounts = computed(() => {
   const total = secrets.secrets.length
   const inSync = secrets.secrets.filter((secret) => secret.git.drift === 'in-sync').length
   return { total, inSync, outOfSync: total - inSync }
