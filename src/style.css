@@ -205,9 +205,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .draw .level .ok { animation: mgrown 260ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 70ms); }
 .draw .level .bad { animation: mgrowd 200ms var(--mo-out) both; animation-delay: calc(var(--d, 0ms) + 210ms); }
 
-/* The reveal: the mask is wiped back rather than faded, and concealing has no counterpart because plaintext is not something to animate. */
+/* The reveal and its counterpart: the mask wipes back on reveal and re-covers along the same edge on conceal, so plaintext never just blinks out of the DOM. */
+@keyframes mveil { from { clip-path: inset(0 0 0 0) } to { clip-path: inset(0 100% 0 0) } }
 .reveal-in { animation: mwipe var(--mo-reveal) var(--mo-out); }
+.reveal-out { animation: mveil var(--mo-reveal) var(--mo-out) both; }
 .sweep { animation: msweep var(--mo-reveal) var(--mo-out); }
+.sweep-out { animation: msweep var(--mo-reveal) var(--mo-out) reverse; }
 
 /* The multi-line value field's mask: `-webkit-text-security` is Blink/WebKit-only, so KeyRows offers it only where `CSS.supports` confirms it. */
 .conceal { -webkit-text-security: disc; }

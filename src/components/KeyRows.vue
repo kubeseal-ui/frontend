@@ -16,6 +16,8 @@ const emit = defineEmits<{ 'update:batch': [Mutation[]] }>()
 const auth = useAuthStore()
 const store = useSecretsStore()
 const revealed = reactive<Record<string, string>>({})
+// Keys mid-conceal-animation: the plaintext is still on screen until the veil finishes.
+const concealing = reactive<Record<string, boolean>>({})
 const replacements = reactive<Record<string, string>>({})
 const operation = reactive<Record<string, MutationOperation>>({})
 /** Keys whose row is open for editing; the change is staged inside the row rather than in a tray below. */
@@ -112,19 +114,45 @@ const setOperation = (key: string, value: string) => { operation[key] = value as
 const hasRevealed = (key: string) => revealed[key] !== undefined
 const openKeys = computed(() => (props.detail.keys || []).filter((key) => editing[key]))
 
+// Plaintext on screen is a window, not a state: each reveal arms its own auto-conceal, so a value
+// left open is wiped without anyone pressing anything. Any later press of Reveal rearms it.
+const autoConcealMs = 30_000
+const concealTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+function armAutoConceal(key: string) {
+  clearTimeout(concealTimers[key])
+  concealTimers[key] = setTimeout(() => {
+    delete concealTimers[key]
+    if (hasRevealed(key)) void conceal(key)
+  }, autoConcealMs)
+}
+function disarmAutoConceal(key: string) {
+  clearTimeout(concealTimers[key])
+  delete concealTimers[key]
+}
+onUnmounted(() => Object.keys(concealTimers).forEach(disarmAutoConceal))
+
 async function reveal(key: string) {
   if (!canRevealValue.value || !baseCommit.value) return
   error.value = ''; activeKey.value = key
   try {
     revealed[key] = (await store.reveal(namespace.value, props.detail.name, key, baseCommit.value)).value
+    armAutoConceal(key)
   } catch (e) { error.value = describeError(e, 'The key could not be revealed') }
   finally { activeKey.value = '' }
 }
 
 /** Drops the plaintext this page is holding; the Secret itself is untouched. */
 async function conceal(key: string) {
+  if (concealing[key]) return
+  disarmAutoConceal(key)
   if (fullscreen.value?.id === revealRowId(key)) fullscreen.value = null
-  delete revealed[key]
+  if (revealed[key] !== undefined) {
+    concealing[key] = true
+    // Matches --mo-reveal: the div stays mounted until the veil finishes, then unmounts for real.
+    await new Promise((resolve) => setTimeout(resolve, 380))
+    delete concealing[key]
+    delete revealed[key]
+  }
   // Conceal is unmounted by its own press, so focus moves to the Reveal that replaces it rather than falling to the body.
   await nextTick()
   revealButtons.value[key]?.focus()
@@ -174,11 +202,13 @@ const setRow = (key: string, element: unknown) => { rows.value[key] = element in
 function clear(key?: string) {
   if (key) {
     if (fullscreen.value?.id === stagedRowId(key) || fullscreen.value?.id === revealRowId(key)) fullscreen.value = null
-    delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
+    disarmAutoConceal(key)
+    delete concealing[key]; delete revealed[key]; delete replacements[key]; delete operation[key]; delete editing[key]
     delete shown[stagedRowId(key)]; delete peek[stagedRowId(key)]; delete multiline[stagedRowId(key)]
   } else {
     fullscreen.value = null
-    for (const bag of [revealed, replacements, operation, editing, shown, peek, multiline]) {
+    Object.keys(concealTimers).forEach(disarmAutoConceal)
+    for (const bag of [concealing, revealed, replacements, operation, editing, shown, peek, multiline]) {
       Object.keys(bag).forEach((item) => delete bag[item])
     }
     added.value = []
@@ -302,7 +332,8 @@ defineExpose({ batchProblem, showProblems, clear })
             aria-readonly="true"
             tabindex="0"
             :aria-label="`Revealed value for ${key}`"
-            class="reveal-in block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised py-1 pr-9 max-sm:pr-10 pl-2.5 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
+              class="block max-h-32 w-full overflow-auto rounded-mini border border-border-strong bg-surface-raised py-1 pr-9 max-sm:pr-10 pl-2.5 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-ink select-all"
+            :class="concealing[key] ? 'reveal-out' : 'reveal-in'"
           >{{ revealed[key] }}</div>
           <!-- The same plaintext the row holds opens to the screen; read-only, since a reveal has no string to write back to. -->
           <button
@@ -327,7 +358,7 @@ defineExpose({ batchProblem, showProblems, clear })
             :class="editing[key] && operationOf(key) === 'delete' ? 'line-through opacity-55' : ''"
           >{{ DOTS }}</span>
           <!-- The accent edge that crosses the slot with the wipe; decorative. -->
-          <span v-if="hasRevealed(key)" class="sweep" aria-hidden="true" />
+          <span v-if="hasRevealed(key)" class="sweep" :class="concealing[key] ? 'sweep-out' : ''" aria-hidden="true" />
         </span>
 
         <!-- Under drift the row keeps its dots and loses every button; the negative edges cancel the end buttons' own `px-2.5`. -->
@@ -347,7 +378,8 @@ defineExpose({ batchProblem, showProblems, clear })
             v-if="hasRevealed(key)"
             type="button"
             :aria-label="`Conceal ${key}`"
-            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised"
+            :disabled="concealing[key]"
+            class="inline-flex h-[27px] cursor-pointer items-center gap-[5px] rounded-mini border border-transparent bg-transparent px-2.5 text-xs font-semibold whitespace-nowrap text-accent hover:border-border-strong hover:bg-surface-raised disabled:cursor-default disabled:opacity-55"
             @click="conceal(key)"
           >
             <AppIcon name="eye-off" :size="13" />Conceal

@@ -108,8 +108,11 @@ describe('revealing', () => {
 
     await revealButtons(wrapper)[0]!.trigger('click')
     await flushPromises()
+    vi.useFakeTimers()
     await button(wrapper, 'Conceal password')!.trigger('click')
-    await flushPromises()
+    // Conceal plays its exit animation before the plaintext leaves the DOM.
+    await vi.advanceTimersByTimeAsync(380)
+    vi.useRealTimers()
 
     expect(wrapper.find('[aria-label="Revealed value for password"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('hunter2')
