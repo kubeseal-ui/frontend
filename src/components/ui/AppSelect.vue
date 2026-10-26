@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// Native on purpose: the only list in the app is a handful of Git paths, and a native
-// `<select>` gives keyboard type-ahead, platform pickers, and correct announcement free.
+// Native on purpose: a handful of Git paths wants keyboard type-ahead, platform pickers, and correct announcement for free.
 withDefaults(
   defineProps<{
     modelValue: string
@@ -16,15 +15,15 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <template>
-  <label class="flex flex-col gap-1 text-sm font-medium text-ink">
+  <label class="flex flex-col gap-[6px] text-[12px] font-[650] text-ink">
     <span :class="hideLabel ? 'sr-only' : ''">{{ label }}</span>
     <select
       :value="modelValue"
-      class="field cursor-pointer"
+      class="h-8 w-full cursor-pointer rounded-[8px] border border-border-strong bg-bg px-2.5 font-mono text-[13px] max-sm:text-[14px] text-ink focus-visible:border-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
     </select>
-    <span v-if="hint" class="text-xs font-normal text-muted">{{ hint }}</span>
+    <span v-if="hint" class="font-mono text-[11px] font-normal text-faint">{{ hint }}</span>
   </label>
 </template>

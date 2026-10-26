@@ -1,7 +1,5 @@
 <script setup lang="ts">
-// With a `label` it is a live region announcing the wait; without one it is decorative.
-// It renders no text in either form: the specs find buttons by exact text, so a spinner
-// contributing a word would break every one of them.
+// With a `label` it is a live region announcing the wait; it renders no text, because the specs find buttons by exact text.
 withDefaults(defineProps<{ label?: string; size?: number }>(), { size: 14 })
 </script>
 

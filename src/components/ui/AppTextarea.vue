@@ -27,7 +27,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
     :disabled="disabled"
     autocomplete="off"
     spellcheck="false"
-    class="field resize-y font-mono leading-relaxed"
+    class="w-full resize-y rounded-[10px] border border-border-strong bg-bg px-3.5 py-3 font-mono text-[12.5px] max-sm:text-[14px] leading-[1.85] text-ink placeholder:font-sans placeholder:text-faint focus-visible:border-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
     @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
   ></textarea>
 </template>

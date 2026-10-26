@@ -11,8 +11,7 @@ export interface User {
   email: string
   name: string
   username: string
-  // Scoped grants, unioned with the flat list below: the effective grant in a
-  // namespace is capabilities ∪ namespaces[namespace]. Present, but may be empty.
+  // Scoped grants, unioned with the flat list below: the effective grant in a namespace is capabilities ∪ namespaces[namespace].
   namespaces: Record<string, Capability[]>
   capabilities?: Capability[]
 }
@@ -20,10 +19,10 @@ export interface User {
 export interface Namespace {
   name: string
   capabilities: Capability[]
-  delivery?: { mode: 'direct' | 'proposal' }
   git_managed?: boolean
   delivery_mode?: 'direct' | 'proposal'
-  git_repository?: string
+  // The wire name is `git_mapping`, not `git_repository`: the Go field is GitRepository and its JSON tag is not.
+  git_mapping?: string
 }
 
 export interface GitState {
@@ -36,10 +35,17 @@ export interface GitState {
   repository?: string
   branch?: string
   delivery_mode?: 'direct' | 'proposal'
-  // Set with `diverged` only, and only when the live Secret still matches the version the file
-  // held before its last change: Git moved ahead of the cluster, so syncing would discard that.
+  // Set with `diverged` only, and only when the live Secret still matches the version the file held before its last change: Git moved ahead of the cluster, so syncing would discard that.
   git_moved_ahead?: boolean
+  // Set with `diverged` only: which part of the two documents disagrees, and every path that disagrees — structural, so never whether the values behind the ciphertext match.
+  drift_reason?: DriftReason
+  drift_fields?: string[]
+  // Set with `diverged` only: the mapped file's own text as Git holds it now, so the sync dialog can show what it replaces rather than naming the file.
+  git_file_yaml?: string
 }
+
+/** Which part of the live SealedSecret and the Git manifest disagrees. */
+export type DriftReason = 'ciphertext' | 'keys' | 'template' | 'metadata' | 'identity'
 
 export interface SealedSecretSummary {
   name: string
@@ -56,24 +62,13 @@ export interface SealedSecretDetail extends SealedSecretSummary {
   sealed_secret_yaml?: string
 }
 
-// Ciphertext only; the plaintext Secret never enters the store.
-export interface NewSecretDraft {
-  namespace: string
-  name: string
-  scope: string
-  yaml: string
-  base_commit: string
-  target_path?: string
-}
-
-/** Encrypted dry-run result returned by `POST /gitops/dry-run`. */
+/** Encrypted dry-run result returned by `POST /gitops/dry-run`. `path` is the resolved destination — the file a delivery must then name. */
 export interface DryRunResult {
   before: string
   after: string
   path: string
   base_commit: string
   mode: 'direct' | 'proposal'
-  target_path?: string
 }
 
 /** Git paths configuration returned by `GET /gitops/paths`. */
@@ -83,10 +78,7 @@ export interface GitPathsConfig {
 
 export interface NamespaceGitPaths {
   namespace: string
-  // The mapping's raw path template, e.g. `apps/{namespace}/{name}.yaml`. Raw rather than
-  // rendered because a per-namespace listing has no Secret name to render `{name}` with; the
-  // client substitutes it. `allowed_paths` are directories the file name is placed under —
-  // the server refuses a bare directory as a destination.
+  // The mapping's raw path template, e.g. `apps/{namespace}/{name}.yaml` — raw because a per-namespace listing has no name to render `{name}` with. `allowed_paths` are directories the file name is placed under; the server refuses a bare directory.
   path_template: string
   allowed_paths: string[]
   repository: string
@@ -97,16 +89,14 @@ export interface NamespaceGitPaths {
 /** The operations one entry of a reviewed batch can carry. */
 export type MutationOperation = 'replace' | 'add' | 'delete'
 
-// One entry change in a reviewed batch: one diff, one commit, so several travel
-// together. `value` is empty for a delete.
+// One entry change in a reviewed batch: one diff, one commit, so several travel together. `value` is empty for a delete.
 export interface Mutation {
   key: string
   operation: MutationOperation
   value: string
 }
 
-// What the API echoes back for a reviewed batch — never the values, which the caller
-// already holds and which have no place in a response body.
+// What the API echoes back for a reviewed batch — never the values, which have no place in a response body.
 export interface MutationSummary {
   key: string
   operation: MutationOperation
@@ -119,6 +109,42 @@ export interface EncryptedDiff {
   base_commit: string
   checksum: string
   target_path?: string
+}
+
+/** The press the one button is about to make. Shared so the bar and the surface that owns the presses cannot disagree about which step is which. */
+export type WorkflowStep = 'review' | 'apply-check' | 'check' | 'deliver'
+
+/** The pending change to one Secret — an edit staged as mutations, or a create carrying the ciphertext `/secrets/encrypt` returned. One model for both, because the three presses that follow are the same three either way. */
+export interface ChangeState {
+  namespace: string
+  /** Null until a create is named. */
+  name: string | null
+  mutations: Mutation[]
+  baseCommit: string
+  targetPath?: string
+  scope: string
+  /** Create only. An edit's ciphertext does not exist until the review is applied. */
+  encrypted?: string
+}
+
+/** What the operator reviewed, frozen when the review was computed: the apply has to send exactly this batch, not whatever the editor holds by the time they press it. */
+export interface ReviewState {
+  before: string
+  after: string
+  mutations: MutationSummary[]
+  baseCommit: string
+  checksum: string
+  targetPath?: string
+}
+
+/** The ciphertext the dry run actually checked. `yaml` is the PATCH's own output, not the
+ *  review's predicted `after` — those are different documents, and delivery sends this one. */
+export interface CheckState {
+  yaml: string
+  checksum: string
+  result: DryRunResult
+  /** Minted with the check and reused by every delivery press of it, so a delivery whose response was lost retries to a replay of the commit it already pushed instead of a base-commit conflict. */
+  idempotencyKey: string
 }
 
 export interface DeliveryResult {

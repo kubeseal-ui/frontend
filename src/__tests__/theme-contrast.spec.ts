@@ -3,6 +3,18 @@
 // --app-surface and --app-bg only because its offset lands it on whatever the control
 // sits on, not on the control's own fill. Read by regex: the stylesheet, not the
 // browser, is the artifact under test, so these hold without a rendering engine.
+//
+// The redesign retired the glass material, and the composite sampling that used to live
+// at the foot of this file went with it: with no translucent fill and no ambient wash,
+// every text token sits on a solid palette colour, so the pairs below are the whole
+// guarantee rather than one half of one. The one translucent surface since added — the
+// sync dialog's .glass-panel — composites toward --app-bg, and its worst text pair over the
+// three surfaces a page can be is 5.21:1, still above the 4.5:1 floor these pairs hold it to.
+//
+// --app-faint is deliberately NOT in textPairs. It is the decorative step — the concealed
+// dots, the keycap glyph, a keyline — and it is held below AA on purpose so it recedes.
+// Nothing that carries information is allowed to use it; that is the rule that keeps the
+// token honest, and it is enforced by review rather than here.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -10,9 +22,9 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8')
 
 /**
- * The colour declarations in a block. rgb() is captured as well as hex because the
- * glass rim colours carry alpha. Non-colour declarations are deliberately not captured,
- * which is why geometry and durations must stay literals rather than tokens.
+ * The colour declarations in a block. rgb() is captured as well as hex because a token
+ * may carry alpha. Non-colour declarations are deliberately not captured, which is why
+ * geometry and durations must stay literals rather than tokens.
  */
 function tokens(block: string): Record<string, string> {
   const found: Record<string, string> = {}
@@ -58,7 +70,7 @@ describe('theme token contrast', () => {
   })
 
   it('resolves every custom property referenced by the stylesheet', () => {
-    // Declared anywhere: --radius-* and --glass-x legitimately live outside the palettes.
+    // Declared anywhere: --radius-* and --mo-* legitimately live outside the palettes.
     const referenced = new Set([...css.matchAll(/var\((--[a-z-]+)\)/g)].map((match) => match[1]))
     expect(referenced.size).toBeGreaterThan(0)
     for (const token of referenced) expect([...declared]).toContain(token)
@@ -83,9 +95,9 @@ describe('theme token contrast', () => {
   it('derives the inner radius from the outer radius and the inset', () => {
     const geometry = css.match(/@theme \{([^}]*)\}/)?.[1] ?? ''
     const inner = geometry.match(/--radius-card-inner:\s*([^;]+);/)?.[1].trim() ?? ''
-    expect(inner).toBe('calc(var(--radius-card) - var(--glass-inset))')
+    expect(inner).toBe('calc(var(--radius-card) - var(--radius-inset))')
     expect(geometry).toMatch(/--radius-card:\s*\d+px;/)
-    expect(geometry).toMatch(/--glass-inset:\s*\d+px;/)
+    expect(geometry).toMatch(/--radius-inset:\s*\d+px;/)
   })
 
   for (const theme of themes) {

@@ -1,7 +1,4 @@
-// Web vitals go to the API's telemetry endpoint so operators can correlate browser
-// experience with server-side traces. Opt-in via VITE_TELEMETRY_ENDPOINT: unset (the
-// default) makes every call a no-op, so local dev and tests make no network requests.
-// Nothing here carries an identifier.
+// Web vitals to the API's telemetry endpoint, opt-in via VITE_TELEMETRY_ENDPOINT (default off); nothing here carries an identifier.
 import { onCLS, onINP, onFCP, onLCP, onTTFB, type Metric } from 'web-vitals'
 
 const endpoint: string = import.meta.env.VITE_TELEMETRY_ENDPOINT ?? ''
@@ -29,8 +26,7 @@ function flushBuffer(): void {
       // attribution carries element selectors; only the stable part is forwarded.
       navigation_type: metric.navigationType ?? '',
     })),
-    // Bounded: a route, not a URL with a query.
-    path: location.pathname,
+    path: location.pathname, // a route, not a URL with a query
     timestamp: new Date().toISOString(),
   })
   // keepalive so the batch survives a page unload mid-navigation.

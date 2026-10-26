@@ -1,142 +1,260 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import AppCard from '@/components/ui/AppCard.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import type { Fact } from '@/components/ui/AppPageFacts.vue'
 import AppPageHeader from '@/components/ui/AppPageHeader.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
-import type { Capability, Namespace, NamespaceGitPaths } from '@/types'
+import { grantLabels } from '@/utils/capabilities'
+import { countLabel } from '@/utils/format'
 
 const secrets = useSecretsStore()
 const auth = useAuthStore()
 
-// `metadata:read` is deliberately absent: it is the grant that puts a namespace on this
-// page at all, so it would print the same chip on every card.
-const CAPABILITY_LABELS: { capability: Capability; label: string }[] = [
-  { capability: 'secret:seal', label: 'Seal' },
-  { capability: 'secret:decrypt', label: 'Reveal' },
-  { capability: 'gitops:push', label: 'Push' },
-  { capability: 'gitops:propose', label: 'Propose' },
-  { capability: 'access:manage', label: 'Admin' },
-]
-
-// "No mapping" is claimed only once the listing has loaded: an absent listing also means
-// the request failed, and those are not the same fact.
-function gitSummary(namespace: Namespace, paths: NamespaceGitPaths | null): string {
-  const mode = paths?.mode || namespace.delivery_mode || ''
-  if (paths) {
-    // A wildcard covers every namespace through a template the listing does not expose,
-    // so it has no directory count; "0 directories" would read as "nowhere to deliver".
-    if (paths.namespace === '*') return `All namespaces${mode ? ` · ${mode}` : ''}`
-    const count = paths.allowed_paths?.length ?? 0
-    return `${count} ${count === 1 ? 'directory' : 'directories'}${mode ? ` · ${mode}` : ''}`
-  }
-  if (namespace.git_managed) return `Git managed${mode ? ` · ${mode}` : ''}`
-  return secrets.gitPathsLoaded ? 'No Git mapping' : 'Git status unavailable'
+// "Seal, Reveal and Push": no comma before the last item, because these read as names rather than a sentence.
+function listSentence(values: string[]): string {
+  if (values.length < 2) return values[0] ?? ''
+  return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`
 }
 
-const cards = computed(() =>
+// The value every row agrees on, or null when they differ; an empty string counts as no shared fact.
+function sharedString(values: string[]): string | null {
+  return values.every((value) => value === values[0]) ? values[0] : null
+}
+
+const problemsOnly = ref(false)
+const emptyOnly = ref(false)
+
+// Per-namespace tallies from the one cross-namespace listing; GET /namespaces carries no secret count and no drift at all.
+const fleet = computed(() => {
+  const counts = new Map<string, { total: number; outOfSync: number }>()
+  for (const secret of secrets.index) {
+    const entry = counts.get(secret.namespace) ?? { total: 0, outOfSync: 0 }
+    entry.total += 1
+    if ((secret.git?.drift || 'unknown') !== 'in-sync') entry.outOfSync += 1
+    counts.set(secret.namespace, entry)
+  }
+  return counts
+})
+
+// One scale for every bar on the page, so their lengths compare; without it each bar would be full width.
+const maxTotal = computed(() => Math.max(1, ...[...fleet.value.values()].map((entry) => entry.total)))
+
+const rows = computed(() =>
   secrets.namespaces.map((namespace) => {
     const paths = secrets.namespaceGitPaths(namespace.name)
-    const repository = paths?.repository || namespace.git_repository || ''
-    const branch = paths?.branch ?? ''
+    const tally = fleet.value.get(namespace.name)
+    const total = tally?.total ?? 0
+    const outOfSync = tally?.outOfSync ?? 0
 
     return {
-      namespace,
-      grants: CAPABILITY_LABELS.filter((entry) => auth.hasCapability(namespace.name, entry.capability)).map(
-        (entry) => entry.label,
-      ),
-      repository: [repository, branch].filter(Boolean).join(' @ '),
-      summary: gitSummary(namespace, paths),
+      name: namespace.name,
+      grants: grantLabels((capability) => auth.hasCapability(namespace.name, capability)),
+      repository: [paths?.repository || namespace.git_mapping || '', paths?.branch ?? ''].filter(Boolean).join(' @ '),
+      total,
+      outOfSync,
+      // Both segments are shares of the fleet's largest namespace, not of the tile, so one length across the grid means one size.
+      ok: `${((total - outOfSync) / maxTotal.value) * 100}%`,
+      bad: `${(outOfSync / maxTotal.value) * 100}%`,
     }
   }),
 )
 
+// A fact every namespace shares is stated once in the header, not printed on twenty tiles.
+const shared = computed((): { repository: string; grants: string[] | null } => {
+  // The header renders before the listing lands, so this is read with no rows at all.
+  const first = rows.value[0]
+  if (!first) return { repository: '', grants: null }
+  return {
+    repository: sharedString(rows.value.map((row) => row.repository)) || '',
+    grants: sharedString(rows.value.map((row) => row.grants.join(', '))) === null ? null : first.grants,
+  }
+})
+
+const grantClause = computed(() => {
+  const grants = shared.value.grants
+  if (!grants) return ''
+  return grants.length ? `${listSentence(grants)} everywhere` : 'read only everywhere'
+})
+
+const hasContext = computed(() => Boolean(grantClause.value || shared.value.repository))
+
+const totalSecrets = computed(() => [...fleet.value.values()].reduce((sum, entry) => sum + entry.total, 0))
+
+const outOfSyncTotal = computed(() => [...fleet.value.values()].reduce((sum, entry) => sum + entry.outOfSync, 0))
+
+const outOfSyncNamespaces = computed(() => [...fleet.value.values()].filter((entry) => entry.outOfSync).length)
+
+const emptyCount = computed(() => rows.value.filter((row) => row.total === 0).length)
+
+// The fleet's tally, with health only once the listing that knows about drift has landed: an unloaded index reports every namespace as clean.
+const facts = computed<Fact[]>(() => {
+  if (!rows.value.length) return []
+  const items: Fact[] = [{ value: String(rows.value.length), label: rows.value.length === 1 ? 'namespace' : 'namespaces' }]
+  if (!secrets.indexLoaded) return items
+  items.push({ value: String(totalSecrets.value), label: 'SealedSecrets' })
+  if (outOfSyncTotal.value) {
+    items.push({
+      value: String(outOfSyncTotal.value),
+      label: `out of sync in ${countLabel(outOfSyncNamespaces.value, 'namespace')}`,
+      tone: 'danger',
+    })
+  }
+  return items
+})
+
+// The two toggles name disjoint sets, so both at once can only ever be empty.
+const visibleRows = computed(() => {
+  if (problemsOnly.value) return rows.value.filter((row) => row.outOfSync > 0)
+  if (emptyOnly.value) return rows.value.filter((row) => row.total === 0)
+  return rows.value
+})
+
+function toggle(which: 'problems' | 'empty') {
+  if (which === 'problems') {
+    problemsOnly.value = !problemsOnly.value
+    emptyOnly.value = false
+    return
+  }
+  emptyOnly.value = !emptyOnly.value
+  problemsOnly.value = false
+}
+
 onMounted(async () => {
   await Promise.all([
-    // Reported through the store, which the error branch renders; catching here only
-    // stops it leaving this hook as an unhandled rejection.
+    // Reported through the store, which the error branch renders; catching here only stops an unhandled rejection.
     secrets.namespaces.length === 0 ? secrets.fetchNamespaces().catch(() => {}) : Promise.resolve(),
-    secrets.gitPaths ? Promise.resolve() : secrets.fetchGitPaths(),
+    // Every destination the page states is resolved from the mappings, so the page has to ask for them itself.
+    secrets.gitPathsLoaded ? Promise.resolve() : secrets.fetchGitPaths(),
   ])
+  // Off the critical path and never awaited: the tiles render from the namespace listing and pick up their counts when this lands.
+  if (!secrets.indexLoaded && !secrets.indexLoading) secrets.fetchIndex().catch(() => {})
 })
+
+// Refresh re-fetches everything the page renders from: counts and drift come from the index, so refreshing namespaces alone looked dead.
+const refreshing = ref(false)
+async function refresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    await Promise.all([
+      secrets.fetchNamespaces().catch(() => {}),
+      secrets.fetchIndex().catch(() => {}),
+      secrets.fetchGitPaths().catch(() => {}),
+    ])
+  } finally {
+    refreshing.value = false
+  }
+}
 </script>
 
 <template>
   <section aria-labelledby="page-title">
-    <AppPageHeader eyebrow="Encrypted configuration" title="Namespaces" title-id="page-title">
+    <AppPageHeader title="Namespaces" title-id="page-title" :facts="facts">
+      <template v-if="hasContext" #context><span v-if="grantClause">{{ grantClause }}<template v-if="shared.repository">, </template></span><span v-if="shared.repository">delivering to <span class="font-mono text-muted">{{ shared.repository }}</span></span></template>
       <template #actions>
-        <AppButton icon="refresh" @click="secrets.fetchNamespaces">Refresh</AppButton>
+        <AppButton icon="refresh" :loading="refreshing" @click="refresh">Refresh</AppButton>
       </template>
     </AppPageHeader>
 
-    <p v-if="secrets.loading" role="status" class="mb-4 flex items-center gap-2 text-sm text-muted">
+    <p v-if="secrets.loading" role="status" class="flex items-center gap-2 page-x text-sm text-muted">
       <AppSpinner :size="15" />
       Loading namespaces…
     </p>
 
-    <AppAlert v-if="secrets.error" type="error" title="Unable to load namespaces">
-      <p class="m-0">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
-      <AppButton class="mt-2" icon="refresh" @click="secrets.fetchNamespaces">Try again</AppButton>
-    </AppAlert>
+    <div class="page-x">
+      <AppAlert v-if="secrets.error" type="error" title="Unable to load namespaces">
+        <p class="m-0">{{ describeError(secrets.error, 'Unable to load namespaces') }}</p>
+        <AppButton class="mt-2" icon="refresh" :loading="refreshing" @click="refresh">Try again</AppButton>
+      </AppAlert>
 
-    <AppEmpty
-      v-else-if="!secrets.loading && secrets.namespaces.length === 0"
-      description="No authorized namespaces. Your account has authenticated, but no namespace grants it a capability yet — ask an administrator to map one."
-    />
+      <AppEmpty
+        v-else-if="!secrets.loading && secrets.namespaces.length === 0"
+        description="No authorized namespaces. Your account has authenticated, but no namespace grants it a capability yet. Ask an administrator to map one."
+      />
+    </div>
 
-    <!-- auto-fill, not auto-fit: auto-fit collapses empty tracks, so three cards
-         would render wide and ten narrow. -->
-    <ul v-else class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-      <li v-for="card in cards" :key="card.namespace.name">
-        <AppCard class="group">
+    <template v-if="secrets.namespaces.length">
+      <!-- Two named sets rather than a text box: "the two that are sick" is a question the fleet can answer. -->
+      <div v-if="secrets.indexLoaded && (outOfSyncTotal || emptyCount)" class="page-x flex max-sm:flex-wrap items-center gap-2.5 pt-[18px] pb-3.5">
+        <button
+          v-if="outOfSyncTotal"
+          type="button"
+          :aria-pressed="problemsOnly"
+          class="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-control border px-[13px] text-[13px] font-medium"
+          :class="
+            problemsOnly
+              ? 'border-danger bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)] text-danger'
+              : 'border-border-strong bg-surface-raised text-muted hover:text-ink'
+          "
+          @click="toggle('problems')"
+        >
+          <AppIcon name="alert" :size="14" />
+          Needs attention <span class="font-mono">{{ outOfSyncTotal }}</span>
+        </button>
+        <button
+          v-if="emptyCount"
+          type="button"
+          :aria-pressed="emptyOnly"
+          class="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-control border px-[13px] text-[13px] font-medium"
+          :class="
+            emptyOnly
+              ? 'border-danger bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)] text-danger'
+              : 'border-border-strong bg-surface-raised text-muted hover:text-ink'
+          "
+          @click="toggle('empty')"
+        >
+          <AppIcon name="database" :size="14" />
+          Empty <span class="font-mono">{{ emptyCount }}</span>
+        </button>
+      </div>
+
+      <AppEmpty
+        v-if="!visibleRows.length"
+        icon="namespace"
+        :description="problemsOnly ? 'No namespace is out of sync.' : 'No namespace is empty.'"
+      />
+
+      <!-- One tile per namespace, and the tile — not a panel — is the surface; the foot is decorative, with the count and chip carrying the same facts in words. -->
+      <ul v-else class="tiles draw m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(232px,1fr))] max-sm:grid-cols-1 gap-2.5 page-x pb-10">
+        <li v-for="(row, index) in visibleRows" :key="row.name" :style="{ '--d': `${Math.min(index, 8) * 40}ms` }">
           <RouterLink
-            :to="`/namespaces/${encodeURIComponent(card.namespace.name)}`"
-            class="absolute inset-0 z-10 rounded-card-inner"
+            :to="`/namespaces/${encodeURIComponent(row.name)}`"
+            class="tiles-lift relative block overflow-hidden rounded-card border bg-surface px-[15px] pt-[15px] pb-[19px] no-underline hover:bg-surface-raised focus-visible:bg-surface-raised"
+            :class="
+              row.outOfSync
+                ? 'border-[color-mix(in_srgb,var(--app-danger)_45%,var(--app-border))] hover:border-danger'
+                : 'border-border hover:border-border-strong'
+            "
           >
-            <span class="sr-only">{{ card.namespace.name }}</span>
+            <span class="name block truncate font-mono text-base font-semibold tracking-[-0.015em]" :class="row.total ? 'text-ink' : 'text-faint'">{{ row.name }}</span>
+
+            <span class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span v-if="row.total"><span class="font-mono">{{ row.total }}</span> {{ row.total === 1 ? 'secret' : 'secrets' }}</span>
+              <span v-else>no secrets</span>
+              <span
+                v-if="row.outOfSync"
+                class="inline-flex items-center gap-[5px] rounded-chip border border-danger/40 px-1.5 py-px text-[11.5px] font-semibold text-danger"
+              >
+                <AppIcon name="alert" :size="11" />{{ row.outOfSync }} drifted
+              </span>
+            </span>
+
+            <!-- Only when the fleet disagrees: a mapping every tile shares is stated once, above. -->            <span v-if="!shared.repository && row.repository" class="mt-1.5 block truncate font-mono text-xs text-faint">{{ row.repository }}</span>
+
+            <span v-if="secrets.indexLoaded" class="level absolute inset-x-0 bottom-0 flex h-[3px]" aria-hidden="true">
+              <i class="ok block h-full bg-accent/55" :style="{ width: row.ok, '--bar-ok': row.ok }" />
+              <i class="bad block h-full bg-danger" :style="{ width: row.bad, '--bar-bad': row.bad }" />
+            </span>
           </RouterLink>
-
-          <div class="flex h-full flex-col gap-2">
-            <h2 class="mb-0 flex min-h-[2.5em] items-start gap-2 text-[1.05rem] leading-tight">
-              <AppIcon name="namespace" :size="16" class="mt-1 text-accent" />
-              <span class="min-w-0 break-words">{{ card.namespace.name }}</span>
-            </h2>
-
-            <div class="flex flex-wrap gap-1">
-              <span
-                v-for="grant in card.grants"
-                :key="grant"
-                class="rounded-chip border border-border px-2 py-0.5 text-xs font-semibold text-muted"
-              >{{ grant }}</span>
-              <span
-                v-if="card.grants.length === 0"
-                class="rounded-chip border border-border px-2 py-0.5 text-xs font-semibold text-muted"
-              >Read only</span>
-            </div>
-
-            <div class="mt-auto flex flex-col gap-1">
-              <p v-if="card.repository" class="m-0 truncate font-mono text-xs text-muted" :title="card.repository">
-                {{ card.repository }}
-              </p>
-              <p class="m-0 flex items-center justify-between gap-2 text-sm text-muted">
-                <span>{{ card.summary }}</span>
-                <AppIcon
-                  name="arrow-right"
-                  :size="16"
-                  class="text-accent opacity-0 transition-opacity group-hover:opacity-100"
-                />
-              </p>
-            </div>
-          </div>
-        </AppCard>
-      </li>
-    </ul>
+        </li>
+      </ul>
+    </template>
   </section>
 </template>

@@ -1,0 +1,40 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
+import type { SealedSecretDetail } from '@/types'
+
+// Renders the ciphertext rather than editing it: every write travels as a batch of mutations, which a free-text YAML box cannot express.
+const props = defineProps<{ detail: SealedSecretDetail }>()
+
+const yaml = computed(() => props.detail.sealed_secret_yaml || props.detail.yaml || '')
+const copied = ref(false)
+
+// The clipboard is not always granted, and a copy button that silently does nothing is worse than no button.
+async function copy() {
+  try {
+    await navigator.clipboard.writeText(yaml.value)
+    copied.value = true
+  } catch {
+    copied.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="flex flex-col gap-2">
+    <p class="m-0 text-sm text-muted">
+      Read-only. Edits are staged as key changes, then reviewed as ciphertext before anything is written.
+    </p>
+    <pre class="m-0 max-h-[32rem] overflow-auto rounded-card-inner border border-border bg-surface-raised/70 p-3 text-xs leading-relaxed"><code class="font-mono whitespace-pre">{{ yaml || 'The server did not return a manifest for this Secret.' }}</code></pre>
+    <div class="flex items-center gap-2">
+      <button
+        v-if="yaml"
+        type="button"
+        class="inline-flex cursor-pointer items-center gap-[5px] rounded-chip border bg-surface/70 px-2.5 py-1 text-xs font-medium transition-colors"
+        :class="copied ? 'border-success/60 text-success' : 'border-border-strong text-ink hover:border-muted'"
+        @click="copy"
+      ><AppIcon :name="copied ? 'check' : 'copy'" :size="13" />{{ copied ? 'Copied' : 'Copy YAML' }}</button>
+      <span role="status" class="text-xs text-muted">{{ copied ? 'The manifest is on the clipboard.' : '' }}</span>
+    </div>
+  </div>
+</template>
