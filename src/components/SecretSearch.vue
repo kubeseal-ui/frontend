@@ -10,6 +10,7 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 const secrets = useSecretsStore()
 const box = ref<HTMLInputElement | null>(null)
 const focused = ref(false)
+const searchShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'
 
 // A whole cross-namespace listing, so it is built on first use rather than on every page load.
 function ensureIndex() {
@@ -86,6 +87,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       v-else
       aria-hidden="true"
       class="pointer-events-none max-sm:hidden shrink-0 select-none rounded-[5px] border border-border-strong px-[5px] py-px font-mono text-[11px] text-faint"
-    >⌘K</kbd>
+    >{{ searchShortcut }}</kbd>
   </div>
 </template>
