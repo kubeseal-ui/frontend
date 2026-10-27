@@ -10,7 +10,7 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 const secrets = useSecretsStore()
 const box = ref<HTMLInputElement | null>(null)
 const focused = ref(false)
-const searchShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'
+const searchShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘ K' : 'Ctrl+K'
 
 // A whole cross-namespace listing, so it is built on first use rather than on every page load.
 function ensureIndex() {
@@ -30,7 +30,7 @@ async function focus() {
   box.value?.focus()
 }
 
-// ⌘K on a Mac, Ctrl+K elsewhere; registered on the window because the point is that it works from wherever the operator is.
+// ⌘ K on a Mac, Ctrl+K elsewhere; registered on the window because the point is that it works from wherever the operator is.
 function onKeydown(event: KeyboardEvent) {
   const combo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k'
   if (combo) {
