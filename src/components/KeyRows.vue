@@ -456,8 +456,11 @@ defineExpose({ batchProblem, showProblems, clear })
                   type="button"
                   :aria-label="multiline[stagedRowId(key)] ? `Use a one-line field for ${key}` : `Use a multi-line field for ${key}`"
                   :aria-pressed="!!multiline[stagedRowId(key)]"
-                  :class="multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-                  class="absolute right-[34px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  class="absolute right-[34px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+                  :class="[
+                    multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2',
+                    multiline[stagedRowId(key)] ? 'bg-ink text-bg' : 'bg-transparent text-muted hover:bg-surface-raised hover:text-ink',
+                  ]"
                   @click="multiline[stagedRowId(key)] = !multiline[stagedRowId(key)]"
                 ><AppIcon name="lines" :size="13" /></button>
                 <button
@@ -472,8 +475,11 @@ defineExpose({ batchProblem, showProblems, clear })
                   type="button"
                   :aria-label="peek[stagedRowId(key)] ? `Hide the replacement value for ${key}` : `Show the replacement value for ${key}`"
                   :aria-pressed="!!peek[stagedRowId(key)]"
-                  :class="multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-                  class="absolute right-1.5 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                  class="absolute right-1.5 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+                  :class="[
+                    multiline[stagedRowId(key)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2',
+                    peek[stagedRowId(key)] ? 'bg-ink text-bg' : 'bg-transparent text-muted hover:bg-surface-raised hover:text-ink',
+                  ]"
                   @click="peek[stagedRowId(key)] = !peek[stagedRowId(key)]"
                 ><AppIcon :name="peek[stagedRowId(key)] ? 'eye-off' : 'eye'" :size="13" /></button>
               </span>
@@ -533,8 +539,11 @@ defineExpose({ batchProblem, showProblems, clear })
             type="button"
             :aria-label="multiline[addedRowId(row)] ? `Use a one-line field for new key ${index + 1}` : `Use a multi-line field for new key ${index + 1}`"
             :aria-pressed="!!multiline[addedRowId(row)]"
-            :class="multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-            class="absolute right-[34px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            class="absolute right-[34px] inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+            :class="[
+              multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2',
+              multiline[addedRowId(row)] ? 'bg-ink text-bg' : 'bg-transparent text-muted hover:bg-surface-raised hover:text-ink',
+            ]"
             @click="multiline[addedRowId(row)] = !multiline[addedRowId(row)]"
           ><AppIcon name="lines" :size="13" /></button>
           <button
@@ -549,8 +558,11 @@ defineExpose({ batchProblem, showProblems, clear })
             type="button"
             :aria-label="peek[addedRowId(row)] ? `Hide the new key value ${index + 1}` : `Show the new key value ${index + 1}`"
             :aria-pressed="!!peek[addedRowId(row)]"
-            :class="multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2'"
-            class="absolute right-1.5 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+            class="absolute right-1.5 inline-flex size-6 max-sm:size-9 cursor-pointer items-center justify-center rounded-mini border-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+            :class="[
+              multiline[addedRowId(row)] ? 'top-1.5' : 'top-1/2 -translate-y-1/2',
+              peek[addedRowId(row)] ? 'bg-ink text-bg' : 'bg-transparent text-muted hover:bg-surface-raised hover:text-ink',
+            ]"
             @click="peek[addedRowId(row)] = !peek[addedRowId(row)]"
           ><AppIcon :name="peek[addedRowId(row)] ? 'eye-off' : 'eye'" :size="13" /></button>
         </span>
@@ -599,7 +611,8 @@ defineExpose({ batchProblem, showProblems, clear })
                 type="button"
                 :aria-label="peek[fullscreen.id] ? 'Hide the value' : 'Show the value'"
                 :aria-pressed="!!peek[fullscreen.id]"
-                class="inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 bg-transparent text-faint hover:text-ink"
+                class="inline-flex size-6 cursor-pointer items-center justify-center rounded-mini border-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+                :class="peek[fullscreen.id] ? 'bg-ink text-bg' : 'bg-transparent text-muted hover:bg-surface-raised hover:text-ink'"
                 @click="peek[fullscreen.id] = !peek[fullscreen.id]"
               ><AppIcon :name="peek[fullscreen.id] ? 'eye-off' : 'eye'" :size="13" /></button>
               <button

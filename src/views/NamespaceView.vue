@@ -178,10 +178,8 @@ watch(() => props.namespace, load)
           :class="
             filter === chip.value
               ? chip.tone === 'danger'
-                ? 'border-danger/50 bg-surface-raised text-danger'
-                : chip.tone === 'success'
-                  ? 'border-success/50 bg-surface-raised text-success'
-                  : 'border-muted bg-surface-raised text-ink'
+                ? 'border-danger bg-danger text-danger-ink'
+                : 'border-ink bg-ink text-bg'
               : ''
           "
           :aria-pressed="filter === chip.value"

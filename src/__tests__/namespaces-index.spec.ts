@@ -141,9 +141,12 @@ describe('the namespace index', () => {
     await buttonWith(wrapper, 'Name A–Z')!.trigger('click')
     expect(rowNames(wrapper)).toEqual(['payments', 'platform', 'search'])
     expect(buttonWith(wrapper, 'Name A–Z')!.attributes('aria-pressed')).toBe('true')
+    expect(buttonWith(wrapper, 'Name A–Z')!.classes()).toContain('bg-ink')
+    expect(buttonWith(wrapper, 'Name A–Z')!.classes()).toContain('text-bg')
 
     await buttonWith(wrapper, 'Attention')!.trigger('click')
     expect(rowNames(wrapper)).toEqual(['search', 'payments', 'platform'])
+    expect(buttonWith(wrapper, 'Attention')!.classes()).toContain('bg-ink')
   })
 
   it('shows the time of the last successful index fetch and updates it on refresh', async () => {
@@ -232,6 +235,7 @@ describe('the namespace index', () => {
 
     expect(rowNames(wrapper)).toEqual(['payments'])
     expect(buttonWith(wrapper, 'Needs attention')!.attributes('aria-pressed')).toBe('true')
+    expect(buttonWith(wrapper, 'Needs attention')!.classes()).toContain('bg-danger')
 
     await buttonWith(wrapper, 'Needs attention')!.trigger('click')
     expect(rowNames(wrapper)).toEqual(['payments', 'platform', 'search'])
@@ -243,6 +247,7 @@ describe('the namespace index', () => {
 
     await buttonWith(wrapper, 'Empty')!.trigger('click')
     expect(buttonWith(wrapper, 'Empty')!.attributes('aria-pressed')).toBe('true')
+    expect(buttonWith(wrapper, 'Empty')!.classes()).toContain('bg-danger')
     expect(rowNames(wrapper)).toEqual(['platform', 'search'])
 
     // Pressing the other one is what releases this one: nothing can be both empty and sick.

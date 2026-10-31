@@ -35,7 +35,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
         variant === 'segmented'
           ? [
               'whitespace-nowrap rounded-[6px] px-2.5 py-[3px] text-xs font-semibold',
-              modelValue === option.value ? 'bg-surface-raised text-accent' : 'text-muted',
+              modelValue === option.value ? 'bg-ink text-bg' : 'text-ink',
               disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:text-ink',
               'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent',
             ]

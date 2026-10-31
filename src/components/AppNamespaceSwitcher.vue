@@ -53,8 +53,8 @@ watch(names, async (list) => {
       class="shrink-0 rounded-mini border px-[11px] py-[5px] font-mono text-xs no-underline"
       :class="
         name === namespace
-          ? 'border-border-strong bg-surface-raised font-semibold text-accent'
-          : 'border-transparent text-muted hover:bg-surface-raised hover:text-ink'
+          ? 'border-ink bg-ink font-semibold text-bg'
+          : 'border-transparent text-ink hover:bg-surface-raised'
       "
     >{{ name }}<span
       v-if="drifted.has(name)"

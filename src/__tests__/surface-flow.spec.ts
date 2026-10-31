@@ -261,6 +261,10 @@ describe('the create path', () => {
     // The mapping's directory, rendered per namespace, marked as where a Secret lands by default.
     expect(wrapper.text()).toContain('clusters/payments')
     expect(wrapper.text()).toContain('default')
+    const strict = wrapper.find('[role="radiogroup"][aria-label="Secret scope"]')
+      .findAll('label').find((label) => label.find('input').element.checked)
+    expect(strict?.classes()).toContain('bg-ink')
+    expect(strict?.classes()).toContain('text-bg')
   })
 
   // A granted directory is where a file goes, not what it is called: joining the choice to the

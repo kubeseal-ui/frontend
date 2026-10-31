@@ -229,7 +229,7 @@ async function refresh() {
           :class="
             problemsOnly
               ? 'border-danger bg-danger text-danger-ink'
-              : 'border-border-strong bg-surface-raised text-muted hover:text-ink'
+              : 'border-border-strong bg-surface-raised text-ink hover:border-muted'
           "
           @click="toggle('problems')"
         >
@@ -243,8 +243,8 @@ async function refresh() {
           class="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-control border px-[13px] text-[13px] font-medium"
           :class="
             emptyOnly
-              ? 'border-danger bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)] text-danger'
-              : 'border-border-strong bg-surface-raised text-muted hover:text-ink'
+              ? 'border-danger bg-danger text-danger-ink'
+              : 'border-border-strong bg-surface-raised text-ink hover:border-muted'
           "
           @click="toggle('empty')"
         >
@@ -255,14 +255,14 @@ async function refresh() {
           <button
             type="button"
             class="inline-flex h-7 cursor-pointer items-center justify-center rounded-chip border-0 px-2.5 text-xs"
-            :class="sortOrder === 'attention' ? 'bg-surface text-ink' : 'bg-transparent text-muted hover:text-ink'"
+            :class="sortOrder === 'attention' ? 'bg-ink text-bg' : 'bg-transparent text-ink hover:bg-surface-raised'"
             :aria-pressed="sortOrder === 'attention'"
             @click="sortOrder = 'attention'"
           >Attention</button>
           <button
             type="button"
             class="inline-flex h-7 cursor-pointer items-center justify-center rounded-chip border-0 px-2.5 text-xs"
-            :class="sortOrder === 'name' ? 'bg-surface text-ink' : 'bg-transparent text-muted hover:text-ink'"
+            :class="sortOrder === 'name' ? 'bg-ink text-bg' : 'bg-transparent text-ink hover:bg-surface-raised'"
             :aria-pressed="sortOrder === 'name'"
             @click="sortOrder = 'name'"
           >Name A–Z</button>

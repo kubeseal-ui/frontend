@@ -353,6 +353,7 @@ describe('the value being staged', () => {
 
     await show.trigger('click')
     expect(field.attributes('type')).toBe('text')
+    expect(button(wrapper, 'Hide the replacement value for password')!.classes()).toContain('bg-ink')
     // One control both ways, so the press that revealed is the press that hides.
     await button(wrapper, 'Hide the replacement value for password')!.trigger('click')
     expect(field.attributes('type')).toBe('password')
@@ -393,6 +394,8 @@ describe('the value being staged', () => {
     await flushPromises()
 
     const pem = '-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEA\n-----END OPENSSH PRIVATE KEY-----\n'
+    expect(button(wrapper, 'Use a one-line field for password')!.attributes('aria-pressed')).toBe('true')
+    expect(button(wrapper, 'Use a one-line field for password')!.classes()).toContain('bg-ink')
     await wrapper.find('textarea[aria-label="Replacement value for password"]').setValue(pem)
 
     expect(batch(wrapper)).toEqual([{ key: 'password', operation: 'replace', value: pem }])

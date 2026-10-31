@@ -92,6 +92,19 @@ describe('the namespace ledger', () => {
     expect(scoped).toHaveLength(1)
   })
 
+  it('keeps the active namespace visibly distinct in the namespace switcher', async () => {
+    useSecretsStore(pinia).namespaces = [
+      { name: 'payments', capabilities: [] },
+      { name: 'platform', capabilities: [] },
+    ]
+    const { wrapper } = await mountNamespaceView()
+
+    const active = wrapper.find('nav[aria-label="Namespaces"] [aria-current="page"]')
+    expect(active.exists()).toBe(true)
+    expect(active.classes()).toContain('bg-ink')
+    expect(active.classes()).toContain('text-bg')
+  })
+
   it('forces a re-fetch on Refresh, where the cached listing would not reload', async () => {
     const { wrapper, get } = await mountNamespaceView()
     const scoped = () => get.mock.calls.filter(([path]) => String(path).includes('namespace=payments')).length
@@ -160,6 +173,7 @@ describe('the namespace ledger', () => {
 
     expect(rowNames(wrapper)).toEqual(['cache', 'events', 'queue'])
     expect(chip(wrapper, 'Out of sync')!.attributes('aria-pressed')).toBe('true')
+    expect(chip(wrapper, 'Out of sync')!.classes()).toContain('bg-danger')
     expect(chip(wrapper, 'All')!.attributes('aria-pressed')).toBe('false')
     expect(chipCount(wrapper, 'Out of sync')).toBe('3')
   })
@@ -170,6 +184,7 @@ describe('the namespace ledger', () => {
     await chip(wrapper, 'In sync')!.trigger('click')
 
     expect(rowNames(wrapper)).toEqual(['api', 'billing', 'db'])
+    expect(chip(wrapper, 'In sync')!.classes()).toContain('bg-ink')
   })
 
   it('returns to every Secret when the filter is cleared', async () => {
