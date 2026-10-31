@@ -57,7 +57,7 @@ export function contrast(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-const textPairs = ['--app-ink', '--app-muted', '--app-accent', '--app-danger', '--app-success']
+const textPairs = ['--app-ink', '--app-muted', '--app-accent', '--app-danger', '--app-success', '--app-info']
 const themes = [
   { name: 'light', values: light },
   { name: 'dark', values: dark },
@@ -110,6 +110,11 @@ describe('theme token contrast', () => {
           expect(ratio, `${token} on ${surface} in ${theme.name}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
         }
       }
+    })
+
+    it(`keeps the danger chip text at AA or better in the ${theme.name} theme`, () => {
+      expect(contrast(theme.values['--app-danger-ink'], theme.values['--app-danger']))
+        .toBeGreaterThanOrEqual(4.5)
     })
 
     it(`keeps the focus indicator at 3:1 or better in the ${theme.name} theme`, () => {

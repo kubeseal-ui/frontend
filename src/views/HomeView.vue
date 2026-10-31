@@ -190,7 +190,7 @@ async function refresh() {
           class="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-control border px-[13px] text-[13px] font-medium"
           :class="
             problemsOnly
-              ? 'border-danger bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)] text-danger'
+              ? 'border-danger bg-danger text-danger-ink'
               : 'border-border-strong bg-surface-raised text-muted hover:text-ink'
           "
           @click="toggle('problems')"

@@ -20,8 +20,8 @@ const props = withDefaults(
 
 const VARIANTS: Record<string, string> = {
   // `text-accent-ink`, not a fixed white: the accent is dark on light and pale on dark, so the readable foreground inverts with it.
-  primary: 'border-transparent bg-accent font-semibold text-accent-ink hover:brightness-110',
-  secondary: 'border-border-strong bg-surface-raised font-[550] text-ink hover:border-muted',
+  primary: 'border-transparent bg-accent font-semibold text-accent-ink hover:brightness-95',
+  secondary: 'border-border-strong bg-surface font-[550] text-ink hover:bg-surface-raised hover:border-muted',
   ghost: 'border-transparent bg-transparent font-[550] text-accent hover:bg-surface-raised',
 }
 

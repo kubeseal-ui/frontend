@@ -3,63 +3,66 @@
 /* Light palette, and it must stay the first block: theme-contrast.spec.ts and palette.spec.ts find it by index-of over the raw text, so neither marker may appear earlier. --app-faint is decorative only (below AA on purpose); --app-accent-ink is the readable colour on the accent. */
 :root, :root[data-theme="light"] {
   color-scheme: light;
-  --app-bg: #f4f6fb;
+  --app-bg: #f4f4f3;
   --app-surface: #ffffff;
-  --app-surface-raised: #eef1f8;
-  --app-ink: #12151c;
-  --app-muted: #5a6478;
-  --app-faint: #6a7488;
-  --app-border: #dde3ee;
-  --app-border-strong: #c3ccdd;
-  --app-accent: #3b4fd8;
+  --app-surface-raised: #ededeb;
+  --app-ink: #171717;
+  --app-muted: #525252;
+  --app-faint: #737373;
+  --app-border: #dedede;
+  --app-border-strong: #a8a8a8;
+  --app-accent: #262626;
   --app-accent-ink: #ffffff;
-  --app-danger: #c62f26;
-  --app-success: #0d7a48;
-  --app-warning: #8a5300;
-  --app-info: #1c5fc4;
-  --app-focus: #3b4fd8;
+  --app-danger: #c00016;
+  --app-danger-ink: #ffffff;
+  --app-success: #007a3d;
+  --app-warning: #5a5a5a;
+  --app-info: #0057e7;
+  --app-focus: #171717;
 }
 
 /* Dark palette, media form: theme-contrast.spec.ts requires exactly one rule wrapping one root rule, nothing before the selector and no nesting. --app-surface-raised is a step toward the page in both themes. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --app-bg: #0b0e15;
-    --app-surface: #141922;
-    --app-surface-raised: #1b2130;
-    --app-ink: #e9eef7;
-    --app-muted: #96a3b8;
-    --app-faint: #78849a;
-    --app-border: #242c3b;
-    --app-border-strong: #333d51;
-    --app-accent: #7f95ff;
-    --app-accent-ink: #0b0e15;
-    --app-danger: #ff7a70;
-    --app-success: #5fd8a0;
-    --app-warning: #f3b95f;
-    --app-info: #6fb6ff;
-    --app-focus: #7f95ff;
+    --app-bg: #141414;
+    --app-surface: #1e1e1e;
+    --app-surface-raised: #292929;
+    --app-ink: #f5f5f5;
+    --app-muted: #c2c2c2;
+    --app-faint: #a3a3a3;
+    --app-border: #3b3b3b;
+    --app-border-strong: #5f5f5f;
+    --app-accent: #e5e5e5;
+    --app-accent-ink: #171717;
+    --app-danger: #ff5733;
+    --app-danger-ink: #1e1e1e;
+    --app-success: #21d07a;
+    --app-warning: #d1d1d1;
+    --app-info: #4d9dff;
+    --app-focus: #e5e5e5;
   }
 }
 
 /* Dark palette, explicit-choice form: a stored preference cannot live inside a media rule, so palette.spec.ts pins this copy identical to the one above. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --app-bg: #0b0e15;
-  --app-surface: #141922;
-  --app-surface-raised: #1b2130;
-  --app-ink: #e9eef7;
-  --app-muted: #96a3b8;
-  --app-faint: #78849a;
-  --app-border: #242c3b;
-  --app-border-strong: #333d51;
-  --app-accent: #7f95ff;
-  --app-accent-ink: #0b0e15;
-  --app-danger: #ff7a70;
-  --app-success: #5fd8a0;
-  --app-warning: #f3b95f;
-  --app-info: #6fb6ff;
-  --app-focus: #7f95ff;
+  --app-bg: #141414;
+  --app-surface: #1e1e1e;
+  --app-surface-raised: #292929;
+  --app-ink: #f5f5f5;
+  --app-muted: #c2c2c2;
+  --app-faint: #a3a3a3;
+  --app-border: #3b3b3b;
+  --app-border-strong: #5f5f5f;
+  --app-accent: #e5e5e5;
+  --app-accent-ink: #171717;
+  --app-danger: #ff5733;
+  --app-danger-ink: #1e1e1e;
+  --app-success: #21d07a;
+  --app-warning: #d1d1d1;
+  --app-info: #4d9dff;
+  --app-focus: #e5e5e5;
 }
 
 /* Bridge runtime tokens into Tailwind's colour namespace; the light palette stays unlayered because unlayered CSS outranks Tailwind's layers before specificity is consulted. */
@@ -75,6 +78,7 @@
   --color-accent: var(--app-accent);
   --color-accent-ink: var(--app-accent-ink);
   --color-danger: var(--app-danger);
+  --color-danger-ink: var(--app-danger-ink);
   --color-success: var(--app-success);
   --color-warning: var(--app-warning);
   --color-info: var(--app-info);
