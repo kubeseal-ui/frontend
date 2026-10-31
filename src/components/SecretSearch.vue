@@ -86,7 +86,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <kbd
       v-else
       aria-hidden="true"
-      class="pointer-events-none max-sm:hidden shrink-0 select-none rounded-[5px] border border-border-strong px-[5px] py-px font-mono text-[11px] text-faint"
+      class="pointer-events-none max-sm:hidden inline-flex min-h-9 min-w-[52px] shrink-0 select-none items-center justify-center rounded-[7px] border border-border-strong bg-surface-raised px-2 font-mono text-[13px] font-medium leading-none text-ink"
     >{{ searchShortcut }}</kbd>
   </div>
 </template>
