@@ -31,7 +31,7 @@ const canConceal = typeof CSS !== 'undefined' && typeof CSS.supports === 'functi
 /** The mask is for a value, not the field: an empty box rendered as dots reads as one that already holds something. */
 const concealed = (id: string, value: string | undefined) => Boolean(multiline[id]) && canConceal && !peek[id] && Boolean(value)
 /** The field opened to fill the screen; the closures edit the same string the row holds, and a null `set` is read-only (a revealed value). */
-const fullscreen = ref<{ id: string; label: string; get: () => string; set: ((value: string) => void) | null } | null>(null)
+const fullscreen = ref<{ id: string; label: string; get: () => string; set: ((_value: string) => void) | null } | null>(null)
 const fullscreenValue = computed({
   get: () => fullscreen.value?.get() ?? '',
   set: (value: string) => { fullscreen.value?.set?.(value) },
@@ -40,7 +40,7 @@ const overlay = ref<HTMLElement | null>(null)
 const fullscreenInput = ref<HTMLTextAreaElement | null>(null)
 let fullscreenReturn: HTMLElement | null = null
 
-async function openFullscreen(id: string, label: string, get: () => string, set: ((value: string) => void) | null) {
+async function openFullscreen(id: string, label: string, get: () => string, set: ((_value: string) => void) | null) {
   fullscreenReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null
   fullscreen.value = { id, label, get, set }
   await nextTick()
