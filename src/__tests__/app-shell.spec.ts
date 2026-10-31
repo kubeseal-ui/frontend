@@ -176,14 +176,14 @@ describe('app shell', () => {
 
     const pressed = () => wrapper.findAll('[aria-pressed]').filter((option) => option.attributes('aria-pressed') === 'true')
     expect(pressed().map((option) => option.attributes('aria-label'))).toEqual(['Dark'])
-    expect(pressed()[0]!.classes()).toContain('bg-accent')
-    expect(pressed()[0]!.classes()).toContain('text-accent-ink')
+    expect(pressed()[0]!.classes()).toContain('bg-ink')
+    expect(pressed()[0]!.classes()).toContain('text-bg')
 
     await wrapper.findAll('[aria-pressed]').find((option) => option.attributes('aria-label') === 'Light')!.trigger('click')
 
     expect(ui.themePreference).toBe('light')
     expect(pressed().map((option) => option.attributes('aria-label'))).toEqual(['Light'])
-    expect(pressed()[0]!.classes()).toContain('bg-accent')
+    expect(pressed()[0]!.classes()).toContain('bg-ink')
   })
 
   it('offers a skip link to the main region it renders', () => {
