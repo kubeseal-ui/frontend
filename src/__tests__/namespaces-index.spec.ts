@@ -14,6 +14,7 @@ import { api } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import HomeView from '@/views/HomeView.vue'
+import { formatRelativeUpdate } from '@/utils/format'
 import type { Capability, GitState, Namespace, NamespaceGitPaths, SealedSecretSummary } from '@/types'
 
 const FLEET: Namespace[] = [
@@ -151,7 +152,9 @@ describe('the namespace index', () => {
     const checked = () => wrapper.find('time')
 
     expect(checked().exists()).toBe(true)
-    expect(wrapper.text()).toContain('Last checked')
+    expect(wrapper.text()).toContain('Updated just now')
+    expect(checked().attributes('title')).toBe(`Updated ${new Date(1_000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
+    expect(checked().attributes('aria-label')).toBe(checked().attributes('title'))
     expect(checked().attributes('datetime')).toBe(new Date(1_000).toISOString())
 
     vi.mocked(Date.now).mockReturnValue(2_000)
@@ -159,6 +162,16 @@ describe('the namespace index', () => {
     await flushPromises()
 
     expect(checked().attributes('datetime')).toBe(new Date(2_000).toISOString())
+  })
+
+  it('formats refresh age as a compact relative time', () => {
+    const updatedAt = 1_000_000
+
+    expect(formatRelativeUpdate(updatedAt, updatedAt + 59_000)).toBe('just now')
+    expect(formatRelativeUpdate(updatedAt, updatedAt + 60_000)).toBe('1 min ago')
+    expect(formatRelativeUpdate(updatedAt, updatedAt + 3_600_000)).toBe('1 hr ago')
+    expect(formatRelativeUpdate(updatedAt, updatedAt + 86_400_000)).toBe('1 day ago')
+    expect(formatRelativeUpdate(updatedAt, updatedAt - 10_000)).toBe('just now')
   })
 
   it('leaves the tiles their names and their tally', async () => {

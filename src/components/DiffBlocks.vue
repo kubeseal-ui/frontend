@@ -125,27 +125,27 @@ const TONES: Record<DiffRow['lk'], string> = { same: 'text-faint', add: 'text-su
       </Transition>
     </span>
     <div
-      class="grid max-sm:grid-cols-1 overflow-hidden rounded-[10px] border border-border bg-border"
-      :class="paired ? 'grid-cols-2 gap-px' : ''"
+      class="overflow-hidden rounded-[10px] border border-border bg-surface"
+      :class="paired ? 'grid grid-cols-2 max-sm:grid-cols-1' : ''"
     >
       <template v-if="paired">
-        <div class="bg-surface px-[13px] pt-[10px] font-sans text-[11px] font-semibold text-muted">{{ beforeHeading }}</div>
-        <div class="bg-surface px-[13px] pt-[10px] font-sans text-[11px] font-semibold text-muted">{{ afterHeading }}</div>
+        <div class="border-b border-border px-[13px] pt-[10px] pb-2 font-sans text-[11px] font-semibold text-muted">{{ beforeHeading }}</div>
+        <div class="border-b border-l border-border px-[13px] pt-[10px] pb-2 font-sans text-[11px] font-semibold text-muted max-sm:border-l-0">{{ afterHeading }}</div>
         <template v-for="(group, groupIndex) in rowGroups" :key="groupIndex">
           <template v-if="group.kind === 'rows'">
             <template v-for="(row, rowIndex) in group.rows" :key="`${groupIndex}-${rowIndex}`">
-              <div class="max-sm:break-all bg-surface px-[13px] font-mono text-[11.5px] leading-[1.85]" :class="TONES[row.lk]">{{ row.left }}</div>
-              <div class="max-sm:break-all bg-surface px-[13px] font-mono text-[11.5px] leading-[1.85]" :class="TONES[row.rk]">{{ row.right }}</div>
+              <div class="min-w-0 max-sm:break-all px-[13px] font-mono text-[11.5px] leading-[1.85]" :class="TONES[row.lk]">{{ row.left }}</div>
+              <div class="min-w-0 max-sm:break-all border-l border-border px-[13px] font-mono text-[11.5px] leading-[1.85] max-sm:border-l-0" :class="TONES[row.rk]">{{ row.right }}</div>
             </template>
           </template>
           <template v-else-if="group.expanded">
             <template v-for="(row, rowIndex) in group.rows" :key="`${group.id}-${rowIndex}`">
-              <div class="max-sm:break-all bg-surface px-[13px] font-mono text-[11.5px] leading-[1.85]" :class="TONES[row.lk]">{{ row.left }}</div>
-              <div class="max-sm:break-all bg-surface px-[13px] font-mono text-[11.5px] leading-[1.85]" :class="TONES[row.rk]">{{ row.right }}</div>
+              <div class="min-w-0 max-sm:break-all px-[13px] font-mono text-[11.5px] leading-[1.85]" :class="TONES[row.lk]">{{ row.left }}</div>
+              <div class="min-w-0 max-sm:break-all border-l border-border px-[13px] font-mono text-[11.5px] leading-[1.85] max-sm:border-l-0" :class="TONES[row.rk]">{{ row.right }}</div>
             </template>
             <button
               type="button"
-              class="col-span-2 max-sm:col-span-1 cursor-pointer border-0 bg-surface-raised px-3 py-1.5 text-left text-[11px] font-medium text-muted hover:text-ink"
+              class="col-span-2 max-sm:col-span-1 cursor-pointer border-0 border-t border-border bg-surface-raised px-3 py-1.5 text-left text-[11px] font-medium text-muted hover:text-ink"
               :aria-expanded="true"
               @click="toggleGroup(group.id)"
             >Hide {{ group.rows.length }} unchanged lines</button>
@@ -153,13 +153,13 @@ const TONES: Record<DiffRow['lk'], string> = { same: 'text-faint', add: 'text-su
           <button
             v-else
             type="button"
-            class="col-span-2 max-sm:col-span-1 cursor-pointer border-0 bg-surface-raised px-3 py-1.5 text-left text-[11px] font-medium text-muted hover:text-ink"
+            class="col-span-2 max-sm:col-span-1 cursor-pointer border-0 border-t border-border bg-surface-raised px-3 py-1.5 text-left text-[11px] font-medium text-muted hover:text-ink"
             :aria-expanded="false"
             @click="toggleGroup(group.id)"
           >Show {{ group.rows.length }} unchanged lines</button>
         </template>
       </template>
-      <div v-else class="col-span-2 max-sm:col-span-1 max-sm:break-all bg-surface px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
+      <div v-else class="max-sm:break-all px-[13px] py-[10px] font-mono text-[11.5px] leading-[1.85]">
         <div v-for="(row, index) in rows" :key="`a${index}`" :class="TONES[row.rk]">{{ row.right }}</div>
       </div>
     </div>

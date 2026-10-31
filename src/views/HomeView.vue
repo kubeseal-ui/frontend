@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppAlert from '@/components/ui/AppAlert.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -12,7 +12,7 @@ import { describeError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSecretsStore } from '@/stores/secrets'
 import { grantLabels } from '@/utils/capabilities'
-import { countLabel } from '@/utils/format'
+import { countLabel, formatRelativeUpdate } from '@/utils/format'
 
 const secrets = useSecretsStore()
 const auth = useAuthStore()
@@ -117,6 +117,11 @@ const lastCheckedTime = computed(() => {
     : new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 })
 
+const now = ref(Date.now())
+const lastCheckedRelative = computed(() =>
+  secrets.indexFetchedAt === null ? '' : formatRelativeUpdate(secrets.indexFetchedAt, now.value),
+)
+
 const lastCheckedDate = computed(() =>
   secrets.indexFetchedAt === null ? '' : new Date(secrets.indexFetchedAt).toISOString(),
 )
@@ -146,7 +151,9 @@ function toggle(which: 'problems' | 'empty') {
   problemsOnly.value = false
 }
 
+let relativeTimeInterval: number | undefined
 onMounted(async () => {
+  relativeTimeInterval = window.setInterval(() => { now.value = Date.now() }, 60_000)
   await Promise.all([
     // Reported through the store, which the error branch renders; catching here only stops an unhandled rejection.
     secrets.namespaces.length === 0 ? secrets.fetchNamespaces().catch(() => {}) : Promise.resolve(),
@@ -155,6 +162,9 @@ onMounted(async () => {
   ])
   // Off the critical path and never awaited: the tiles render from the namespace listing and pick up their counts when this lands.
   if (!secrets.indexLoaded && !secrets.indexLoading) secrets.fetchIndex().catch(() => {})
+})
+onUnmounted(() => {
+  if (relativeTimeInterval !== undefined) window.clearInterval(relativeTimeInterval)
 })
 
 // Refresh re-fetches everything the page renders from: counts and drift come from the index, so refreshing namespaces alone looked dead.
@@ -180,7 +190,12 @@ async function refresh() {
       <template v-if="hasContext" #context><span v-if="grantClause">{{ grantClause }}<template v-if="shared.repository">, </template></span><span v-if="shared.repository">delivering to <span class="font-mono text-muted">{{ shared.repository }}</span></span></template>
       <template #actions>
         <span v-if="lastCheckedTime" class="whitespace-nowrap text-[11px] text-muted">
-          Last checked <time :datetime="lastCheckedDate">{{ lastCheckedTime }}</time>
+          Updated
+          <time
+            :datetime="lastCheckedDate"
+            :title="`Updated ${lastCheckedTime}`"
+            :aria-label="`Updated ${lastCheckedTime}`"
+          >{{ lastCheckedRelative }}</time>
         </span>
         <AppButton icon="refresh" :loading="refreshing" @click="refresh">Refresh</AppButton>
       </template>
