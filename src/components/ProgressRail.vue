@@ -6,7 +6,7 @@ const emit = defineEmits<{ navigate: [key: string] }>()
 
 <template>
   <!-- On a phone the stops size to content and scroll sideways rather than wrapping into two half-steps. -->
-  <nav aria-label="Workflow progress" class="flex w-max max-w-full items-center overflow-x-auto no-scrollbar">
+  <nav aria-label="Workflow progress" class="-mx-1 -my-1 flex w-max max-w-full items-center overflow-x-auto px-1 py-1 no-scrollbar">
     <template v-for="(step, i) in steps" :key="step.key">
       <span
         v-if="i"

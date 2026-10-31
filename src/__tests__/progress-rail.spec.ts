@@ -19,6 +19,12 @@ function rail(active: number, steps = STEPS) {
 describe('the workflow rail', () => {
   it('wipes the connector in rather than swapping its colour', () => {
     const first = rail(0)
+    const nav = first.find('nav[aria-label="Workflow progress"]')
+    expect(nav.classes()).toContain('px-1')
+    expect(nav.classes()).toContain('py-1')
+    expect(nav.classes()).toContain('-mx-1')
+    expect(nav.classes()).toContain('-my-1')
+
     const connector = first.find('.rail-bar')
     expect(connector.exists()).toBe(true)
     // Behind the operator is the only filled state; ahead of them the track is bare.

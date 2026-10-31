@@ -620,10 +620,10 @@ describe('the surface', () => {
     // ...and the active view has an inverse fill as well as an announced pressed state.
     expect(modeButton('YAML').attributes('aria-pressed')).toBe('true')
     expect(modeButton('Keys').attributes('aria-pressed')).toBe('false')
-    expect(modeButton('YAML').classes()).toContain('bg-ink')
-    expect(modeButton('YAML').classes()).toContain('text-bg')
+    expect(modeButton('YAML').attributes('style')).toContain('background-color: var(--app-ink)')
+    expect(modeButton('YAML').attributes('style')).toContain('color: var(--app-bg)')
     expect(modeButton('Keys').classes()).toContain('text-ink')
-    expect(modeButton('Keys').classes()).not.toContain('bg-ink')
+    expect(modeButton('Keys').attributes('style')).toBeUndefined()
     expect(wrapper.find('[role="group"][aria-label="Secret view"]').text()).toContain('View')
     expect(wrapper.text()).toContain('Copy YAML')
     expect(refetches()).toBe(reads)

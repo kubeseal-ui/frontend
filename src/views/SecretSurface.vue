@@ -367,7 +367,8 @@ watch([() => route.params.namespace, () => route.params.name], load)
                   :key="option"
                   type="button"
                   class="h-[30px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  :class="mode === option ? 'bg-ink text-bg' : 'text-ink hover:bg-surface-raised'"
+                  :class="mode === option ? '' : 'text-ink hover:bg-surface-raised'"
+                  :style="mode === option ? { backgroundColor: 'var(--app-ink)', color: 'var(--app-bg)' } : undefined"
                   :aria-pressed="mode === option"
                   @click="setMode(option)"
                 >{{ option === 'rows' ? 'Keys' : 'YAML' }}</button>
