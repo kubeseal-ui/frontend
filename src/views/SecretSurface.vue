@@ -358,15 +358,16 @@ watch([() => route.params.namespace, () => route.params.name], load)
 
           <!-- Hidden while a diff or confirmation is the task; both editors stay mounted (v-show) so a staged batch survives review and back. -->
           <div v-show="composing">
-            <!-- Pressed buttons, so the state is announced and never colour alone. -->
-            <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Document mode">
+            <!-- The selected view uses the inverse accent so it stays obvious in both themes. -->
+            <div class="flex items-center gap-2 border-b border-border pb-3" role="group" aria-label="Secret view">
+              <span class="text-xs font-medium text-muted">View</span>
               <span class="flex max-sm:gap-2 gap-[3px] rounded-control border border-border bg-surface p-[3px]">
                 <button
                   v-for="option in (['rows', 'yaml'] as const)"
                   :key="option"
                   type="button"
-                  class="h-[26px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold"
-                  :class="mode === option ? 'bg-surface-raised text-accent' : 'text-muted hover:text-ink'"
+                  class="h-[30px] cursor-pointer rounded-chip border-0 bg-transparent px-3 text-[12.5px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  :class="mode === option ? 'bg-accent text-accent-ink' : 'text-muted hover:bg-surface-raised hover:text-ink'"
                   :aria-pressed="mode === option"
                   @click="setMode(option)"
                 >{{ option === 'rows' ? 'Keys' : 'YAML' }}</button>

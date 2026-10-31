@@ -102,11 +102,11 @@ async function logout() {
             type="button"
             :aria-label="theme.label"
             :title="theme.label"
-            class="inline-flex h-6 w-[26px] max-sm:h-9 max-sm:w-9 cursor-pointer items-center justify-center rounded-chip border-0"
+            class="inline-flex h-6 w-[26px] max-sm:h-9 max-sm:w-9 cursor-pointer items-center justify-center rounded-chip border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             :class="
               ui.themePreference === theme.value
-                ? 'bg-surface-raised text-accent'
-                : 'bg-transparent text-faint hover:text-ink'
+                ? 'bg-accent text-accent-ink'
+                : 'bg-transparent text-muted hover:bg-surface-raised hover:text-ink'
             "
             :aria-pressed="ui.themePreference === theme.value"
             @click="ui.setThemePreference(theme.value)"

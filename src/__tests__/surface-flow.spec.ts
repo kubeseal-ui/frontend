@@ -613,9 +613,13 @@ describe('the surface', () => {
 
     // The mode is a query parameter, so a reload lands where the operator was...
     expect(router.currentRoute.value.query.mode).toBe('yaml')
-    // ...and both buttons announce which one is pressed rather than showing it in colour alone.
+    // ...and the active view has a high-contrast inverse fill as well as an announced pressed state.
     expect(modeButton('YAML').attributes('aria-pressed')).toBe('true')
     expect(modeButton('Keys').attributes('aria-pressed')).toBe('false')
+    expect(modeButton('YAML').classes()).toContain('bg-accent')
+    expect(modeButton('YAML').classes()).toContain('text-accent-ink')
+    expect(modeButton('Keys').classes()).not.toContain('bg-accent')
+    expect(wrapper.find('[role="group"][aria-label="Secret view"]').text()).toContain('View')
     expect(wrapper.text()).toContain('Copy YAML')
     expect(refetches()).toBe(reads)
   })
