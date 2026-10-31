@@ -126,6 +126,41 @@ describe('the namespace index', () => {
     expect(indexCalls()).toBeGreaterThan(before)
   })
 
+  it('sorts drifted namespaces first and offers alphabetical order', async () => {
+    const index = [
+      entry('search', 'crawler', 'diverged'),
+      entry('payments', 'api', 'in-sync'),
+      entry('platform', 'database-urls', 'in-sync'),
+    ]
+    const wrapper = await mountIndex([WILDCARD], FLEET, index)
+
+    expect(rowNames(wrapper)).toEqual(['search', 'payments', 'platform'])
+    expect(wrapper.find('[role="group"][aria-label="Namespace sort order"]').exists()).toBe(true)
+
+    await buttonWith(wrapper, 'Name A–Z')!.trigger('click')
+    expect(rowNames(wrapper)).toEqual(['payments', 'platform', 'search'])
+    expect(buttonWith(wrapper, 'Name A–Z')!.attributes('aria-pressed')).toBe('true')
+
+    await buttonWith(wrapper, 'Attention')!.trigger('click')
+    expect(rowNames(wrapper)).toEqual(['search', 'payments', 'platform'])
+  })
+
+  it('shows the time of the last successful index fetch and updates it on refresh', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const wrapper = await mountIndex()
+    const checked = () => wrapper.find('time')
+
+    expect(checked().exists()).toBe(true)
+    expect(wrapper.text()).toContain('Last checked')
+    expect(checked().attributes('datetime')).toBe(new Date(1_000).toISOString())
+
+    vi.mocked(Date.now).mockReturnValue(2_000)
+    await buttonWith(wrapper, 'Refresh')!.trigger('click')
+    await flushPromises()
+
+    expect(checked().attributes('datetime')).toBe(new Date(2_000).toISOString())
+  })
+
   it('leaves the tiles their names and their tally', async () => {
     const wrapper = await mountIndex()
 

@@ -156,7 +156,10 @@ async function logout() {
     </header>
 
     <!-- No horizontal padding: sections own their gutter through `page-x`, so a full-bleed row can reach its keyline and a phone narrows the gutter in one place. -->
-    <div class="mx-auto w-[min(1320px,100%)] pb-16">
+    <div
+      class="mx-auto pb-16"
+      :class="route.name === 'home' || route.name === 'namespaces' ? 'w-[min(1600px,100%)]' : 'w-[min(1320px,100%)]'"
+    >
       <main id="main-content" class="min-w-0">
         <SearchResults v-if="searching" :query="query" />
         <div v-show="!searching"><slot /></div>

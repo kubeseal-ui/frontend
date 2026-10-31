@@ -20,7 +20,7 @@ function testRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/', component: { template: '<div />' } },
+      { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/signed-out', component: { template: '<div />' } },
     ],
   })
@@ -192,6 +192,14 @@ describe('app shell', () => {
     const main = wrapper.find('main#main-content')
     expect(main.exists()).toBe(true)
     expect(main.text()).toContain('route content')
+  })
+
+  it('gives the namespaces page additional room for its tiles', async () => {
+    const wrapper = mountShell()
+    await flushPromises()
+
+    expect(wrapper.find('#main-content').element.parentElement?.classList.contains('w-[min(1600px,100%)]'))
+      .toBe(true)
   })
 
   it('puts the search in the strip rather than behind a drawer', () => {

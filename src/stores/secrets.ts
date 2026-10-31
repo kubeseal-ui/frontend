@@ -40,6 +40,7 @@ export const useSecretsStore = defineStore('secrets', {
     // The strip's search index, one cross-namespace listing; names, key names, scope and drift only — nothing decrypted — so it survives clearSensitiveState() and a route change.
     index: [] as SealedSecretSummary[],
     indexLoaded: false,
+    indexFetchedAt: null as number | null,
     // Read by the results panel too: while the index is in flight a query has no matches *yet*, and "No Secret or key matches." would be an answer it cannot give.
     indexLoading: false,
     indexError: null as Error | null,
@@ -73,6 +74,7 @@ export const useSecretsStore = defineStore('secrets', {
         const response = await api.get<ListResponse<SealedSecretSummary>>('/api/v1/secrets')
         this.index = response.data.secrets || []
         this.indexLoaded = true
+        this.indexFetchedAt = Date.now()
         return this.index
       } catch (error) {
         this.indexError = error instanceof Error ? error : new Error('Failed to load secrets')

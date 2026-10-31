@@ -30,6 +30,7 @@ function sharedString(values: string[]): string | null {
 
 const problemsOnly = ref(false)
 const emptyOnly = ref(false)
+const sortOrder = ref<'attention' | 'name'>('attention')
 
 // Per-namespace tallies from the one cross-namespace listing; GET /namespaces carries no secret count and no drift at all.
 const fleet = computed(() => {
@@ -109,11 +110,30 @@ const facts = computed<Fact[]>(() => {
   return items
 })
 
-// The two toggles name disjoint sets, so both at once can only ever be empty.
+const lastCheckedTime = computed(() => {
+  const timestamp = secrets.indexFetchedAt
+  return timestamp === null
+    ? ''
+    : new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+})
+
+const lastCheckedDate = computed(() =>
+  secrets.indexFetchedAt === null ? '' : new Date(secrets.indexFetchedAt).toISOString(),
+)
+
+// The two filters name disjoint sets; ordering applies consistently to the filtered and full list.
 const visibleRows = computed(() => {
-  if (problemsOnly.value) return rows.value.filter((row) => row.outOfSync > 0)
-  if (emptyOnly.value) return rows.value.filter((row) => row.total === 0)
-  return rows.value
+  const filtered = problemsOnly.value
+    ? rows.value.filter((row) => row.outOfSync > 0)
+    : emptyOnly.value
+      ? rows.value.filter((row) => row.total === 0)
+      : rows.value
+
+  return [...filtered].sort((a, b) =>
+    sortOrder.value === 'attention'
+      ? b.outOfSync - a.outOfSync || a.name.localeCompare(b.name)
+      : a.name.localeCompare(b.name),
+  )
 })
 
 function toggle(which: 'problems' | 'empty') {
@@ -159,6 +179,9 @@ async function refresh() {
     <AppPageHeader title="Namespaces" title-id="page-title" :facts="facts">
       <template v-if="hasContext" #context><span v-if="grantClause">{{ grantClause }}<template v-if="shared.repository">, </template></span><span v-if="shared.repository">delivering to <span class="font-mono text-muted">{{ shared.repository }}</span></span></template>
       <template #actions>
+        <span v-if="lastCheckedTime" class="whitespace-nowrap text-[11px] text-muted">
+          Last checked <time :datetime="lastCheckedDate">{{ lastCheckedTime }}</time>
+        </span>
         <AppButton icon="refresh" :loading="refreshing" @click="refresh">Refresh</AppButton>
       </template>
     </AppPageHeader>
@@ -182,9 +205,9 @@ async function refresh() {
 
     <template v-if="secrets.namespaces.length">
       <!-- Two named sets rather than a text box: "the two that are sick" is a question the fleet can answer. -->
-      <div v-if="secrets.indexLoaded && (outOfSyncTotal || emptyCount)" class="page-x flex max-sm:flex-wrap items-center gap-2.5 pt-[18px] pb-3.5">
+      <div class="page-x flex max-sm:flex-wrap items-center gap-2.5 pt-[18px] pb-3.5">
         <button
-          v-if="outOfSyncTotal"
+          v-if="secrets.indexLoaded && outOfSyncTotal"
           type="button"
           :aria-pressed="problemsOnly"
           class="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-control border px-[13px] text-[13px] font-medium"
@@ -199,7 +222,7 @@ async function refresh() {
           Needs attention <span class="font-mono">{{ outOfSyncTotal }}</span>
         </button>
         <button
-          v-if="emptyCount"
+          v-if="secrets.indexLoaded && emptyCount"
           type="button"
           :aria-pressed="emptyOnly"
           class="inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-control border px-[13px] text-[13px] font-medium"
@@ -213,6 +236,22 @@ async function refresh() {
           <AppIcon name="database" :size="14" />
           Empty <span class="font-mono">{{ emptyCount }}</span>
         </button>
+        <div class="ml-auto flex shrink-0 items-center gap-[2px] rounded-control border border-border bg-bg p-[3px]" role="group" aria-label="Namespace sort order">
+          <button
+            type="button"
+            class="inline-flex h-7 cursor-pointer items-center justify-center rounded-chip border-0 px-2.5 text-xs"
+            :class="sortOrder === 'attention' ? 'bg-surface text-ink' : 'bg-transparent text-muted hover:text-ink'"
+            :aria-pressed="sortOrder === 'attention'"
+            @click="sortOrder = 'attention'"
+          >Attention</button>
+          <button
+            type="button"
+            class="inline-flex h-7 cursor-pointer items-center justify-center rounded-chip border-0 px-2.5 text-xs"
+            :class="sortOrder === 'name' ? 'bg-surface text-ink' : 'bg-transparent text-muted hover:text-ink'"
+            :aria-pressed="sortOrder === 'name'"
+            @click="sortOrder = 'name'"
+          >Name A–Z</button>
+        </div>
       </div>
 
       <AppEmpty

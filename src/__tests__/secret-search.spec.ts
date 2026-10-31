@@ -31,7 +31,7 @@ describe('secret search shortcut label', () => {
     setPlatform('MacIntel')
     const wrapper = mountSearch()
 
-    expect(wrapper.find('kbd').text()).toBe('⌘K')
+    expect(wrapper.find('kbd').text()).toBe('⌘ K')
     wrapper.unmount()
   })
 
