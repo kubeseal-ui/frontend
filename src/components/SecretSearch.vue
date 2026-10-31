@@ -10,7 +10,8 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 const secrets = useSecretsStore()
 const box = ref<HTMLInputElement | null>(null)
 const focused = ref(false)
-const searchShortcut = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘ K' : 'Ctrl+K'
+const isApplePlatform = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+const searchShortcut = isApplePlatform ? '⌘ K' : 'Ctrl+K'
 
 // A whole cross-namespace listing, so it is built on first use rather than on every page load.
 function ensureIndex() {
@@ -86,7 +87,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <kbd
       v-else
       aria-hidden="true"
-      class="pointer-events-none max-sm:hidden inline-flex min-h-9 min-w-[52px] shrink-0 select-none items-center justify-center rounded-[7px] border border-border-strong bg-surface-raised px-2 font-mono text-[13px] font-medium leading-none text-ink"
-    >{{ searchShortcut }}</kbd>
+      class="pointer-events-none inline-flex shrink-0 select-none items-center justify-center font-mono font-medium leading-none text-ink max-sm:hidden"
+    >
+      <template v-if="isApplePlatform">
+        <span class="text-[18px]">⌘</span>{{ ' ' }}<span class="text-[14px]">K</span>
+      </template>
+      <span v-else>{{ searchShortcut }}</span>
+    </kbd>
   </div>
 </template>

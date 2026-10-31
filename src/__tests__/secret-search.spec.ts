@@ -33,9 +33,10 @@ describe('secret search shortcut label', () => {
 
     const shortcut = wrapper.find('kbd')
     expect(shortcut.text()).toBe('⌘ K')
-    expect(shortcut.classes()).toContain('min-h-9')
-    expect(shortcut.classes()).toContain('min-w-[52px]')
-    expect(shortcut.classes()).toContain('text-[13px]')
+    expect(shortcut.classes()).not.toContain('border')
+    expect(shortcut.classes()).not.toContain('bg-surface-raised')
+    expect(shortcut.find('span').classes()).toContain('text-[18px]')
+    expect(shortcut.findAll('span')[1].classes()).toContain('text-[14px]')
     wrapper.unmount()
   })
 
